@@ -272,8 +272,8 @@ body.kbd .bwrap{min-height:0}body.kbd .arenawrap{min-height:72px}body.kbd .hpbox
 .btop button{min-height:44px}.skov .skip.sm{min-height:44px}
 .bqcard .spk,.ansline .spk{width:44px;height:44px;min-height:44px}
 .bqcard .row>.small{flex:none;white-space:nowrap}
-/* 答錯後的「下一題／繼續」：放在卡片最下面一整列，不蓋住題目 */
-.nextbtn{position:static;display:flex;width:100%;margin-top:8px;min-height:48px;font-size:17px}
+/* 答錯後的「下一題／繼續」：題目卡外面貼底的一整列（見最下面「第四批」），不蓋住題目、永遠看得到 */
+.nextbtn{position:static;display:flex;width:100%;margin-top:6px;min-height:48px;font-size:17px}
 /* 招式選單：上緣留給怪物血條、開著時收起已作答的選項，選單內不必捲動 */
 .skov{max-height:calc(100% - 62px)}
 /* 選單開著時怪物血條縮成一小條貼在最上面，選單就不會蓋到它 */
@@ -331,10 +331,11 @@ body.soulmode{background:#0a0b0e;color:#d9d4c8}
 /* 暫停（切到背景後回來） */
 .pauseov{position:fixed;inset:0;z-index:60;border:0;border-radius:0;background:rgb(8 9 12/.78);color:#fff;display:flex;flex-direction:column;gap:6px;font-size:16px;min-height:0}
 .pauseov b{font-size:24px;letter-spacing:.2em}.pauseov span{opacity:.85}
-/* 戰場最小高度（手機）：題目卡再高也留 300px 給 3D 畫面 */
-@media(max-width:600px){.arenawrap{min-height:300px}}
-/* 選項文字過長：縮字、最多兩行 */
-.bopts button .ot{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;flex:1}
+/* 戰場高度（手機）：平常至少留 300px（矮螢幕約四成高）給 3D 畫面；題目卡真的放不下時（長題、作答後多了答案列與「下一題」）戰場先縮、最小到 150px，
+   還是不夠才輪到題目卡在卡片內捲動。flex-shrink 1000＝戰場先讓。 */
+@media(max-width:600px){.arenawrap{flex:1 1000 min(300px,calc(var(--vvh,100dvh)*.38));min-height:min(150px,calc(var(--vvh,100dvh)*.22))}}
+/* 選項文字過長：縮字；還是放不下就往下多排幾行，不截斷 */
+.bopts button .ot{flex:1;min-width:0;overflow-wrap:anywhere}
 .bopts button.long{font-size:12.5px;line-height:1.2}
 /* 魂系指令列：題目卡下面的一排，不蓋戰場 */
 .cmdrow{margin-top:6px}.cmdhead{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:#7fb4ff;letter-spacing:.06em;margin-bottom:4px}.cmdhead b{font-weight:600;color:var(--ink)}
@@ -366,8 +367,11 @@ body.soulmode{background:#0a0b0e;color:#d9d4c8}
   .bwrap #bq{grid-column:2;grid-row:3;overflow-y:auto;min-height:0}
   .btop button{min-height:44px;padding-top:0;padding-bottom:0}.bprompt{font-size:20px}.bqcard{padding:8px 10px}.bopts{gap:5px;margin-top:6px}.bopts button{min-height:44px;font-size:13.5px;padding:4px 8px}
   .go{min-height:52px}.ansline{margin-top:4px}.nextbtn{min-height:44px;margin-top:6px}
-  .cmds button{min-height:44px}.skov{max-height:calc(100% - 8px);left:1%;right:1%;bottom:1%}
-  .bwrap:not(.soul).menuopen .hpbox.foe{left:auto;right:3%;top:auto;bottom:3%;z-index:5;transform:scale(.8);transform-origin:right bottom}
+  .cmds button{min-height:44px}.skov{left:1%;right:1%;bottom:1%}.bwrap.soul .skov{max-height:calc(100% - 8px)}
+  /* 題目卡在右欄：卡片內容太長時在卡片內捲，「下一題」留在欄底 */
+  .bwrap #bq{overflow:visible}
+  /* 招式選單開著：怪物血條維持貼在最上面的一小條（選單讓出上緣），不再移到右下角壓住招式鈕；訊息列在右欄，不必收起來 */
+  .bwrap.menuopen:not(.soul) .skov{max-height:calc(100% - 40px);padding:5px 8px}.bwrap.menuopen:not(.soul) .msgbox{display:block}
 }
 /* 小螢幕直式：招式選單再緊一點，開著時把訊息列收起來讓出高度 */
 @media(max-width:400px),(max-height:660px){.bwrap.menuopen:not(.soul) .msgbox{display:none}.skov .chl{display:none}.skov .skills{gap:4px}}
@@ -381,3 +385,85 @@ button.pri,.btn.pri{color:light-dark(#fff,#1d0f08)}
 @media(orientation:landscape) and (max-height:520px){.cmds button{font-size:12px;padding:3px 5px}.cmds button b{font-size:12px}.cmds button .k{display:none}.cmds button .c{font-size:9.5px}}
 /* 魂系結算頁：站台頁首也跟著變暗 */
 body:has(.soulres){background:#0a0b0e}body:has(.soulres) header{background:#0d0e11;border-color:#3d3a33;color:#d9d4c8}body:has(.soulres) header a,body:has(.soulres) header .logo{color:#d9d4c8}
+
+/* ---------- 第四批（第二輪手機試玩：打怪／回合制） ---------- */
+/* hidden 屬性一律生效（按鈕等元件的 display:flex 會蓋掉瀏覽器預設的 [hidden]{display:none}） */
+[hidden]{display:none!important}
+/* 題目區：題目卡可以縮（最後手段才在卡片內捲動）；「下一題／繼續」是卡片外面貼底的一列，任何尺寸都完整可見 */
+#bq{flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
+#bq>*{flex:none}
+#bq>.bqcard{flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* 已作答（打怪模式，以及魂系閃避題答完等「繼續」的時候）：小螢幕只留「正解」與「你選的」兩個選項，讓出高度給答案列與「下一題」 */
+@media(max-width:600px),(max-height:520px){
+  .bwrap.ans:not(.menuopen) #bopts{display:flex}
+  .bwrap.ans #bopts button{flex:1 1 0;min-width:0}
+  .bwrap.ans #bopts button:not(.right):not(.wrong){display:none}
+}
+/* 軟鍵盤彈出／很矮的直式視窗：戰場只留一小條；作答後可以讓到只剩邊框（答案列與「下一題」優先） */
+body.kbd .bwrap .arenawrap{min-height:72px}body.kbd .bwrap.ans .arenawrap{min-height:0}
+@media(orientation:portrait) and (max-height:520px){.bwrap{min-height:0}.bwrap .arenawrap{min-height:72px}.bwrap.ans .arenawrap{min-height:0}.bwrap .hpbox.me{display:none}}
+/* 連點保護：剛出題的半秒內選項還不能按，看得出來是未啟用 */
+.bopts button{transition:opacity .15s}
+.bopts.guard button{opacity:.45;filter:saturate(.35);pointer-events:none}
+/* 招式名／勝利橫幅出現時，血量框先淡出（橫幅不會被蓋住）；大招演出期間收起「你」的血量框（不擋魔王下半身） */
+.hpbox{transition:opacity .18s,bottom .2s}
+.bwrap:not(.soul) .arenawrap:has(.v3-banner) .hpbox{opacity:0}
+.bwrap.bigfx:not(.soul) .hpbox.me{opacity:0}
+/* 朗讀字幕條（戰鬥中）：放在戰場底緣，不擋上面那排按鈕與怪物名字；「你」的血量框往上讓；招式選單開著時被選單蓋住 */
+.arenawrap #cap{position:absolute;left:6px;right:6px;top:auto;bottom:6px;width:auto;max-width:none;z-index:3;transform:translateY(12px);padding:4px 10px;font-size:13px;line-height:1.3;border-width:2px;box-shadow:none;background:rgb(20 22 61/.93)}
+.arenawrap #cap.on{transform:none}
+.arenawrap #cap b{font-size:12px}
+.bwrap:not(.soul) .arenawrap:has(#cap.on) .hpbox.me{bottom:calc(var(--caph,40px) + 14px)}
+.bwrap.soul .arenawrap #cap{bottom:36px;background:rgb(6 7 10/.88);border:1px solid #6b6455;border-radius:0;color:#e3ddd0}
+body.kbd .arenawrap #cap{display:none}
+@media(orientation:portrait) and (max-height:520px){.arenawrap #cap{display:none}}
+/* 暫停遮罩：字放在不透明的小面板裡，不和底下的血量框疊字 */
+.pauseov{background:rgb(8 9 12/.84)}
+.pauseov .pbox{display:flex;flex-direction:column;align-items:center;gap:6px;background:#14163d;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 3px #14163d;padding:16px 30px}
+body.soulmode .pauseov .pbox{background:#121317;border:1px solid #6b6455;border-radius:0;box-shadow:none}
+/* 設定頁：黏底的「開始」列高度約 84px，捲動定位（scrollIntoView／鍵盤焦點）時讓選項停在它上面；頁尾留等高空白 */
+@media(max-width:600px){html:has(#start){scroll-padding-bottom:92px}.cut .body:has(>.row>#start){padding-bottom:4px}main:has(#start){padding-bottom:96px}}
+/* 橫式：訊息列在右欄，招式選單開著也照常顯示 */
+@media(orientation:landscape) and (max-height:520px){.bwrap.menuopen:not(.soul) .msgbox{display:block}}
+/* 橫式：戰場夠高，字幕條放在「你」的血量框左邊（最多四行），血量框不必往上讓、不會蓋到怪物 */
+@media(orientation:landscape) and (max-height:520px){
+  .bwrap:not(.soul) .arenawrap #cap{right:calc(3% + min(210px,44%) + 16px);font-size:12.5px}
+  .bwrap:not(.soul) .arenawrap #cap span{-webkit-line-clamp:4;line-clamp:4}
+  .bwrap:not(.soul) .arenawrap:has(#cap.on) .hpbox.me{bottom:5%}
+}
+/* 觸控裝置：招式鈕上的鍵盤數字提示收起來，招式名稱才排得進一行 */
+@media(pointer:coarse){.skov .skills .k{display:none}}
+/* 很矮的直式視窗（分割畫面等）開招式選單：題目卡只留答案列、上面那排按鈕收起來，選單用整個戰場，不必在選單裡捲動 */
+@media(orientation:portrait) and (max-height:520px){
+  .bwrap.menuopen:not(.soul) .btop{display:none}
+  .bwrap.menuopen:not(.soul) #bqc>*:not(#bans):not(.tline){display:none}
+  .bwrap.menuopen:not(.soul) #bqc{padding:6px 8px}.bwrap.menuopen:not(.soul) #bqc .ansline{margin-top:0}
+  .bwrap.menuopen:not(.soul) .skov{max-height:calc(100% - 6px);padding:5px 8px}
+  .bwrap.menuopen:not(.soul) .hpbox.foe{display:none}
+}
+/* 軟鍵盤／很矮的直式：怪物血條縮成貼頂的一小條（戰場只剩 72px 時不會被切） */
+body.kbd .bwrap:not(.soul) .hpbox.foe{top:5px;padding:3px 10px 5px}body.kbd .bwrap:not(.soul) .hpbox.foe #fhpt{display:none}
+@media(orientation:portrait) and (max-height:520px){.bwrap:not(.soul) .hpbox.foe{top:5px;padding:3px 10px 5px}.bwrap:not(.soul) .hpbox.foe #fhpt{display:none}}
+
+/* ---------- 第五批（第二輪手機試玩：魂系） ---------- */
+/* 耐力被扣：耐力條閃紅、冒出扣減數字 */
+.enb.sta{position:relative}
+.enb.sta.drain>div{animation:stadrain .7s ease-out}
+@keyframes stadrain{0%{box-shadow:0 0 0 2px #ff5a3a,0 0 14px #ff5a3a;background:#7a1c12}100%{box-shadow:0 0 0 0 transparent}}
+.stadrop{position:absolute;right:0;bottom:100%;font:800 15px/1 Lexend,sans-serif;font-style:normal;color:#ff8a70;text-shadow:0 0 6px #000,0 1px 2px #000;pointer-events:none;animation:stadrop .9s ease-out forwards}
+@keyframes stadrop{0%{transform:translateY(6px);opacity:0}15%{opacity:1}100%{transform:translateY(-16px);opacity:0}}
+/* 答案列剛出現時先不接受點擊（連點選項的第二下不會按到上面的喇叭） */
+.ansline.fresh{pointer-events:none}
+/* 指令列標題：配合暗金色調（原本是亮藍） */
+.bwrap.soul .cmdhead{color:#c9a24a}
+/* 暫停／逃跑確認框開著時把題目與選項蓋掉，不能趁暫停偷想 */
+.pauseov{background:rgb(8 9 12/.9)}
+body:has(#pauseov) #bq,body.inbattle:has(#modal:not(.hide)) #bq{filter:blur(12px);opacity:.5}
+/* 魂系：指令選單的慢動作才套冷色去飽和（出招與轉階段不套，動作要看得清楚） */
+.arena.slowmo{filter:saturate(.45) brightness(.92) contrast(1.05)}
+/* 戰鬥中的例句列（例句模式）：行距收緊，題目卡才放得進畫面 */
+.bqcard>.row:has(>.ex){margin-top:6px!important;padding-top:6px!important}
+.bqcard .ex{font-size:15px!important;line-height:1.35}
+@media(orientation:landscape) and (max-height:520px){.bqcard>.row:has(>.ex){margin-top:3px!important;padding-top:3px!important}.bqcard .ex{font-size:14px!important}.bwrap.soul .bqcard{padding:6px 10px}}
+/* 橫式、已作答：例句列收起來（答案列上還有「例句」喇叭），答案列與「繼續」才放得下 */
+@media(orientation:landscape) and (max-height:520px){.bwrap.ans .bqcard>.row:has(>.ex){display:none}}

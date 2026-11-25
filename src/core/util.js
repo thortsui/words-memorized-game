@@ -17,3 +17,5 @@ export function once(k,m){if(told[k])return;told[k]=1;toast(m)}
 // 讀寫 localStorage 的小包裝
 export const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}};
 export const lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
+// 有實體鍵盤（滑鼠＋可懸停）的裝置才提示快捷鍵；觸控裝置不顯示「（Enter）」
+export const KEY_HINT=typeof matchMedia==="function"&&matchMedia("(hover:hover) and (pointer:fine)").matches?"（Enter）":"";

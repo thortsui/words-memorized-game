@@ -27,8 +27,9 @@ function makePool(eng,max,additive){
   g.setAttribute("kind",new THREE.BufferAttribute(kind,1).setUsage(THREE.DynamicDrawUsage));
   const m=new THREE.ShaderMaterial({vertexShader:VS,fragmentShader:FS,uniforms:{uScale:{value:300}},transparent:true,depthWrite:false,blending:additive?THREE.AdditiveBlending:THREE.NormalBlending});
   const pts=new THREE.Points(g,m);pts.frustumCulled=false;pts.renderOrder=additive?11:10;eng.scene.add(pts);
-  let cur=0,alive=0;const c=new THREE.Color();
-  function emit(o){let n=o.n||1;if(eng.rm)n=Math.ceil(n*.4);else if(eng.quality==="low")n=Math.ceil(n*.6);
+  let cur=0,alive=0,dirty=false;const c=new THREE.Color();
+  function emit(o){let n=o.n||1;if(eng.rm)n=Math.ceil(n*.4);else if(eng.quality==="low"){if(o.deco)return;n=Math.ceil(n*.35)} // 低畫質：裝飾用的粒子（花粉、飄雪）不發，其餘約三分之一
+    dirty=true;
     const p=V(o.p),sp=o.speed||[.5,1.5],sz=o.size||[.08,.16],lf=o.life||[.4,.8],dir=o.dir?V(o.dir):null,spread=o.spread==null?1:o.spread,rad=o.radius||0;
     for(let i=0;i<n;i++){const k=cur;cur=(cur+1)%max;
       // 方向：有 dir 就在它周圍散開，沒有就是全向
@@ -41,7 +42,8 @@ function makePool(eng,max,additive){
       a0[k]=o.alpha==null?1:o.alpha;size0[k]=rand(sz[0],sz[1]);size[k]=size0[k];grow[k]=o.grow||0;
       maxLife[k]=life[k]=rand(lf[0],lf[1]);grav[k]=o.gravity||0;drag[k]=o.drag||0;kind[k]=o.kind||0}
     g.attributes.kind.needsUpdate=true}
-  function update(dt){alive=0;if(dt<=0)return;
+  function update(dt){if(dt<=0)return;if(!alive&&!dirty)return; // 沒有粒子時不必每幀掃一遍、重傳三個緩衝
+    alive=0;dirty=false;
     for(let k=0;k<max;k++){if(life[k]<=0)continue;life[k]-=dt;
       if(life[k]<=0){col[k*4+3]=0;size[k]=0;continue}alive++;
       const d=Math.max(0,1-drag[k]*dt);vel[k*3]*=d;vel[k*3+1]=vel[k*3+1]*d-grav[k]*dt;vel[k*3+2]*=d;
@@ -96,11 +98,15 @@ export function createFx(eng,{soul=false}={}){
     return eng.tween(dur,(k,r)=>update(k,r),ez).then(()=>{scene.remove(mesh);mesh.traverse(o=>{if(o.material)o.material.dispose()})})}
 
   /* ---------- DOM 浮字 ---------- */
+  // HUD 血條框的位置快取 0.4 秒（每個浮字都量一次會強制重排，連段時很傷）
+  let boxCache=null,boxAt=-1e9;
+  function hudBoxes(){const now=performance.now();if(boxCache&&now-boxAt<400)return boxCache;boxAt=now;const host=eng.container.parentElement,hb=host?host.getBoundingClientRect():null;
+    return boxCache=host?[...host.querySelectorAll(".hpbox")].map(b=>{const r=b.getBoundingClientRect();return{l:r.left-hb.left-6,r:r.right-hb.left+6,t:r.top-hb.top-6,b:r.bottom-hb.top+6,top:r.top-hb.top<hb.height/2}}):[]}
   // cls：dmg（傷害數字）、ono（擬聲字）、good、bad、gold、soul…（樣式在 style.css 的 .v3-t）
   function text(pos,str,cls="",o={}){if(eng.dead)return Promise.resolve();const el=document.createElement("div");el.className="v3-t "+cls;el.textContent=str;el.style.opacity=0;eng.overlay.appendChild(el);
     const p=V(pos).clone(),dx=o.dx==null?rand(-14,14):o.dx,dy=o.dy||0,rise=o.rise==null?46:o.rise,dur=o.dur||.95,rot=o.rot==null?rand(-8,8):o.rot;
     // HUD 血條框的位置（相對戰場），字不要被它蓋住，也不要超出戰場被切掉
-    const host=eng.container.parentElement,hb=host?host.getBoundingClientRect():null,boxes=host?[...host.querySelectorAll(".hpbox")].map(b=>{const r=b.getBoundingClientRect();return{l:r.left-hb.left-6,r:r.right-hb.left+6,t:r.top-hb.top-6,b:r.bottom-hb.top+6,top:r.top-hb.top<hb.height/2}}):[];
+    const boxes=hudBoxes();
     const hw=el.offsetWidth/2+4,hh=el.offsetHeight/2+2;
     const place=(x,y)=>{x=Math.max(hw,Math.min(eng.width-hw,x));y=Math.max(hh,Math.min(eng.height-hh,y));
       for(const b of boxes){if(x+hw>b.l&&x-hw<b.r&&y+hh>b.t&&y-hh<b.b){if(b.top)y=b.b+hh;else y=b.t-hh}}return[x,Math.max(hh,Math.min(eng.height-hh,y))]};

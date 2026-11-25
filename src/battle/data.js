@@ -29,10 +29,10 @@ export const STORY=["這裡是劍與魔法的大陸——艾爾文斯。","千�
 
 /* ---------- 魂系模式 ---------- */
 export const SOUL={
-  windowMs:10000,      // 玩家回合的攻擊時間（只在題目顯示中倒數）
+  windowMs:10500,      // 玩家回合的攻擊時間（只在題目顯示中倒數）；10.5 秒＝每題 2.5 秒的玩家答得到第 4 題
   minCostMs:2500,      // 每一題至少消耗這麼多攻擊時間（答得再快，一回合也只有 4 題）
   missPenaltyMs:2000,  // 攻擊回合答錯，多扣的攻擊時間
-  healOnKill:55,       // 打倒 Boss 回復的 HP
+  healOnKill:40,       // 打倒 Boss 回復的 HP
   atbMax:3,
   staminaMax:100,
   staminaTurn:15,      // 每次輪到玩家回復
@@ -54,6 +54,8 @@ export const SOUL={
   paceWindow:8, paceMin:3, paceCenter:3.2, paceSpan:1.6, wrongAs:6,
   limitSwing:.35,      // 時限最多縮短／放寬 35%
   perfectSwing:300,    // 彈反判定最多 ±0.3 秒
+  tightAt:.8, perfectTight:420, // d 超過 tightAt 後彈反門檻再收緊，d=1 時多收 0.42 秒（1.5−0.3−0.42＝0.78 秒）：高手也會有一兩成落到翻滾
+  foeDmgSwing:1,       // Boss 傷害 ×(1＋foeDmgSwing×max(0,d))：只跟動態難度掛勾的壓力（模擬：0.3 對熟練玩家幾乎沒影響，1.0 才把熟練壓到約九成）
   dmgBonus:0,          // 高難度時的玩家傷害加成（已取消：答得快本來就打得多）
   extraAt:.6,          // d 超過這個值，Boss 多出手一次
   easeDown:false,      // true＝d 低於 −extraAt 時少出手一次（已關閉：亂點會被判成「很慢」而佔到便宜）
@@ -70,7 +72,7 @@ export const SOUL_BIG=[
  {name:"聖光審判劍",move:"holy",hits:[115]}];
 // phases：血量比例降到 at 以下就進入該階段（atkMul 攻擊倍率、extra 多出手次數、limitMul 閃避時限倍率）
 export const SOUL_BOSSES=[
- {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:80,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
+ {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:60,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
   phases:[{at:.5,name:"根鬚暴走",atkMul:1.15,extra:0,limitMul:.95,move:"根鬚纏擊"}]},
  {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:200,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
   phases:[{at:.5,name:"石翼狂嘯",atkMul:1.15,extra:1,limitMul:.95,move:"碎石吐息"}]},

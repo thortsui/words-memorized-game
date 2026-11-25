@@ -9,10 +9,13 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
 // 動態難度：recent = [{ok, ms}]。d 介於 -1（放寬）到 +1（加壓）。
 export function difficulty(recent){const r=recent.slice(-SOUL.paceWindow);
-  if(r.length<SOUL.paceMin)return{d:0,pace:null,limitMul:1,extra:0,perfectMs:SOUL.perfectMs,dmgMul:1};
+  if(r.length<SOUL.paceMin)return{d:0,pace:null,limitMul:1,extra:0,perfectMs:SOUL.perfectMs,dmgMul:1,foeMul:1};
   const pace=r.reduce((a,x)=>a+(x.ok?Math.min(x.ms/1000,SOUL.wrongAs):SOUL.wrongAs),0)/r.length;
   const d=clamp((SOUL.paceCenter-pace)/SOUL.paceSpan,-1,1);
-  return{d,pace,limitMul:1-SOUL.limitSwing*d,extra:d>=SOUL.extraAt?1:(SOUL.easeDown&&d<=-SOUL.extraAt)?-1:0,perfectMs:Math.round(SOUL.perfectMs-SOUL.perfectSwing*d),dmgMul:1+SOUL.dmgBonus*Math.max(0,d)}}
+  // d 接近上限（高手）時彈反門檻再收緊：tight 從 tightAt 起線性加到 1
+  const tight=clamp((d-SOUL.tightAt)/(1-SOUL.tightAt),0,1);
+  return{d,pace,limitMul:1-SOUL.limitSwing*d,extra:d>=SOUL.extraAt?1:(SOUL.easeDown&&d<=-SOUL.extraAt)?-1:0,perfectMs:Math.round(SOUL.perfectMs-SOUL.perfectSwing*d-SOUL.perfectTight*tight),dmgMul:1+SOUL.dmgBonus*Math.max(0,d),
+    foeMul:1+SOUL.foeDmgSwing*Math.max(0,d)}} // foeMul：Boss 傷害倍率，只跟動態難度掛勾（答得越快越痛）
 
 // 閃避判定：回傳 parry（彈反）／dodge（閃避）／graze（擦傷）／hit（中招）
 export function gradeDodge(ok,ms,limitMs,perfectMs){if(!ok||ms>limitMs)return"hit";if(ms<=Math.min(perfectMs,limitMs*.5))return"parry";if(ms<=limitMs*SOUL.slowAt)return"dodge";return"graze"}
@@ -79,11 +82,11 @@ export function createSoulBattle({pool,mode,rng=Math.random,onEvent}){
     nextDodge(){if(B.phase!=="enemy"||!B.enemy||B.enemy.i>=B.enemy.total)return null;const out=[],ev=mk(out);const b=boss(),p=ph(),d=diff(),w=nextWord();
       const limitMs=Math.max(SOUL.minLimitMs,Math.round(b.limitMs*(p?p.limitMul:1)*d.limitMul));const perfectMs=Math.min(d.perfectMs,Math.round(limitMs*.5));
       const move=p&&B.enemy.i===B.enemy.total-1?p.move:b.move;
-      B.w=w;B.enemy.cur={limitMs,perfectMs,move};B.phase="dodge";
+      B.w=w;B.enemy.cur={limitMs,perfectMs,move,foeMul:d.foeMul};B.phase="dodge";
       ev("telegraph",{boss:b,move,index:B.enemy.i,total:B.enemy.total,limitMs,perfectMs});
       return{w,mode:mcOf(B.mode),limitMs,perfectMs,index:B.enemy.i,total:B.enemy.total,move,events:out}},
     answerDodge(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="dodge")return out;const w=B.w,cur=B.enemy.cur,b=boss(),p=ph();B.enemy.i++;B.n++;record(ok,ms);
-      let g=gradeDodge(ok,ms,cur.limitMs,cur.perfectMs);const full=Math.round((b.atk+Math.round(rng()*6))*(p?p.atkMul:1));
+      let g=gradeDodge(ok,ms,cur.limitMs,cur.perfectMs);const full=Math.round((b.atk+Math.round(rng()*6))*(p?p.atkMul:1)*(cur.foeMul||1));
       if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000)}else{B.combo=0;requeue(w)}
       B.phase="enemy";
       if(g==="parry"){B.parries++;B.atb=Math.min(SOUL.atbMax,B.atb+1);addStamina(SOUL.staminaParry);ev("parry",{move:cur.move,ms});

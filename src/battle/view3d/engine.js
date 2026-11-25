@@ -69,21 +69,32 @@ export function createEngine(container,{reducedMotion=false}={}){
   const ro=typeof ResizeObserver!=="undefined"?new ResizeObserver(()=>E.resize()):null;ro&&ro.observe(container);
   const onWinResize=()=>E.resize();window.addEventListener("resize",onWinResize);
 
-  /* ---------- 掉幀偵測：先把 DPR 降到 1，還是不夠就關掉陰影、減少粒子 ---------- */
-  let fpsN=0,fpsT=0,lowCount=0,warm=0;
-  function fpsTick(rdt){fpsN++;fpsT+=rdt;if(fpsT<1)return;E.fps=Math.round(fpsN/fpsT);fpsN=0;fpsT=0;container.dataset.fps=E.fps;container.dataset.dpr=E.dpr;container.dataset.quality=E.quality;
-    if(++warm<=2)return; // 剛開場在編譯 shader、載模型，不列入判斷
-    if(E.fps<26)lowCount++;else lowCount=Math.max(0,lowCount-1);
-    if(lowCount>=3){lowCount=0;
-      if(E.dpr>1){E.dpr=1;renderer.setPixelRatio(1);E._forceResize=true;E.resize()}
-      else if(E.quality!=="low"){E.quality="low";for(const f of E.onQuality)f("low")}}}
+  /* ---------- 掉幀偵測：分三段降級 ①DPR 降到 1 ②低畫質（場景各自關描邊／陰影／環境光、減粒子）③DPR 再降到 0.75 ----------
+     累計 2 秒低於 38fps（中間沒有回到 48fps 以上）就降一段；任何一秒低於 20fps 就立刻把 ①② 一次做完。模型載完（E.armed）一秒後才開始判斷。 */
+  let fpsN=0,fpsT=0,fpsReal=0,lowCount=0,warm=0;
+  const LOCK=typeof window!=="undefined"&&window.__v3q||"";
+  const setDpr=d=>{E.dpr=d;renderer.setPixelRatio(d);E._forceResize=true;E.resize()};
+  const setLow=()=>{if(E.quality==="low")return;E.quality="low";for(const f of E.onQuality){try{f("low")}catch(e){console.warn("[view3d] quality",e)}}};
+  function degrade(hard){
+    if(E.dpr>1){setDpr(1);if(hard)setLow()}
+    else if(E.quality!=="low")setLow();
+    else if(E.dpr>.75)setDpr(.75);
+    warm=1} // 降完先觀察一秒再判斷
+  function fpsTick(rdt,real){fpsN++;fpsT+=rdt;fpsReal+=real;if(fpsT<1)return;E.fps=Math.round(fpsN/Math.max(fpsT,fpsReal));fpsN=0;fpsT=0;fpsReal=0;container.dataset.fps=E.fps;container.dataset.dpr=E.dpr;container.dataset.quality=E.quality;container.dataset.calls=renderer.info.render.calls;
+    if(!E.armed){warm=0;return}       // 還在載模型、編譯 shader：不列入判斷
+    if(LOCK){if(LOCK==="low"&&E.dpr>.75){degrade(true);degrade();degrade()}return} // 測試用：window.__v3q="high" 不降級、"low" 一開始就降到底
+    if(E.paused||++warm<=1)return;
+    if(E.fps<20){lowCount=0;degrade(true);return} // 差很多（低於 20fps）：不等累計，量到就直接降兩級（DPR 1＋低畫質），已經降過就再往下一級
+    if(warm<=2)return;
+    if(E.fps<38)lowCount++;else if(E.fps>=48)lowCount=0;
+    if(lowCount>=2){lowCount=0;degrade(E.fps<22)}}
 
   /* ---------- 主迴圈 ---------- */
   let raf=0,last=0;
   const shakeOff=new THREE.Vector3();
   function frame(now){raf=requestAnimationFrame(frame);
-    let rdt=(now-last)/1000;last=now;if(rdt<=0)return;if(rdt>.1)rdt=.1;
-    fpsTick(rdt);
+    let rdt=(now-last)/1000;last=now;if(rdt<=0)return;const real=Math.min(rdt,1);if(rdt>.1)rdt=.1;
+    fpsTick(rdt,real);
     if(E.paused){renderer.render(scene,camera);return} // 暫停：畫面留著，時間不走
     let k=E.timeScale*(E.fast||1); // fast：跳過演出時的快轉倍率
     if(E.fast>1)rdt=Math.min(rdt,.034);if(now<freezeUntil)k*=.02;else if(now<slowUntil)k*=slowK;

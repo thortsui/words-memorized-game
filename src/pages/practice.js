@@ -1,5 +1,5 @@
 // 練習設定頁與一般練習（五種題型）
-import { $, app, esc, SC, lsSet, toast } from '../core/util.js';
+import { $, app, esc, SC, lsSet, toast, KEY_HINT } from '../core/util.js';
 import { S, allDicts, setup, saveSetup, pool, mark, unlog, pushHist, allWords, ctx } from '../core/store.js';
 import { MODES, shuffle, clozeAns, clozePos, zhPrompt, opts, normEn, checkEn, checkZhSmart } from '../core/grading.js';
 import { sp, speak, readAll, gate, spkBtn, enVoices, stopSpeech, resetGoogleFail } from '../core/speech.js';
@@ -79,7 +79,7 @@ function answer(ok,idx,typed,loose){if(Q.done)return;Q.done=true;const w=Q.items
    <div style="margin-top:6px"><span class="w">${esc(w.en)}</span><span class="pos">${esc(w.pos)}</span> ${spkBtn(w.en)}</div><div>${esc(w.zh)}</div>
    ${w.ex?`<div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:6px"><div class="ex en">${esc(w.ex)}</div>${spkBtn(w.ex,"朗讀例句")}</div>`:""}
    ${!ok&&typed&&idx<0?`<p class="small" style="margin:8px 0 0">你的答案：${esc(typed)}</p>`:""}</div>
-   <div class="row" style="margin-top:12px"><button class="pri" id="nx" style="flex:1 1 200px">${Q.i+1<Q.items.length?(Q.i+1<Q.n0?"下一題":"下一題・重考"):"看結果"}（Enter）</button>${!ok&&typedMode&&typed?'<button id="ovr" class="ghost">我其實答對了</button>':""}</div>`;
+   <div class="row" style="margin-top:12px"><button class="pri" id="nx" style="flex:1 1 200px">${Q.i+1<Q.items.length?(Q.i+1<Q.n0?"下一題":"下一題・重考"):"看結果"}${KEY_HINT}</button>${!ok&&typedMode&&typed?'<button id="ovr" class="ghost">我其實答對了</button>':""}</div>`;
   $("#nx").onclick=next;$("#nx").focus();const ov=$("#ovr");if(ov)ov.onclick=()=>{if(Q.pushed){Q.items.pop();Q.reps--}if(w._rep)Q.fixed++;else{Q.right++;Q.wrong.pop()}unlog(w);mark(w,true,"",Q.mode);next()};
   Q.readP=readAll(w,app.querySelector("#fb .spk"));gate($("#nx"),Q.readP,"朗讀中…（英文→中文→例句）")}
 // 換題前先停掉上一題還沒唸完的朗讀（25 秒強制解鎖後也一樣）

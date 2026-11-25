@@ -53,10 +53,46 @@ export function zhPrompt(w){const keys=new Set();normEn(w.en).split(" ").concat(
   const z=String(w.zh||"").replace(/（[^（）]*）|\([^()]*\)/g,m=>has(m)?"":m).replace(WORD_RE,t=>leak(t)?"＿＿":t).replace(/\s+/g," ").trim();
   return z||String(w.zh||"")}
 
-// 干擾選項：先限同為單字或片語；同詞性夠 3 個就只用同詞性
-export function opts(w,key,bank){const ph=isPhrase(w),val=x=>key==="cloze"?clozeAns(x):x[key],ans=val(w);let c=bank.filter(x=>x.id!==w.id&&val(x)&&val(x).toLowerCase()!==ans.toLowerCase()&&isPhrase(x)===ph);
-  const sp=c.filter(x=>x.pos===w.pos);if(sp.length>=3)c=sp;if(c.length<3)c=bank.filter(x=>x.id!==w.id&&val(x)&&val(x).toLowerCase()!==ans.toLowerCase());
-  const pick=[],seen=new Set([ans.toLowerCase()]);for(const x of shuffle(c)){const v=val(x);if(seen.has(v.toLowerCase()))continue;seen.add(v.toLowerCase());pick.push(v);if(pick.length===3)break}
+// 詞形分類（克漏字選項用）：base 原形、s 複數／第三人稱、ed 過去式／分詞、ing、er 比較級／最高級、other
+export function formOf(form,en,pos){const f=String(form).toLowerCase().replace(/[^a-z ]/g,"").trim(),b=String(en).toLowerCase().replace(/[^a-z ]/g,"").trim();
+  if(!f||f===b)return"base";if(/\s/.test(f))return"other";
+  if(/ing$/.test(f))return"ing";if(/ed$/.test(f))return"ed";
+  if((IRREG[b]||[]).includes(f)){if(/adj|adv|形|副/i.test(pos||""))return"er";if(/^n|名/i.test(pos||""))return"s";return/s$/.test(f)?"s":"ed"} // went／taught／children／better
+  if(/(er|est)$/.test(f)&&/adj|adv|形|副/i.test(pos||""))return"er";
+  if(/s$/.test(f))return"s";
+  // 認不出來的不規則變化（misunderstood、mice…）：動詞當過去式、名詞當複數
+  if(/^v|動/i.test(pos||""))return"ed";if(/^n|名/i.test(pos||""))return"s";return"other"}
+// 把原形變成指定詞形（只做規則變化；不規則字、要重複字尾子音的短字回傳空字串＝不用它）
+export function inflectAs(en,form){const b=String(en).trim().toLowerCase();if(!/^[a-z]{3,}$/.test(b)||IRREG[b]||/(ye|oe|ee)$/.test(b)||Object.keys(IRREG).some(k=>k.length>=3&&b.endsWith(k)))return""; // 含不規則字根的（misunderstand）也不變
+  const cvc=/[^aeiou][aeiou][^aeiouwxy]$/.test(b);
+  if(form==="s")return/[^s]s$/.test(b)?"":/(s|x|z|ch|sh)$/.test(b)?b+"es":/[^aeiou]y$/.test(b)?b.slice(0,-1)+"ies":/(f|fe|o)$/.test(b)?"":b+"s";
+  if(form==="ed")return/e$/.test(b)?b+"d":/[^aeiou]y$/.test(b)?b.slice(0,-1)+"ied":cvc||/c$/.test(b)?"":b+"ed";
+  if(form==="ing")return/ie$/.test(b)?"":/[^e]e$/.test(b)?b.slice(0,-1)+"ing":cvc||/c$/.test(b)?"":b+"ing";
+  return""}
+const posSet=p=>String(p||"").toLowerCase().split(/[\/、,\s]+/).filter(Boolean);
+const samePos=(a,b)=>{const B=posSet(b);return posSet(a).some(x=>B.includes(x))}; // 「v./n.」和「v.」算同詞性
+// 大小寫跟著正解：正解字首大寫（句首）→ 干擾項字首也大寫；正解小寫（句中）→ 干擾項字首小寫。全大寫的縮寫（TV）與 I 不動。
+export function matchCase(v,ans){v=String(v);const a=String(ans).match(/[A-Za-z]/);if(!a||!v)return v;if(/^[A-Z]{2,}\b/.test(v)||/^I\b/.test(v))return v;
+  const up=a[0]===a[0].toUpperCase();return v.replace(/[A-Za-z]/,c=>up?c.toUpperCase():c.toLowerCase())}
+// 干擾選項：先限同為單字或片語；同詞性夠 3 個就只用同詞性。
+// 克漏字另外要求：大小寫與正解一致（不能靠句首大寫認出答案）、盡量挑同詞形的字（正解是 -ed 就都給 -ed、正解是複數就都給複數）。
+export function opts(w,key,bank){const ph=isPhrase(w),cz=key==="cloze",val=x=>cz?clozeAns(x):x[key],ans=val(w),al=ans.toLowerCase();
+  if(cz){const form=formOf(ans,w.en,w.pos),lc=s=>String(s||"").trim().toLowerCase();
+    // 候選：別的字在它自己例句裡的詞形；正解是原形時，沒有例句的單字也能直接拿原形來用
+    const cand=[],made=[];for(const x of bank){if(x.id===w.id)continue;const v=clozeAns(x);if(v)cand.push({v,f:formOf(v,x.en,x.pos),pos:x.pos,ph:isPhrase(x)});
+      // 同詞形的字不夠時的備案：拿同詞性的字照規則變成同一種詞形（overlooking 的干擾項用 abandoning、carving…）
+      if(!ph&&!isPhrase(x)&&samePos(x.pos,w.pos)&&(form==="s"||form==="ed"||form==="ing")){const m=inflectAs(x.en,form);if(m)made.push({v:m,f:form,pos:x.pos,ph:false})}
+      if(form==="base"&&!isPhrase(x)&&/^[A-Za-z]+$/.test(String(x.en).trim())&&lc(v)!==lc(x.en))cand.push({v:String(x.en).trim(),f:"base",pos:x.pos,ph:false})}
+    const ok=cand.filter(c=>lc(c.v)!==al),sameKind=ok.filter(c=>ph?c.ph:(!c.ph&&!/\s/.test(c.v)));
+    const tail=s=>/[^s]s$/i.test(s),at=tail(ans),fit=c=>c.f===form&&tail(c.v)===at; // 字尾有沒有 s 也要一致（goods 不混進單數名詞裡）
+    // 由嚴到寬：同詞性＋同詞形 → 同詞形 → 同詞性 → 同為單字／片語 → 全部
+    const tiers=[sameKind.filter(c=>fit(c)&&samePos(c.pos,w.pos)),sameKind.filter(fit),made.filter(c=>lc(c.v)!==al&&tail(c.v)===at),sameKind.filter(c=>c.f===form),sameKind.filter(c=>samePos(c.pos,w.pos)),sameKind,ok];
+    const pick=[],seen=new Set([al]);
+    for(const tr of tiers){for(const c of shuffle(tr)){const v=matchCase(c.v,ans),k=v.toLowerCase();if(seen.has(k))continue;seen.add(k);pick.push(v);if(pick.length===3)break}if(pick.length===3)break}
+    return shuffle([ans,...pick])}
+  let c=bank.filter(x=>x.id!==w.id&&val(x)&&val(x).toLowerCase()!==al&&isPhrase(x)===ph);
+  const sp=c.filter(x=>x.pos===w.pos);if(sp.length>=3)c=sp;if(c.length<3)c=bank.filter(x=>x.id!==w.id&&val(x)&&val(x).toLowerCase()!==al);
+  const pick=[],seen=new Set([al]);for(const x of shuffle(c)){const v=val(x);if(seen.has(v.toLowerCase()))continue;seen.add(v.toLowerCase());pick.push(v);if(pick.length===3)break}
   return shuffle([ans,...pick])}
 
 // (s) 這種可有可無的複數直接拿掉；sb／sth／somebody／someone／something 這些受詞標記寫不寫都一樣

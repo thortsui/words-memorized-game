@@ -69,8 +69,12 @@ export function createSoulScene(eng,fx,api){
   const rim=new THREE.DirectionalLight(0x9fb8e8,1.7); // 位置每幀跟著「主角→Boss」方向更新，永遠在 Boss 後上方
   // 蓄力時的紅光：一直存在、平常強度 0（燈的數量不變，就不會重編 shader）
   const danger=new THREE.PointLight(0xff2a1a,0,8,1.8);
-  scene.add(hemi,moon,moon.target,rim,rim.target,danger);
-  const L0={hemi:hemi.intensity,moon:moon.intensity};
+  // 主角的冷色主光：聚光燈跟在鏡頭右上方照主角，抵掉火盆把盔甲染成紅銅色（盔甲原本是灰鋼色）
+  const key=new THREE.SpotLight(0xc4d4ff,34,11,.55,.85,1.3);
+  scene.add(hemi,moon,moon.target,rim,rim.target,danger,key,key.target);
+  const L0={hemi:hemi.intensity,moon:moon.intensity,rim:rim.intensity};
+  // 受擊回饋用輪廓光脈衝（邊緣亮一下），不把整隻角色塗成單色
+  const rimPulse=(k=1,dur=.22)=>{rim.intensity=L0.rim*(1+2.2*k);eng.tween(dur,t=>{rim.intensity=L0.rim*(1+2.2*k*(1-t))},ease.out)};
 
   /* ---------- 程式版競技場（退回方案） ---------- */
   const stone=new THREE.MeshLambertMaterial({color:0x4c5059}),stoneD=new THREE.MeshLambertMaterial({color:0x2e3138}),stoneL=new THREE.MeshLambertMaterial({color:0x5c616b,flatShading:true});
@@ -103,7 +107,7 @@ export function createSoulScene(eng,fx,api){
   const mists=[],mistTex=mistTexture();for(let i=0;i<2;i++){const m=new THREE.MeshBasicMaterial({map:mistTex,transparent:true,opacity:.1,depthWrite:false,color:0x7f8ea6,fog:false});
     const p=new THREE.Mesh(new THREE.PlaneGeometry(24,24),m);p.position.set(rand(-2,2),.06+i*.1,rand(-3,1));p.rotation.set(-Math.PI/2,0,rand(0,6));p.renderOrder=7;p.userData.sp=(i%2?1:-1)*rand(.02,.05);scene.add(p);mists.push(p)}
   // 火盆：鐵籠、炭火（程式版才有）；火焰光球與點光源兩種場景共用，GLB 載入後搬到 FirePoint
-  const braziers=[],iron=new THREE.MeshStandardMaterial({color:0x1a1a1d,roughness:.6,metalness:.7}),coal=new THREE.MeshBasicMaterial({color:0xff8a2a}),FIRE=14;
+  const braziers=[],iron=new THREE.MeshStandardMaterial({color:0x1a1a1d,roughness:.6,metalness:.7}),coal=new THREE.MeshBasicMaterial({color:0xff8a2a}),FIRE=10;
   for(const [a,r] of [[.95,8.1],[-.95,8.1],[2.25,8.3],[-2.25,8.3]]){const x=Math.sin(a)*r,z=Math.cos(a)*r,g=new THREE.Group();g.position.set(x,0,z);envProc.add(g);
     const bowl=new THREE.Mesh(new THREE.CylinderGeometry(.48,.3,.42,8,1,true),iron);bowl.position.y=.95;bowl.material.side=THREE.DoubleSide;g.add(bowl);
     for(let k=0;k<3;k++){const l=new THREE.Mesh(cyl,iron);l.scale.set(.035,.9,.035);const b=k/3*Math.PI*2;l.position.set(Math.sin(b)*.3,.42,Math.cos(b)*.3);l.rotation.set(Math.cos(b)*.2,0,-Math.sin(b)*.2);g.add(l)}
@@ -122,10 +126,12 @@ export function createSoulScene(eng,fx,api){
   const core=Promise.all([load.warm("hero_knight"),load.warm(api.foes[0]&&api.foes[0].model)]);
   const arenaP=core.then(()=>load("arena_cathedral")).then(g=>{if(!g||eng.dead)return;const root=g.scene,fps=[];root.updateMatrixWorld(true);
     root.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=false;if(/Grass/.test(o.name))clearCentre(o.material,7)}if(/^FirePoint/.test(o.name))fps.push(o.getWorldPosition(v3()))});
-    envProc.visible=false;scene.add(root);arenaGLB=root;winLook.set(0,10.5,-18);
+    // 開打之後才到（慢速網路）：先讓霧變濃（約 0.4 秒）再換，換完霧再散開，不會整個場景突然跳變
+    if(eng.armed&&!eng.rm){const d0=scene.fog.density;eng.tween(.4,k=>{scene.fog.density=lerp(d0,d0*4.5,k)},ease.in,{real:true}).then(()=>{if(eng.dead)return;swap();eng.tween(.9,k=>{scene.fog.density=lerp(d0*4.5,arena.dens*(1+.22*phaseTint),k)},ease.out,{real:true})})}else swap();
+    function swap(){envProc.visible=false;scene.add(root);arenaGLB=root;winLook.set(0,10.5,-18);
     // 火焰與點光源搬到模型裡的 FirePoint（離場中央較遠，照射距離放大）
     if(fps.length)braziers.forEach((b,i)=>{const p=fps[i%fps.length];b.pos.set(p.x,p.y+.2,p.z);b.flame.sprite.position.set(p.x,p.y+.45,p.z);b.light.position.set(p.x,p.y+.7,p.z);b.light.distance=24;b.front=p.z>0});
-    if(eng.quality==="low")lowArena()});
+    if(eng.quality==="low")lowArena()}});
 
   const flameC=new THREE.Color(0xff7a2a);let flameK=1,emberT=0,snow=false,snowT=0;
   eng.onUpdate((dt,rdt,t)=>{
@@ -133,7 +139,7 @@ export function createSoulScene(eng,fx,api){
     emberT-=dt;if(emberT<=0){emberT=.07;const b=braziers[(Math.random()*braziers.length)|0];
       fx.emit({p:b.pos,n:1,color:[0xff8a2a,0xffc36a,0xff5a1a],speed:[.2,.7],up:rand(.8,1.6),size:[.05,.11],life:[1.4,3],gravity:-.25,drag:.25,radius:.25});
       if(Math.random()<.5)fx.emit({p:v3(rand(-7,7),rand(.2,3),rand(-7,5)),n:1,color:[0xff9a4a,0x8a8f9a],speed:[.05,.3],up:.15,size:[.04,.08],life:[2,4],alpha:.7})}
-    if(snow){snowT-=dt;if(snowT<=0){snowT=.05;fx.emitN({p:v3(rand(-8,8),rand(3,6),rand(-8,5)),n:1,color:0xdff3ff,speed:[.1,.4],up:-.9,size:[.05,.1],life:[3,5],alpha:.8})}}
+    if(snow){snowT-=dt;if(snowT<=0){snowT=.05;fx.emitN({p:v3(rand(-8,8),rand(3,6),rand(-8,5)),n:1,color:0xdff3ff,speed:[.1,.4],up:-.9,size:[.05,.1],life:[3,5],alpha:.8,deco:true})}}
     for(const m of mists)m.rotation.z+=m.userData.sp*dt;
     for(let i=0;i<shafts.length;i++)shafts[i].material.opacity=.09+.035*Math.sin(t*.5+i*1.7)});
 
@@ -162,19 +168,24 @@ export function createSoulScene(eng,fx,api){
   const csReset=(dur=.5)=>eng.to(cs,{...CS0},dur);
   function onResize(){camDefaults();eng.kill(cs);Object.assign(cs,CS0);camera.near=.3;fx.setScale()}
   eng.onResize.push(onResize);
-  function updateCamera(rdt){const hp=hero.root.position,bp=bossPos();let wantFov;
+  function updateCamera(rdt){const hp=hero.root.position,bp=bossPos();let wantFov;const air=Math.max(0,hp.y),fast=air>.15||hs.tangent; // 躍起／翻滾中：鏡頭跟緊
     if(cine){tp.copy(cine.pos);tl.copy(cine.look);wantFov=cine.fov||46}
     else{dir.subVectors(bp,hp).setY(0);const d=dir.length()||1;dir.multiplyScalar(1/d);right.set(-dir.z,0,dir.x);
-      tp.copy(hp).addScaledVector(dir,-cs.back).addScaledVector(right,cs.side);tp.y=cs.height;
+      const back=cs.back+air*.75; // 主角離地越高鏡頭退越遠
+      tp.copy(hp).addScaledVector(dir,-back).addScaledVector(right,cs.side);tp.y=cs.height;
       // 鏡頭不穿出牆外（牆在 12 m）
       const rr=Math.hypot(tp.x,tp.z);if(rr>CAM_RMAX){tp.x*=CAM_RMAX/rr;tp.z*=CAM_RMAX/rr}
       // 用「主角到場中央」的距離來框（Boss 撲過來時畫面不會跟著縮放）
-      const d0=Math.max(2,hs.r),bh=(boss?boss.h:3)*1.06,aFeet=-Math.atan2(cs.height+.05,cs.back),aTop=Math.atan2(bh-cs.height,cs.back+d0),mid=(aTop+aFeet)/2,span=(aTop-aFeet)*180/Math.PI+5;
+      const d0=Math.max(2,hs.r),bh=(boss?boss.h:3)*1.06,aFeet=-Math.atan2(cs.height+.3,back); // 腳下多留 0.25 m：貼底的 HUD 不壓到腳邊的閃避圈
+      let aTop=Math.atan2(bh-cs.height,back+d0);if(air>.15)aTop=Math.max(aTop,Math.atan2(air+hero.h*1.05-cs.height,back)); // 躍起時畫面上緣要留住主角
+      const mid=(aTop+aFeet)/2,span=(aTop-aFeet)*180/Math.PI+5;
       const hMin=2*Math.atan(Math.tan(21*Math.PI/180)/eng.aspect)*180/Math.PI; // 直式畫面至少要有 42° 的水平視角
-      wantFov=clamp(Math.max(span,hMin),34,72)+cs.fovD;
-      const ld=cs.back+d*cs.lookK;tl.copy(hp).addScaledVector(dir,d*cs.lookK).addScaledVector(right,-cs.shift);tl.y=cs.height+Math.tan(mid)*ld+cs.lookUp}
-    const k=camInit?1-Math.exp(-rdt*(cine?cine.k||3.5:6)):1;camInit=true;camPos.lerp(tp,k);camLook.lerp(tl,k);fovNow=lerp(fovNow,wantFov,k);
+      wantFov=clamp(Math.max(span,hMin),34,air>.15?82:72)+cs.fovD;
+      const ld=back+d*cs.lookK;tl.copy(hp).addScaledVector(dir,d*cs.lookK).addScaledVector(right,-cs.shift);tl.y=cs.height+Math.tan(mid)*ld+cs.lookUp}
+    const k=camInit?1-Math.exp(-rdt*(cine?cine.k||3.5:fast?18:6)):1;camInit=true;camPos.lerp(tp,k);camLook.lerp(tl,k);fovNow=lerp(fovNow,wantFov,k);
     camera.position.copy(camPos);camera.lookAt(camLook);
+    // 冷色主光跟著鏡頭（右上方）照主角
+    key.position.copy(camPos).addScaledVector(right,1.2);key.position.y=camPos.y+2.6;key.target.position.set(hp.x,hp.y+1.1,hp.z);
     if(Math.abs(camera.fov-fovNow)>.02){camera.fov=fovNow;camera.updateProjectionMatrix();fx.setScale()}
     // 輪廓光：永遠從 Boss 後上方照向鏡頭這一側
     dir.subVectors(bp,hp).setY(0).normalize();rim.position.copy(bp).addScaledVector(dir,7);rim.position.y=6.5;rim.target.position.copy(bp);rim.target.position.y=1.5}
@@ -205,17 +216,17 @@ export function createSoulScene(eng,fx,api){
 
   // 命中 Boss：火花、受擊／踉蹌、傷害數字、頓格、震動
   async function impact(p,{power=1,color=0xffffff}={}){const b=boss;if(!b)return p.onImpact&&p.onImpact();const c=b.center(v3(),.5),hp=hero.root.position;
-    p.onImpact&&p.onImpact();b.flash(0xffffff,.25);
+    p.onImpact&&p.onImpact();b.flash(0xffffff,1);rimPulse(Math.min(1.4,.6+.3*power));
     if(!p.kill)b.play(power>=2||(p.last&&p.big)?"Stagger":"Hit");
     const away=v3().subVectors(c,hp).setY(.3).normalize();
-    sparks(c,Math.round(10+9*power),[0xffd9a0,0xffffff,color],5+power*1.5,away);fx.burstRing(c,{color,r1:.5+.35*power,dur:.25});fx.flash(c,{color,size:.7+.4*power,dur:.18,opacity:.55});
+    sparks(c,Math.round(10+9*power),[0xffd9a0,0xffffff,color],5+power*1.5,away);fx.burstRing(c,{color,r1:.5+.35*power,dur:.25});fx.flash(c,{color,size:.45+.25*power,dur:.14,opacity:.4});
     fx.emit({p:c,n:Math.round(4+4*power),color:[0x3a1512,0x6a2018],speed:[.5,2.5],dir:away,spread:.8,size:[.08,.18],life:[.4,.8],gravity:5,alpha:.9});
     fx.text(v3(c.x,c.y+b.h*.2,c.z),String(p.dmg),"dmg soul"+(power>=2||p.kill?" big":""),{dur:1,rise:40,dx:rand(20,34)});
     eng.hitStop(45+30*power);eng.shake(.03+.035*power,.28);
     if(p.kill)eng.slowmo(.25,650);
     await eng.wait(power>=2?.32:.18)}
-  function dim(k,dur=.35){const h0=hemi.intensity,m0=moon.intensity;return eng.tween(dur,t=>{hemi.intensity=lerp(h0,L0.hemi*(1-k*.6),t);moon.intensity=lerp(m0,L0.moon*(1-k*.6),t)})}
-  const camHint=name=>{if(name==="melee")csTo({back:CS0.back-.5,lookK:.9},.3);else if(name==="cast")csTo({back:CS0.back+.4},.4);else if(name==="sky")csTo({back:CS0.back+1,lookUp:1.2,fovD:8},.4);else csReset(.5)};
+  function dim(k,dur=.35){const h0=hemi.intensity,m0=moon.intensity;return eng.tween(dur,t=>{hemi.intensity=lerp(h0,L0.hemi*(1-k*.2),t);moon.intensity=lerp(m0,L0.moon*(1-k*.2),t)})}
+  const camHint=name=>{if(name==="melee")csTo({back:CS0.back-.5,lookK:.9},.3);else if(name==="cast")csTo({back:CS0.back+.4},.4);else if(name==="sky")csTo({back:CS0.back+.8,fovD:4},.4);else csReset(.5)};
   const pal={slash:0xdfe8ff,fire:0xff6a1a,thunder:0xbfd6ff,ice:0x9fe6ff,holy:0xffe2a0,meteor:0xffa040};
   const moves=createMoves({eng,fx,hero,foe:()=>boss,soul:true,approach,retreat,impact,cam:camHint,dim,pal});
   // meteorEnd 會直接移動主角（躍起、俯衝），期間暫停極座標走位
@@ -247,8 +258,15 @@ export function createSoulScene(eng,fx,api){
   async function bossStrike(speed=1){const b=boss;if(!b)return v3();await bossBack;const name=atkName();atkN++;
     const t=b.impactTime(name,speed),hp=hero.root.position.clone(),d=v3().subVectors(H0,hp).setY(0).normalize(),to=hp.clone().addScaledVector(d,b.h*.55+.6),r=b.root.position,from=r.clone();
     b.play(name,{speed});const lunge=Math.max(.06,t-.05);
+    if(b.data&&b.data.id==="priest")eng.wait(Math.max(0,t-.14)).then(()=>{if(boss===b)iceSpikes(hp,d)});
     await eng.tween(lunge,k=>{r.lerpVectors(from,to,k)},ease.out);await eng.wait(Math.max(0,t-lunge));
     return hero.center(v3(),.6).addScaledVector(d,.5)}
+  // 冰刺：三根冰錐在 0.14 秒內從地面斜刺向主角（剛好在命中格到位），停一下再碎掉
+  function iceSpikes(at,d){for(let i=0;i<3;i++){const m=new THREE.Mesh(fx.G.cone,new THREE.MeshBasicMaterial({color:i===1?0xffffff:0x9fe6ff,transparent:true,opacity:.92,fog:false}));
+      const side=(i-1)*.42,base=v3(at.x+d.x*(.55+.1*Math.abs(i-1))-d.z*side,0,at.z+d.z*(.55+.1*Math.abs(i-1))+d.x*side),hgt=i===1?1.9:1.35;
+      m.scale.set(.34,.01,.34);m.position.copy(base);m.rotation.set(-d.z*.45,0,d.x*.45); // 往主角那一側傾
+      fx.temp(m,.62,(k,r)=>{const g=Math.min(1,r/.22);m.scale.y=Math.max(.01,hgt*ease.out(g));m.position.y=m.scale.y/2;m.material.opacity=r>.6?.92*(1-(r-.6)/.4):.92},ease.lin)}
+    fx.emit({p:v3(at.x+d.x*.5,.2,at.z+d.z*.5),n:22,color:[0x9fe6ff,0xffffff],speed:[1,4.5],up:2,size:[.06,.16],life:[.3,.7],gravity:6,kind:1});fx.ring(v3(at.x,.05,at.z),{color:0x9fe6ff,r1:1.6,dur:.35,opacity:.6})}
   // 收招回原位（不等它，下一次攻擊前會自動等）
   function bossRecover(delay=.45){const b=boss;if(!b)return;const r=b.root.position;b.glow(b.eye,phaseTint?.7:0);
     bossBack=eng.wait(delay).then(()=>{if(boss!==b)return;const from=r.clone();return eng.tween(.7,k=>{r.lerpVectors(from,H0,k)},ease.io)})}
@@ -294,15 +312,17 @@ export function createSoulScene(eng,fx,api){
     // 敵人回合開始：Boss 眼睛亮起、踏前一步
     async enemyTurn(){const b=boss;if(!b)return;await bossBack;b.glow(b.eye,1);eng.shake(.03,.3);dust(b.root.position,6);fx.ring(b.root.position,{color:b.eye,r1:b.h*1.1,dur:.5,opacity:.5});await eng.wait(.4);b.glow(b.eye,phaseTint?.7:0)},
     // 轉階段：蜷縮後爆發、衝擊波、霧色改變、火盆轉色；結束後只有眼睛與裂縫留著光
-    async bossPhase(p){const b=boss;if(!b)return;stopThreat();await bossBack;stopRoam();fx.banner(p.info.name,"soul phase",1.6);
-      csTo({back:CS0.back+1,side:CS0.side+.8,shift:CS0.shift+.3},.5);b.glow(b.eye,.5);b.play("PhaseShift");
-      const pre=b.impactTime("PhaseShift");
+    async bossPhase(p){const b=boss;if(!b)return;stopThreat();await bossBack;stopRoam();fx.banner(p.info.name,"soul phase",1.4);
+      // 整段壓在約 2.5 秒：片段加速播（原本約 5 秒）
+      const psp=b.has("PhaseShift")?Math.max(1,b.duration("PhaseShift")/2.1):1;
+      csTo({back:CS0.back+1,side:CS0.side+.8,shift:CS0.shift+.3},.4);b.glow(b.eye,.5);b.play("PhaseShift",{speed:psp});
+      const pre=b.impactTime("PhaseShift",psp);
       await eng.tween(pre,()=>{if(Math.random()<.6){const a=rand(0,7),c=b.center();fx.emit({p:v3(c.x+Math.sin(a)*3,rand(.3,2.5),c.z+Math.cos(a)*3),n:1,color:b.eye,speed:[2.5,4],dir:[-Math.sin(a),0,-Math.cos(a)],spread:.1,size:[.06,.12],life:[.5,.8]})}eng.shake(.015,.1)});
       eng.shake(.16,.9);fx.pulseVig("white",.15,.3);fx.ring(H0,{color:b.eye,r1:10,dur:.9});fx.ring(H0,{color:0xffffff,r1:6.5,dur:.6,opacity:.6});fx.pillar(b.root.position,{color:b.eye,r:b.h*.5,h:12,dur:.8});
       fx.emit({p:b.center(),n:50,color:[b.eye,0xff9a4a,0x8a8f9a],speed:[2,9],size:[.06,.14],life:[.5,1.2],drag:1.4});dust(H0,20);pushBack(.7,.4);hero.play("Guard");
       phaseTint=p.phase;const f0=fogC.clone(),f1=new THREE.Color(arena.fog).lerp(new THREE.Color(b.eye),.06*p.phase).multiplyScalar(.6),d0=scene.fog.density,c0=flameC.clone(),c1=new THREE.Color(0xff7a2a).lerp(new THREE.Color(b.eye),.12),k0=flameK;
       eng.tween(1.2,k=>{fogC.lerpColors(f0,f1,k);scene.fog.color.copy(fogC);scene.fog.density=lerp(d0,arena.dens*(1+.22*p.phase),k);flameC.lerpColors(c0,c1,k);flameK=lerp(k0,1+.15*p.phase,k)});
-      await eng.wait(Math.max(1,b.has("PhaseShift")?b.duration("PhaseShift")-pre-.3:1));b.glow(b.eye,.7);csReset(.6);await eng.wait(.3)},
+      await eng.wait(Math.max(.6,b.has("PhaseShift")?b.duration("PhaseShift",psp)-pre-.2:.8));b.glow(b.eye,.7);csReset(.5);await eng.wait(.15)},
     // 蓄力：Boss 擺出蓄力姿勢、眼睛與裂縫轉紅、身邊亮起紅光、紅粒子往身上聚、鏡頭微推；結束後開始倒數提示
     async telegraph(p){const b=boss;if(!b)return;await bossBack;stopRoam();hero.play("Idle");
       b.play("Telegraph",{hold:true});csTo({back:CS0.back-.4,fovD:-3},.6,ease.out);
@@ -339,7 +359,7 @@ export function createSoulScene(eng,fx,api){
     async foeHit(p){stopThreat();const b=boss;if(!b)return;if(p.timeout)hero.play("Guard",{speed:1.6});const at=await bossStrike(1.05);fx.slash(at,{color:0xff3a2a,size:1.5,ang:-.5,dur:.26,sweep:1.6})},
     // 玩家受擊：依 kind（hit／guard／graze）輕重不同（主角只會淡淡閃一下，不會整個變紅）
     async playerHit(p){const c=hero.center(v3(),.6),k=p.kind==="hit"?1:p.kind==="guard"?.45:.55;p.onImpact&&p.onImpact();
-      hero.flash(0xff5040,.25);fx.pulseVig("red",.3+.45*k,.35+.3*k);eng.shake(.03+.1*k,.25+.2*k);eng.hitStop(30+90*k);
+      hero.flash(0xff6a50,1);rimPulse(.5);fx.pulseVig("red",.1+.14*k,.3+.25*k);eng.shake(.03+.1*k,.25+.2*k);eng.hitStop(30+90*k);
       fx.text(v3(c.x,c.y+.9,c.z),"-"+p.dmg,"dmg soul hurt"+(k>=1?" big":""),{dur:1,rise:34});
       if(p.kind==="hit"){hero.play("Hit");sparks(c,16,[0xff3a2a,0x8a1a12,0xffffff],6);fx.burstRing(c,{color:0xff3a2a,r1:1.2});pushBack(1.2,.35);dust(hero.root.position,8)}
       else if(p.kind==="guard"){pushBack(.9,.35)}

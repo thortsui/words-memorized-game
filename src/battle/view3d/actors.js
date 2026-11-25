@@ -78,7 +78,7 @@ const IMPACT={
   boss_sentinel:{Attack:.27,Attack2:.83,PhaseShift:{f:.3}},
   boss_gargoyle:{Attack:.3,Attack2:.92,PhaseShift:{f:.3}},
   boss_priest:{Attack:.38,Attack2:.45,PhaseShift:{f:.3}},
-  boss_executioner:{Attack:.38,Attack2:.75,PhaseShift:{f:.3}},
+  boss_executioner:{Attack:.31,Attack2:.68,PhaseShift:{f:.3}}, // 第二輪實測：傷害數字比斧刃碰到主角晚 60–80ms，各提前 0.07 秒
   boss_devourer:{Attack:.42,Attack2:.6,PhaseShift:{f:.3}},
 };
 // 怪物攻擊片段自帶的前衝距離（身高的倍數）：場景移動怪物時要扣掉，才不會衝過頭
@@ -166,7 +166,7 @@ export class Actor{
     if(isStandin){const s=this.h/(c.height||1);c.group.scale.setScalar(s)}
     this.bob.add(c.group);
     if(this.o.toon)toonify(c.group,this.o.toon);
-    if(this.o.outline)addOutline(c.group,this.h,c.group.scale.x);
+    if(this.o.outline){addOutline(c.group,this.h,c.group.scale.x);if(this.eng.quality==="low")this.setOutline(false)}
     this.mats=[];c.group.traverse(m=>{if(!m.isMesh)return;if(this.o.castShadow&&!m.userData.isOutline)m.castShadow=true;
       for(const mt of Array.isArray(m.material)?m.material:[m.material]){if(mt.userData.outline||this.mats.find(x=>x.m===mt))continue;this.mats.push({m:mt,e0:mt.emissive?mt.emissive.clone():null,o0:mt.opacity,t0:mt.transparent,glow:/Glow/i.test(mt.name||"")||!!mt.emissiveMap||(isStandin&&mt.emissive&&mt.emissiveIntensity>1.5)})}});
     this._tint=true}
@@ -216,7 +216,9 @@ export class Actor{
   /* ---------- 閃白／發光／透明度 ---------- */
   flash(color=0xffffff,k=1){this.flashC.set(color);this.flashK=k;this._tint=true}
   glow(color,k){if(color!=null)this.glowC.set(color);this.glowK=k;this._tint=true}
-  setOpacity(v){this.opacity=v;for(const x of this.mats){x.m.transparent=v<1?true:x.t0;x.m.opacity=x.o0*v}this.content.traverse(o=>{if(o.userData.isOutline)o.visible=v>.9});this.shadow.material.opacity=(this.cute?.55:.75)*v}
+  // 低畫質：描邊整個關掉（每個部位少畫一次、少算一次蒙皮）
+  setOutline(on){this.content.traverse(o=>{if(o.userData.isOutline)o.visible=on&&this.opacity>.9})}
+  setOpacity(v){this.opacity=v;for(const x of this.mats){x.m.transparent=v<1?true:x.t0;x.m.opacity=x.o0*v}const ol=this.eng.quality!=="low";this.content.traverse(o=>{if(o.userData.isOutline)o.visible=ol&&v>.9});this.shadow.material.opacity=(this.cute?.55:.75)*v}
 
   _update(dt,time){if(this.mixer)this.mixer.update(dt);
     // 待機／走路／飛行的程式擺動
@@ -234,7 +236,7 @@ export class Actor{
     // 閃白衰減、發光（發光量除以材質的發光強度，避免本來就會發光的材質整個過曝）
     if(this.flashK>0){this.flashK=Math.max(0,this.flashK-dt*5.5);this._tint=true}
     if(this.glowK!==this._g0){this._g0=this.glowK;this._tint=true}
-    if(this._tint){this._tint=this.flashK>0;const soft=this.o.soft,fk=Math.min(soft?.07:1,this.flashK); // 魂系場景很暗，自發光只要一點點就很亮
+    if(this._tint){this._tint=this.flashK>0;const soft=this.o.soft,fk=soft?Math.min(1,this.flashK)*.008:Math.min(1,this.flashK); // 暗場景裡 3% 的白色自發光就足以把整隻洗成灰白，所以只留 0.8%，主要靠輪廓光脈衝 // 魂系場景很暗，自發光只要一點點就很亮
       for(const x of this.mats){if(!x.e0)continue;x.m.emissive.copy(x.e0);
         if(this.glowK>0){
           if(soft){ // 魂系：只讓「本來就會發光」的部位（眼睛、裂縫）換色變亮，身體只帶一點點色

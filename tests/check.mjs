@@ -1,7 +1,7 @@
 // 純邏輯檢查：node tests/check.mjs
 import assert from 'node:assert/strict';
 import { BUILTIN } from '../src/data/no307.js';
-import { isPhrase, normEn, enVariants, checkEn, checkZh, nearZh, zhSegs, clozeAns, clozePos, zhPrompt, inflections, checkZhSmart, opts, mcOf, sayable } from '../src/core/grading.js';
+import { isPhrase, normEn, enVariants, checkEn, checkZh, nearZh, zhSegs, clozeAns, clozePos, zhPrompt, inflections, checkZhSmart, opts, mcOf, sayable, formOf, matchCase, inflectAs } from '../src/core/grading.js';
 import { normalizeState, normalizeSetup } from '../src/core/normalize.js';
 import { parseOcr, parseLines, parseLayout, parseHead, deriveBlank } from '../src/scan/parse.js';
 import { consensus, tally, charDiff, alignEntries, NORM } from '../src/scan/consensus.js';
@@ -115,9 +115,22 @@ t("打怪：打倒 5 隻破關、HP 歸零失敗",()=>{const E=createMonsterBatt
 /* ---------- 魂系模式 ---------- */
 t("魂系：閃避判定依答題速度分級",()=>{assert.equal(gradeDodge(true,900,4000,1500),"parry");assert.equal(gradeDodge(true,2000,4000,1500),"dodge");assert.equal(gradeDodge(true,3500,4000,1500),"graze");assert.equal(gradeDodge(true,4001,4000,1500),"hit");assert.equal(gradeDodge(false,500,4000,1500),"hit")});
 t("魂系：動態難度隨答題速度變化",()=>{assert.equal(difficulty([]).d,0);const fast=difficulty(Array(8).fill({ok:true,ms:1200})),slow=difficulty(Array(8).fill({ok:true,ms:5500})),bad=difficulty(Array(8).fill({ok:false,ms:1000}));
-  assert.equal(fast.d,1);assert.ok(Math.abs(fast.limitMul-(1-SOUL.limitSwing))<1e-9);assert.equal(fast.extra,1);assert.equal(fast.perfectMs,SOUL.perfectMs-SOUL.perfectSwing);assert.equal(fast.dmgMul,1+SOUL.dmgBonus);
+  assert.equal(fast.d,1);assert.ok(Math.abs(fast.limitMul-(1-SOUL.limitSwing))<1e-9);assert.equal(fast.extra,1);assert.equal(fast.perfectMs,SOUL.perfectMs-SOUL.perfectSwing-SOUL.perfectTight);assert.equal(fast.dmgMul,1+SOUL.dmgBonus);assert.ok(Math.abs(fast.foeMul-(1+SOUL.foeDmgSwing))<1e-9);
   // 答得慢：時限放寬，但 Boss 不會少出手（亂點會被判成「很慢」，不能讓它佔便宜）
-  assert.equal(slow.d,-1);assert.ok(Math.abs(slow.limitMul-(1+SOUL.limitSwing))<1e-9);assert.equal(slow.extra,0);assert.equal(slow.perfectMs,SOUL.perfectMs+SOUL.perfectSwing);assert.equal(slow.dmgMul,1);assert.equal(bad.d,-1)});
+  assert.equal(slow.d,-1);assert.ok(Math.abs(slow.limitMul-(1+SOUL.limitSwing))<1e-9);assert.equal(slow.extra,0);assert.equal(slow.perfectMs,SOUL.perfectMs+SOUL.perfectSwing);assert.equal(slow.dmgMul,1);assert.equal(slow.foeMul,1);assert.equal(bad.d,-1);
+  // 彈反門檻只在 d 超過 tightAt 之後才額外收緊；d＝tightAt 時還是 1.5−0.3d
+  const mid=difficulty(Array(8).fill({ok:true,ms:(SOUL.paceCenter-SOUL.tightAt*SOUL.paceSpan)*1000}));assert.ok(Math.abs(mid.d-SOUL.tightAt)<1e-9);assert.equal(mid.perfectMs,Math.round(SOUL.perfectMs-SOUL.perfectSwing*SOUL.tightAt));
+  assert.equal(difficulty([]).foeMul,1)});
+t("魂系：第二輪調整後的數值（攻擊時間 10.5 秒答得到第 4 題、擊倒回 40、守門騎士 HP 60）",()=>{assert.equal(SOUL.windowMs,10500);assert.equal(SOUL.healOnKill,40);assert.equal(SOUL_BOSSES[0].hp,60);
+  assert.ok(SOUL.windowMs-3*SOUL.minCostMs>=SOUL.minCostMs,"每題 2.5 秒也答得到第 4 題");
+  // 高手（0.45–0.85 秒）在 d=1 時的彈反門檻落在這個區間裡：一部分會變成翻滾
+  const pm=difficulty(Array(8).fill({ok:true,ms:600})).perfectMs;assert.ok(pm>450&&pm<850,"perfectMs="+pm)});
+t("魂系：Boss 傷害跟著動態難度加重（只看 d，答得快才會痛）",()=>{const b=SOUL_BOSSES[0];
+  const run=recent=>{const E=createSoulBattle({pool,mode:"en2zh",rng:()=>0});E.start();E.state.recent=recent.slice();E.state.stamina=0;E.nextAttackQuestion();E.attackTimeout();E.nextDodge();
+    const ev=E.answerDodge(false,E.state.enemy.cur.limitMs+1,{timeout:true});return ev.find(e=>e.type==="playerHit").dmg};
+  assert.equal(run([]),b.atk);assert.equal(run(Array(8).fill({ok:true,ms:5500})),b.atk);
+  // 最後一題超時也會被記進 recent，所以用當下的難度反推預期值
+  const fastRecent=Array(8).fill({ok:true,ms:900}),d=difficulty(fastRecent).foeMul;assert.ok(d>1.5);assert.equal(run(fastRecent),Math.round(b.atk*d))});
 t("魂系：玩家回合累積 ATB、迅擊、出招、時間用完換敵人",()=>{const E=createSoulBattle({pool,mode:"en2zhT",rng:()=>0});assert.deepEqual(types(E.start()),["bossEnter","playerTurn"]);
   let q=E.nextAttackQuestion();assert.equal(q.leftMs,SOUL.windowMs);let ev=E.answerAttack(true,3000);assert.deepEqual(types(ev),["atb"]);assert.equal(E.state.atb,1);assert.equal(E.state.atkLeft,SOUL.windowMs-3000);assert.equal(E.state.phase,"cmd");
   assert.deepEqual(types(E.command(0)),[]);assert.equal(E.state.phase,"pturn");
@@ -125,7 +138,7 @@ t("魂系：玩家回合累積 ATB、迅擊、出招、時間用完換敵人",()
   E.nextAttackQuestion();ev=E.answerAttack(true,1000);assert.deepEqual(types(ev),["atb","quickSlash","hit"]);assert.equal(ev[2].dmg,Math.round(SOUL.quickDmg*comboMult(2)));assert.equal(E.state.atb,2);assert.equal(E.state.atkLeft,SOUL.windowMs-3000-SOUL.minCostMs);
   ev=E.command(2);assert.deepEqual(types(ev).slice(0,4),["skill","hit","hit","hit"]);assert.equal(E.state.atb,0);assert.equal(E.state.phase,"cmd");assert.deepEqual(E.command(1),[]);
   // 答錯多扣 missPenaltyMs
-  E.command(0);let left=E.state.atkLeft;E.nextAttackQuestion();ev=E.answerAttack(false,2600);assert.deepEqual(types(ev),["miss"]);assert.equal(E.state.atkLeft,Math.max(0,left-2600-SOUL.missPenaltyMs));
+  E.command(0);let left=E.state.atkLeft;E.nextAttackQuestion();const slow=left-SOUL.missPenaltyMs;ev=E.answerAttack(false,slow);assert.deepEqual(types(ev),["miss"]);assert.equal(E.state.atkLeft,Math.max(0,left-slow-SOUL.missPenaltyMs));
   assert.equal(E.state.atkLeft,0);
   ev=E.command(0);assert.deepEqual(types(ev),["windowEnd","enemyTurn"]);assert.equal(E.state.phase,"enemy")});
 t("魂系：彈反／閃避／擦傷／格擋／中招與耐力",()=>{const b=SOUL_BOSSES[0],mkE=()=>{const E=createSoulBattle({pool,mode:"zh2enT",rng:()=>0});E.start();E.nextAttackQuestion();E.answerAttack(false,10000);E.command(0);return E};
@@ -141,8 +154,9 @@ t("魂系：彈反／閃避／擦傷／格擋／中招與耐力",()=>{const b=SO
   // 答對但耐力不足以翻滾：勉強格擋
   E=mkE();E.state.stamina=5;E.nextDodge();ev=E.answerDodge(true,2500);assert.deepEqual(types(ev),["guard","playerHit"]);assert.equal(ev[1].dmg,Math.max(1,Math.round(b.atk*SOUL.guardRate)));assert.equal(E.state.stamina,0)});
 t("魂系：Boss 階段轉換、擊倒後換下一隻（回復 HP、ATB 歸零）、全破",()=>{const E=createSoulBattle({pool,mode:"en2zh",rng:()=>0});E.start();E.state.atb=3;E.state.phase="cmd";
-  let ev=E.command(3);assert.ok(types(ev).includes("bossPhase"));assert.equal(E.state.bphase,1);assert.ok(E.state.mhp>0&&E.state.mhp<=SOUL_BOSSES[0].hp*SOUL_BOSSES[0].phases[0].at);
-  E.state.atb=3;E.state.hp=30;E.state.phase="cmd";ev=E.command(1);assert.deepEqual(types(ev),["skill","hit","faint","heal","bossEnter","playerTurn"]);assert.equal(E.state.mi,1);assert.equal(E.state.bphase,0);assert.equal(E.state.phase,"pturn");
+  let ev=E.command(2);assert.ok(types(ev).includes("bossPhase")); // 守門騎士 HP 60：連斬（36）打到半血以下、但不會倒
+  assert.equal(E.state.bphase,1);assert.ok(E.state.mhp>0&&E.state.mhp<=SOUL_BOSSES[0].hp*SOUL_BOSSES[0].phases[0].at);
+  E.state.atb=3;E.state.hp=30;E.state.mhp=5;E.state.phase="cmd";ev=E.command(1);assert.deepEqual(types(ev),["skill","hit","faint","heal","bossEnter","playerTurn"]);assert.equal(E.state.mi,1);assert.equal(E.state.bphase,0);assert.equal(E.state.phase,"pturn");
   assert.equal(E.state.hp,30+SOUL.healOnKill);assert.equal(E.state.atb,0);
   let guard=0;while(E.state.phase!=="end"&&guard++<400){E.state.atb=3;E.state.phase="cmd";ev=E.command(3)}
   assert.equal(E.result().win,true);assert.equal(E.result().kills,SOUL_BOSSES.length);assert.equal(ev.at(-1).type,"win")});
@@ -243,6 +257,30 @@ t("規則檢查：兩個引擎犯同一種錯也攔得下（片語黏成一個�
 t("測試書頁的正確答案：只有故意印錯的 recieve 會被規則檢查標出來",()=>{const T=JSON.parse(rd("tests/fixtures/truth.json")),all=Object.values(T).flat();assert.equal(all.length,26);
   assert.deepEqual(all.filter(w=>ruleWarnings(w,lex).length).map(w=>w.en),["recieve"]);for(const w of all)assert.equal(deriveBlank(w.en,w.pos,w.ex),w.blank,w.en)});
 t("PP-OCR 字元表（YAML）解析",()=>{assert.deepEqual(parseDict("PostProcess:\n  name: CTCLabelDecode\n  character_dict:\n  - '!'\n  - ''''\n  - a\n  - \\\n  - 棄\nOther: 1\n"),["!","'","a","\\","棄"])});
+/* ---------- 第二輪手機試玩：克漏字選項不能靠大小寫／單複數／時態洩線索 ---------- */
+t("matchCase／formOf／inflectAs",()=>{
+  assert.equal(matchCase("Monday","dyed"),"monday");assert.equal(matchCase("carved","Paint"),"Carved");assert.equal(matchCase("TV","dyed"),"TV");assert.equal(matchCase("I am","dyed"),"I am");assert.equal(matchCase("according to","No matter what"),"According to");
+  assert.equal(formOf("dyed","dye","v."),"ed");assert.equal(formOf("went","go","v."),"ed");assert.equal(formOf("misunderstood","misunderstand","v."),"ed");assert.equal(formOf("goes","go","v."),"s");
+  assert.equal(formOf("children","child","n."),"s");assert.equal(formOf("accents","accent","n."),"s");assert.equal(formOf("making","make","v."),"ing");assert.equal(formOf("better","good","adj."),"er");assert.equal(formOf("Paint","paint","v."),"base");assert.equal(formOf("goods","goods","n."),"base");
+  assert.equal(inflectAs("carve","ing"),"carving");assert.equal(inflectAs("identify","ed"),"identified");assert.equal(inflectAs("accomplish","s"),"accomplishes");assert.equal(inflectAs("overlook","ed"),"overlooked");
+  // 沒把握的一律不變：不規則、含不規則字根、要重複字尾子音、-ye／-ee
+  for(const [en,f] of [["go","ed"],["misunderstand","ed"],["stop","ing"],["dye","ing"],["agree","ing"],["goods","s"],["pick up","ed"]])assert.equal(inflectAs(en,f),"",en)});
+t("克漏字選項：大小寫與正解一致、4 個不重複且含正解",()=>{const up=x=>/^[A-Z]/.test(x);let n=0;
+  for(const w of W){const ans=clozeAns(w);if(!ans)continue;n++;for(let k=0;k<12;k++){const o=opts(w,"cloze",W);assert.equal(o.length,4,w.en);assert.equal(new Set(o.map(x=>x.toLowerCase())).size,4,w.en+"："+o);assert.ok(o.includes(ans),w.en);
+    for(const x of o)assert.equal(up(x),up(ans),`${w.en}：${o.join("／")}`)}}
+  assert.ok(n>100);
+  // 句首的答案（字首大寫）：干擾項也都要大寫；句中的答案：都小寫（就算干擾項在它自己的例句裡是句首）
+  const bank=[...W,{id:"x1",en:"paint",pos:"v.",zh:"油漆",ex:"Paint the wall, painter!",blank:""},{id:"x2",en:"carve",pos:"v.",zh:"雕刻",ex:"Carve the wood slowly.",blank:""}];
+  for(let k=0;k<20;k++){const o=opts(bank[bank.length-2],"cloze",bank);assert.ok(o.includes("Paint"));assert.ok(o.every(up),o.join("／"))}
+  for(let k=0;k<40;k++){const o=opts(by("dye"),"cloze",bank);assert.ok(!o.some(up),o.join("／"))}});
+t("克漏字選項：單字題的干擾項與正解同詞形（-ed 配 -ed、複數配複數、-ing 配 -ing、原形不混複數）",()=>{const one=W.filter(w=>!isPhrase(w)&&clozeAns(w)&&!/\s/.test(clozeAns(w)));let ed=0,s=0,ing=0;
+  for(const w of one){const ans=clozeAns(w),f=formOf(ans,w.en,w.pos);for(let k=0;k<12;k++){const o=opts(w,"cloze",W),msg=`${ans}：${o.join("／")}`;
+    assert.ok(o.every(x=>!/\s/.test(x)),msg); // 單字題不混片語
+    if(f==="ed"&&/ed$/.test(ans)){ed++;assert.ok(o.filter(x=>/(ed|[a-z]{3})$/.test(x)).length===4&&o.filter(x=>/ed$/.test(x)).length>=3,msg)} // misunderstood 這種不規則過去式可以混進來
+    if(f==="s"){s++;assert.ok(o.every(x=>/s$/.test(x)),msg)}
+    if(f==="ing"){ing++;assert.ok(o.every(x=>/ing$/.test(x)),msg)}
+    if(f==="base"&&/^n/.test(w.pos)&&!/s$/.test(ans))assert.ok(o.every(x=>!/[^su]s$/.test(x)),msg)}} // 單數名詞不混複數（goods 這種）
+  assert.ok(ed>0&&s>0&&ing>0)});
 console.log(`\n全部通過：${n} 項`);
 // 掃描「漏網」情境（試用測試找到的問題）另外放在 scan.check.mjs
 await import("./scan.check.mjs");

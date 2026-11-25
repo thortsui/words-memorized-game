@@ -1,6 +1,6 @@
 // 戰鬥控制器：把規則引擎（monster.js／soul.js）、HUD（DOM）與戰鬥畫面（view3d.js）接在一起。
 // 計時、作答、朗讀、錯題紀錄都在這裡；規則本身在引擎裡，畫面動畫在 view 裡。
-import { $, app, esc, ask, SC, wait, lsGet, lsSet } from '../core/util.js';
+import { $, app, esc, ask, SC, wait, lsGet, lsSet, KEY_HINT } from '../core/util.js';
 import { setup, mark, pushHist, allWords, ctx, save } from '../core/store.js';
 import { clozeAns, opts, normEn, checkEn, checkZhSmart, zhPrompt, clozePos } from '../core/grading.js';
 import { speak, readAll, gate, spkBtn, stopSpeech, releaseSpeech } from '../core/speech.js';
@@ -15,7 +15,10 @@ import { toSetup, exLine, startQuiz } from '../pages/practice.js';
 const RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
 let T=null; // 目前這場戰鬥：{E 引擎, view, soul, phase, …}
 const alive=t=>t===T&&ctx.B===t;
-const TAP_GUARD_MS=350; // 題目出現後這段時間內的點擊不算作答
+// 題目出現後這段時間內的點擊不算作答（選項同時顯示成未啟用）。魂系的閃避題分秒必爭，維持原本的 350ms
+const guardMs=t=>t.soul?350:500;
+const setAns=v=>{const w=app.querySelector(".bwrap");if(w)w.classList.toggle("ans",!!v)}; // 已作答的回饋狀態（版面讓出高度）
+function nextBtn(label){const nb=document.createElement("button");nb.className="pri nextbtn";nb.id="bnx";nb.textContent=label;$("#bq").appendChild(nb);return nb}
 const say=(t,cls)=>{const el=$("#msg");if(!el)return;el.className="msgbox "+(cls||"");el.textContent=t};
 
 export function startBattle(ws,soul){if(!ws.length)return;ctx.Q=null;stopSpeech();
@@ -43,21 +46,38 @@ export function endBattle(){const t=T;if(!t)return;cancelAnimationFrame(t.raf);c
 
 // 逃跑（按鈕或瀏覽器上一頁）：先確認；中斷時把這場已作答的紀錄寫進練習歷程
 let asking=false;
-async function flee(t){if(asking||!alive(t))return;asking=true;const ok=await ask("要逃跑嗎？已作答的題目會記進練習歷程，但這場戰鬥不能接續。");asking=false;if(!ok||!alive(t))return;saveProgress(t);endBattle();toSetup()}
+// 確認框開著的期間暫停計時與畫面（兩個模式都是），取消後接著跑
+async function flee(t){if(asking||!alive(t))return;asking=true;
+  const po=$("#pauseov");if(po)po.remove(); // 「已暫停」遮罩還在就先收掉（它會蓋住確認框）；暫停狀態由這裡接手
+  if(!t.paused){t.paused=true;t.tm&&t.tm.pause();t.view.setPaused&&t.view.setPaused(true)}
+  const ok=await ask("要逃跑嗎？已作答的題目會記進練習歷程，但這場戰鬥不能接續。");asking=false;if(!alive(t))return;
+  if(!ok){t.paused=false;t.view.setPaused&&t.view.setPaused(false);t.tm&&t.tm.resume();return}
+  saveProgress(t);endBattle();toSetup()}
 function saveProgress(t){if(!t||t.saved)return;const r=t.E.result();if(!r.n)return;t.saved=true;
   pushHist({t:Date.now(),mode:t.mode,dict:setup.dict,n:r.n,right:r.right,wrong:r.wrong.map(w=>[w.dict||setup.dict,w.id]),game:t.soul?"soul":true,aborted:true})}
-// 戰鬥中多推一筆 history：按上一頁會先跳出逃跑確認（不會直接離開網站）；重新整理或關分頁前由瀏覽器提示
-const onPop=()=>{const t=T;if(!t||ctx.B!==t)return;history.pushState({battle:1},"");flee(t)};
+// 戰鬥中多推一筆 history：按上一頁會先跳出逃跑確認（不會直接離開網站）；重新整理或關分頁前由瀏覽器提示。
+// 這一筆在離開戰鬥時收回（history.back），否則離開後第一次按上一頁會沒反應；popSkip＝自己觸發的 popstate，不當成使用者按上一頁。
+let popSkip=0;
+const hasMark=()=>{try{return!!(history.state&&history.state.battle)}catch(e){return false}};
+window.addEventListener("popstate",()=>{if(popSkip>0){popSkip--;return}const t=T;
+  if(!t||ctx.B!==t){if(hasMark()){popSkip++;try{history.back()}catch(e){popSkip--}}return} // 沒在戰鬥卻走到殘留的那一筆：直接再退一步
+  if(!hasMark())try{history.pushState({battle:1},"")}catch(e){}flee(t)});
 const onUnload=e=>{if(!T||ctx.B!==T)return;e.preventDefault();e.returnValue=""};
 const onHide=()=>{if(T&&ctx.B===T)saveProgress(T)}; // 真的離開頁面時才寫入
-function guardOn(){guardOff();try{history.pushState({battle:1},"")}catch(e){}window.addEventListener("popstate",onPop);window.addEventListener("beforeunload",onUnload);window.addEventListener("pagehide",onHide)}
-function guardOff(){window.removeEventListener("popstate",onPop);window.removeEventListener("beforeunload",onUnload);window.removeEventListener("pagehide",onHide)}
+function unbind(){window.removeEventListener("beforeunload",onUnload);window.removeEventListener("pagehide",onHide)}
+function guardOn(){unbind();if(!hasMark())try{history.pushState({battle:1},"")}catch(e){}window.addEventListener("beforeunload",onUnload);window.addEventListener("pagehide",onHide)}
+function guardOff(){unbind();if(hasMark()){popSkip++;try{history.back()}catch(e){popSkip--}}}
 
 // 軟鍵盤彈出時 visualViewport 會變矮：把高度寫進 --vvh 讓 .bwrap 跟著縮，並加上 body.kbd 讓戰場讓出空間給題目與輸入框
-const vv=window.visualViewport;
-function vvSync(){if(!vv)return;const h=Math.round(vv.height);document.documentElement.style.setProperty("--vvh",h+"px");document.body.classList.toggle("kbd",h<window.innerHeight-120||h<430);if(vv.offsetTop||window.scrollY)window.scrollTo(0,0)}
-function vvOn(){if(!vv)return;vv.addEventListener("resize",vvSync);vv.addEventListener("scroll",vvSync);vvSync()}
-function vvOff(){if(!vv)return;vv.removeEventListener("resize",vvSync);vv.removeEventListener("scroll",vvSync);document.documentElement.style.removeProperty("--vvh");document.body.classList.remove("kbd")}
+// 鍵盤是否彈出：只在輸入框有焦點時，看可視高度比「沒在打字時的高度」縮了多少（不能用絕對高度判斷，橫式手機本來就只有 390px 高）
+const vv=window.visualViewport;let vvBase=0,vvW=0;
+const typing=()=>{const a=document.activeElement;return!!a&&(a.tagName==="INPUT"||a.tagName==="TEXTAREA")};
+function vvSync(){if(!vv)return;const h=Math.round(vv.height),full=Math.round(vv.height*(vv.scale||1)),w=Math.round(vv.width*(vv.scale||1)),ty=typing();
+  if(w!==vvW||!ty){vvW=w;vvBase=Math.max(full,ty?0:window.innerHeight)}else vvBase=Math.max(vvBase,full); // 轉向或沒在打字：重新記基準
+  document.documentElement.style.setProperty("--vvh",h+"px");document.body.classList.toggle("kbd",ty&&vvBase-full>120);if(vv.offsetTop||window.scrollY)window.scrollTo(0,0)}
+const vvLater=()=>setTimeout(()=>{if(T)vvSync()},0);
+function vvOn(){if(!vv)return;vvBase=0;vvW=0;vv.addEventListener("resize",vvSync);vv.addEventListener("scroll",vvSync);document.addEventListener("focusin",vvLater);document.addEventListener("focusout",vvLater);vvSync()}
+function vvOff(){if(!vv)return;vv.removeEventListener("resize",vvSync);vv.removeEventListener("scroll",vvSync);document.removeEventListener("focusin",vvLater);document.removeEventListener("focusout",vvLater);document.documentElement.style.removeProperty("--vvh");document.body.classList.remove("kbd")}
 
 /* ---------- 序章 ---------- */
 function story(t,lines,key){return new Promise(res=>{const st=document.createElement("div");st.className="story";st.innerHTML=`<button class="sm sskip" id="sskip">跳過序章 ✕</button><div class="sbox"><p id="stxt"></p><div class="row" style="justify-content:space-between;margin-top:8px"><span class="small" id="spg" style="color:#555"></span><button class="sm pri" id="snext">繼續 ▶</button></div></div>`;$("#ovl").appendChild(st);
@@ -94,18 +114,27 @@ const MSG={
   telegraph:e=>[`${e.boss.name} 準備使出 ${e.move}！快答對才能彈反！`,"bad"],
   parry:()=>["彈反成功！ATB +1，立刻反擊！","good"],
   dodge:()=>["翻滾閃避成功！","good"],
-  guard:()=>["耐力不足，只能勉強格擋！","bad"],
+  guard:e=>e.blocked?[`答錯了！舉盾硬擋（耐力 −${SOUL.blockCost}）`,"bad"]:["耐力不足，勉強格擋！","bad"],
   graze:()=>["答得太慢，被擦傷！","bad"],
   foeHit:e=>[e.timeout?"來不及了！":"答錯了，沒有躲開！","bad"],
   faint:e=>[`${(e.monster||e.boss).name} 倒下了！`,"good"],
   heal:e=>[`你恢復了 ${e.amount} HP！`,"good"],
 };
 const SFX={gain:"shot",atb:"shot",chainStart:"shot",chainCharge:"shot",telegraph:"hurt",parry:"parry",dodge:"shot",faint:"faint",heal:"win"};
-async function run(t,events){for(const e of events){if(!alive(t))return;const m=MSG[e.type]&&MSG[e.type](e);if(m)say(m[0],m[1]);if(SFX[e.type])sfx(SFX[e.type]);
+// 大招演出期間（起手到最後一段傷害）在 .bwrap 掛 bigfx：「你」的血量框先收起來，不擋畫面
+const bigFx=v=>{const w=app.querySelector(".bwrap");if(w)w.classList.toggle("bigfx",!!v)};
+async function run(t,events){try{await runEvents(t,events)}finally{if(alive(t))bigFx(false)}}
+// 耐力被扣（翻滾、硬擋、格擋、擦傷）：耐力條閃紅＋冒出扣減數字
+function staDrain(n){const el=app.querySelector(".enb.sta");if(!el||!n)return;el.classList.remove("drain");void el.offsetWidth;el.classList.add("drain");
+  const f=document.createElement("em");f.className="stadrop";f.textContent="−"+n;el.appendChild(f);setTimeout(()=>f.remove(),900)}
+async function runEvents(t,events){for(const e of events){if(!alive(t))return;
+    if(!t.soul){if((e.type==="skill"&&e.big)||e.type==="chainFire")bigFx(true);else if(e.type!=="hit"&&e.type!=="chainStage"&&!(e.type==="skill"&&e.chainStage))bigFx(false)}const m=MSG[e.type]&&MSG[e.type](e);if(m)say(m[0],m[1]);if(SFX[e.type])sfx(SFX[e.type]);
     const s=e.s;
     if(e.type==="hit"){e.onImpact=()=>{sfx(e.big||e.dmg>=40?"crit":"hit");hud(s,"foe")}} // 命中瞬間才扣怪物血
     else if(e.type==="playerHit"){e.onImpact=()=>{sfx("hurt");hud(s,"me")}}
     else hud(s);
+    if(t.soul&&(e.type==="guard"||e.type==="dodge"||e.type==="graze")){const prev=t.lastSta==null?s.stamina:t.lastSta;if(prev>s.stamina)staDrain(prev-s.stamina)}
+    if(t.soul&&s)t.lastSta=s.stamina;
     if(e.type==="win")sfx("win");if(e.type==="lose")sfx("lose");
     // 倒下、登場、結局一律用正常速度播（不沿用出招時的慢動作）
     if(e.type==="faint"||e.type==="bossEnter"||e.type==="enter"||e.type==="win"||e.type==="lose")t.view.setTimeScale(1);
@@ -124,37 +153,39 @@ function qCard(t,w,m,o={}){let prompt="",body="";
   if(m==="en2zh"||m==="zh2en"||m==="cloze"){const key=m==="en2zh"?"zh":m==="zh2en"?"en":"cloze";t.ans=key==="cloze"?clozeAns(w):w[key];t.opts=opts(w,key,t.bank);
     body=`<div class="bopts" id="bopts">${t.opts.map((x,i)=>`<button data-o="${i}" class="${key==="zh"?"":"en"}${x.length>(key==="zh"?13:22)?" long":""}"><span class="k">${i+1}</span><span class="ot">${esc(x)}</span></button>`).join("")}</div>`}
   else{t.opts=null;body=`<form id="btf" class="row" style="margin-top:8px"><input id="bti" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" ${m==="zh2enT"?'inputmode="text" lang="en"':""} placeholder="${m==="en2zhT"?"輸入中文意思":"輸入英文"}" style="flex:1 1 160px;width:auto"><button class="pri">送出</button></form>`}
-  t.qAt=performance.now();
+  t.qAt=performance.now();setAns(false);
   return `<div class="bqcard ${o.cls||""}" id="bqc"><div class="tline"><i id="tb"></i></div>${w._rep?'<div class="small" style="color:var(--bad);font-weight:700">剛剛答錯，再考一次</div>':""}${prompt}${body}<div id="bans"></div></div>`}
 // 接上作答：cb(ok, 選項索引, 作答內容, 近義說明)。填空英翻中要等 Google 判定，期間暫停計時。
-function hook(t,w,m,cb,onPause){const o=$("#bopts");if(o)o.onclick=e=>{const b=e.target.closest("[data-o]");if(b&&t.phase==="q"){if(t.paused||performance.now()-t.qAt<TAP_GUARD_MS)return;t.phase="busy";cb(t.opts[+b.dataset.o]===t.ans,+b.dataset.o,t.opts[+b.dataset.o])}};
+function hook(t,w,m,cb,onPause){const o=$("#bopts");if(o){o.classList.add("guard");setTimeout(()=>o.classList.remove("guard"),guardMs(t))}if(o)o.onclick=e=>{const b=e.target.closest("[data-o]");if(b&&t.phase==="q"){if(t.paused||performance.now()-t.qAt<guardMs(t))return;t.phase="busy";cb(t.opts[+b.dataset.o]===t.ans,+b.dataset.o,t.opts[+b.dataset.o])}};
   const f=$("#btf");if(f){const ti=$("#bti");ti.focus();f.onsubmit=e=>{e.preventDefault();if(t.phase!=="q"||t.paused)return;const v=ti.value;if(!v.trim())return;t.phase="busy";ti.readOnly=true;
     if(m==="en2zhT"){onPause&&onPause();say("判斷中…");checkZhSmart(v,w).then(r=>{if(alive(t))cb(r.ok,-1,v,r.loose)})}else cb(checkEn(v,w),-1,v)}}}
-function markOpts(t,idx){app.querySelectorAll("#bopts button").forEach((b,i)=>{b.disabled=true;if(t.opts[i]===t.ans)b.classList.add("right");else if(i===idx)b.classList.add("wrong")});const bi=$("#bti");if(bi)bi.readOnly=true;const sb=app.querySelector("#btf button");if(sb){sb.disabled=true;sb.hidden=true}}
-function answerLine(w,ok,extra=""){const el=$("#bans");if(!el)return;el.innerHTML=`<div class="ansline ${ok?"ok":"no"}"><span class="w">${esc(w.en)}</span><span class="pos">${esc(w.pos)}</span> ${spkBtn(w.en)}<span class="zhm">${esc(w.zh)}</span>${extra}</div>`}
+function markOpts(t,idx){app.querySelectorAll("#bopts button").forEach((b,i)=>{b.disabled=true;if(t.opts[i]===t.ans)b.classList.add("right");else if(i===idx)b.classList.add("wrong")});const bi=$("#bti");if(bi){bi.readOnly=true;bi.blur()} /* 作答後收起軟鍵盤，版面回到完整高度 */const sb=app.querySelector("#btf button");if(sb){sb.disabled=true;sb.hidden=true}}
+function answerLine(w,ok,extra=""){const el=$("#bans");if(!el)return;el.innerHTML=`<div class="ansline ${ok?"ok":"no"}"><span class="w">${esc(w.en)}</span><span class="pos">${esc(w.pos)}</span> ${spkBtn(w.en)}<span class="zhm">${esc(w.zh)}</span>${extra}</div>`;
+  const al=el.firstChild;al.classList.add("fresh");setTimeout(()=>al.classList.remove("fresh"),400)}
 // 倒數條。回傳 {elapsed(), stop()}；時間到呼叫 onEnd。
 function timer(t,totalMs,startLeft,els,onEnd,onTick){let t0=performance.now(),stopped=false,at=0,pausedAt=0;
   const draw=left=>{const s=`scaleX(${Math.max(0,left/totalMs)})`;els.forEach(e=>{if(e)e.style.transform=s});onTick&&onTick(Math.max(0,left))};draw(startLeft);
   const el=()=>(pausedAt||performance.now())-t0;
-  const tick=()=>{if(stopped||pausedAt||!alive(t))return;const left=startLeft-el();draw(left);if(left<=0){stopped=true;at=startLeft;if(t.tm===me)t.tm=null;onEnd&&onEnd();return}t.raf=requestAnimationFrame(tick)};
+  let lastTick=t0;
+  const tick=()=>{if(stopped||pausedAt||!alive(t))return;const now=performance.now();if(now-lastTick>1000)t0+=now-lastTick;lastTick=now;const left=startLeft-el();draw(left);if(left<=0){stopped=true;at=startLeft;if(t.tm===me)t.tm=null;onEnd&&onEnd();return}t.raf=requestAnimationFrame(tick)};
   const me={elapsed:()=>stopped?at:Math.min(startLeft,el()),stop(){if(!stopped){at=Math.min(startLeft,el());stopped=true;cancelAnimationFrame(t.raf);if(t.tm===me)t.tm=null}return at},
     // 切到背景時暫停、回來按「繼續」才恢復（見 pauseBattle）
-    pause(){if(!stopped&&!pausedAt){pausedAt=performance.now();cancelAnimationFrame(t.raf)}},resume(){if(!stopped&&pausedAt){t0+=performance.now()-pausedAt;pausedAt=0;t.raf=requestAnimationFrame(tick)}}};
+    pause(){if(!stopped&&!pausedAt){pausedAt=performance.now();cancelAnimationFrame(t.raf)}},resume(){if(!stopped&&pausedAt){t0+=performance.now()-pausedAt;pausedAt=0;lastTick=performance.now();t.raf=requestAnimationFrame(tick)}}};
   t.tm=me;t.raf=requestAnimationFrame(tick);return me}
 // 頁面切到背景：暫停計時與畫面，回來後要點一下才繼續（否則回來時已經超時扣血）
 function pauseBattle(t){if(t.paused||!alive(t))return;t.paused=true;t.tm&&t.tm.pause();t.view.setPaused&&t.view.setPaused(true);stopSpeech();
-  const ov=document.createElement("button");ov.className="pauseov";ov.id="pauseov";ov.innerHTML="<b>已暫停</b><span>點一下繼續</span>";document.body.appendChild(ov);
+  const ov=document.createElement("button");ov.className="pauseov";ov.id="pauseov";ov.innerHTML='<span class="pbox"><b>已暫停</b><span>點一下繼續</span></span>';document.body.appendChild(ov);
   ov.onclick=()=>{ov.remove();if(!alive(t))return;t.paused=false;t.view.setPaused&&t.view.setPaused(false);t.tm&&t.tm.resume()}}
 document.addEventListener("visibilitychange",()=>{if(document.hidden&&T&&ctx.B===T)pauseBattle(T)});
 function closeMenu(){const s=$("#skov");if(s)s.remove();const w=app.querySelector(".bwrap");if(w)w.classList.remove("menuopen")}
 const menuOpen=()=>{const w=app.querySelector(".bwrap");if(w)w.classList.add("menuopen")};
 
 /* ---------- 打怪模式 ---------- */
-function mReady(t){if(!alive(t)||!$("#bq"))return;t.phase="ready";closeMenu();const c=t.E.state.chain,S=t.E.state;
-  $("#bq").innerHTML=c?`<button class="pri go chaingo" id="gonext">${esc(c.s.name)}・蓄力 第 ${c.stage+1} / ${c.s.chain.length} 題 ▶<span style="font-size:13px;font-weight:500">限時 ${c.s.times[c.stage]} 秒！${c.s.chain.length} 題全對才會發動（Enter）</span></button>`:`<button class="pri go" id="gonext">下一題 ▶<span style="font-size:13px;font-weight:500">按下後才開始計時（Enter）</span></button>`;
+function mReady(t){if(!alive(t)||!$("#bq"))return;t.phase="ready";closeMenu();setAns(false);const c=t.E.state.chain,S=t.E.state;
+  $("#bq").innerHTML=c?`<button class="pri go chaingo" id="gonext">${esc(c.s.name)}・蓄力 第 ${c.stage+1} / ${c.s.chain.length} 題 ▶<span style="font-size:13px;font-weight:500">限時 ${c.s.times[c.stage]} 秒！${c.s.chain.length} 題全對才會發動${KEY_HINT}</span></button>`:`<button class="pri go" id="gonext">下一題 ▶<span style="font-size:13px;font-weight:500">按下後才開始計時${KEY_HINT}</span></button>`;
   $("#gonext").onclick=()=>mQuestion(t);gate($("#gonext"),t.readP,c?"朗讀中…（聽完就能繼續蓄力）":"朗讀中…（英文→中文→例句）");
   if(c){if(!/連招/.test($("#msg").textContent))say(`連招蓄力中：${c.s.name}（${c.stage}/${c.s.chain.length}）`,"good")}else if(!/出現|倒下|恢復|連招/.test($("#msg").textContent))say(`能量 ${S.en}/${MAXEN}。準備好就按「下一題」。`)}
-function mQuestion(t){if(!alive(t)||t.phase!=="ready")return;const q=t.E.nextQuestion(),w=q.w,m=q.mode;t.phase="q";
+function mQuestion(t){if(!alive(t)||t.phase!=="ready")return;const q=t.E.nextQuestion(),w=q.w,m=q.mode;t.phase="q";setAns(false);
   $("#bq").innerHTML=qCard(t,w,m,{cls:q.chain?"chainq":""});
   if(q.chain)say(`連招蓄力 ${q.chain.stage+1}/${q.chain.total}：${q.limitMs/1000} 秒內答對！`,"bad");else say(`${t.E.monster.name} 正盯著你…越快答對，能量越多！`);
   const fin=(ok,idx,given,loose,opt)=>mAnswer(t,w,ok,idx,given,tm.stop()/1000,loose,opt);
@@ -162,19 +193,19 @@ function mQuestion(t){if(!alive(t)||t.phase!=="ready")return;const q=t.E.nextQue
   const tm=timer(t,q.limitMs,q.limitMs,[$("#tb")],q.timed?()=>{if(t.phase==="q"){t.phase="busy";say("時間到！","bad");fin(false,-1,"（超時）",null,{timeout:true})}}:null);
   hook(t,w,m,fin,()=>tm.stop());
   if(setup.auto&&(m==="en2zh"||m==="en2zhT"))speak(w.en,$("#bq .spk"))}
-async function mAnswer(t,w,ok,idx,given,sec,loose,opt){mark(w,ok,given,t.mode);if(t.opts)markOpts(t,idx);else markOpts(t,-9);answerLine(w,ok);t.readP=readAll(w,$("#bans .spk"));
+async function mAnswer(t,w,ok,idx,given,sec,loose,opt){setAns(true);mark(w,ok,given,t.mode);if(t.opts)markOpts(t,idx);else markOpts(t,-9);answerLine(w,ok);t.readP=readAll(w,$("#bans .spk"));
   const evs=t.E.answer(ok,sec,opt||{});const g=evs.find(e=>e.type==="gain");
   if(ok&&g&&!t.E.state.chain&&t.E.state.phase==="skill")say(`答對了！${loose?"（"+loose+"）":""}${sec.toFixed(1)} 秒，+${g.raw} 能量`+(t.E.state.en===MAXEN?"（已滿）":"")+"。看一下單字，再選招式。","good");
   await run(t,evs);if(!alive(t))return;const ph=t.E.state.phase,c=t.E.state.chain;
   if(ph==="end")return finish(t);
   if(ph==="skill")return mSkills(t);
-  if(ph==="wrong"){t.phase="wrong";say("答錯了，記住正確答案。","bad");const nb=document.createElement("button");nb.className="pri nextbtn";nb.id="bnx";nb.textContent="下一題 ▶";$("#bqc").appendChild(nb);
+  if(ph==="wrong"){t.phase="wrong";say("答錯了，記住正確答案。","bad");const nb=nextBtn("下一題 ▶");
     nb.onclick=()=>{if(t.phase!=="wrong")return;nb.disabled=true;nb.remove();t.E.ack();t.phase="ready";mQuestion(t)};gate(nb,t.readP,"朗讀中…");nb.focus({preventScroll:true});return}
   if(c)say(`連招蓄力 ${c.stage}/${c.s.chain.length}！（${sec.toFixed(1)} 秒）再答對 ${c.s.chain.length-c.stage} 題就能發動「${c.s.name}」`,"good");
   mReady(t)}
 function mSkills(t){if(!alive(t))return;t.phase="skill";const S=t.E.state,mult=comboMult(S.combo);closeMenu();
   const ov=document.createElement("div");ov.className="skov";ov.id="skov";
-  ov.innerHTML=`<div class="row" style="margin-bottom:6px;flex-wrap:nowrap"><b>選擇招式</b><span class="small" style="margin-left:auto;color:#5ad1ff">能量 ${S.en}/${MAXEN}${mult>1?`・×${mult.toFixed(1)}`:""}</span><button class="skip sm" data-s="-1" style="padding:2px 12px">不出招</button></div><div class="skills">${SKILLS.map((s,i)=>s.chain?"":`<button data-s="${i}" ${S.en<s.cost?"disabled":""}><b><span class="k">${i+1}</span>${s.name}</b><span class="c">${s.cost?"⚡"+s.cost:"免費"}・約 ${s.hits.reduce((a,b)=>a+Math.round(b*mult),0)}</span></button>`).join("")}<div class="chl"><b>連招（不耗能量、還會累積能量）</b> 連續答對指定題數後一次打出整套，限時較短</div>${SKILLS.map((s,i)=>s.chain?`<button class="chainb" data-s="${i}"><b><span class="k">${i+1}</span>${s.name}</b><span class="c">連對 ${s.chain.length} 題・約 ${(m=>s.stages.flat().reduce((a,b)=>a+Math.round(b*m),0))(comboMult(S.combo+s.chain.length))}</span></button>`:"").join("")}</div>`;
+  ov.innerHTML=`<div class="row" style="margin-bottom:6px;flex-wrap:nowrap"><b>選擇招式</b><span class="small" style="margin-left:auto;color:#5ad1ff;white-space:nowrap"><span style="color:#9dffb8">HP ${S.hp}</span>・能量 ${S.en}/${MAXEN}${mult>1?`・×${mult.toFixed(1)}`:""}</span><button class="skip sm" data-s="-1" style="padding:2px 12px">不出招</button></div><div class="skills">${SKILLS.map((s,i)=>s.chain?"":`<button data-s="${i}" ${S.en<s.cost?"disabled":""}><b><span class="k">${i+1}</span>${s.name}</b><span class="c">${s.cost?"⚡"+s.cost:"免費"}・約 ${s.hits.reduce((a,b)=>a+Math.round(b*mult),0)}</span></button>`).join("")}<div class="chl"><b>連招（不耗能量、還會累積能量）</b> 連續答對指定題數後一次打出整套，限時較短</div>${SKILLS.map((s,i)=>s.chain?`<button class="chainb" data-s="${i}"><b><span class="k">${i+1}</span>${s.name}</b><span class="c">連對 ${s.chain.length} 題・約 ${(m=>s.stages.flat().reduce((a,b)=>a+Math.round(b*m),0))(comboMult(S.combo+s.chain.length))}</span></button>`:"").join("")}</div>`;
   $("#ovl").appendChild(ov);menuOpen();
   ov.onclick=async e=>{const b=e.target.closest("[data-s]");if(!b||b.disabled||t.phase!=="skill")return;const i=+b.dataset.s;closeMenu();t.phase="busy";
     if(i<0)say(`保留能量 ${S.en}/${MAXEN}。`);
@@ -196,10 +227,20 @@ function sQ(t){if(!alive(t)||!$("#bq"))return;++t.seq;t.view.setTimeScale(1);clo
   hook(t,w,m,async(ok,idx,given,loose)=>{const ms=tm.stop();mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerAttack(ok,ms),s=t.E.snapshot();$("#satb").innerHTML=atbHtml(s);
     say(ok?`答對！${loose?"（"+loose+"）":""}ATB ${s.atb}/3。剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`:`答錯了，多扣 ${SOUL.missPenaltyMs/1000} 秒！剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`,ok?"good":"bad");
-    await run(t,evs);if(!alive(t))return;const ph=t.E.state.phase;if(ph==="end")return finish(t);if(ph==="pturn")return sQ(t);sCmd(t)},()=>tm.stop());
+    setAns(true);const seq=t.seq;
+    await run(t,evs);if(!alive(t)||t.seq!==seq)return;const ph=t.E.state.phase;if(ph==="end")return finish(t);if(ph==="pturn")return sQ(t);
+    // 沒有任何招可出：不開指令列。答錯的話多停一下讓玩家看正確答案
+    if(!t.E.commands().some(c=>c.ready)){await holdFor(t,ok?350:1100);if(!alive(t)||t.seq!==seq)return}
+    sCmd(t)},()=>tm.stop());
   if(setup.auto&&(m==="en2zh"||m==="en2zhT"))speak(w.en,$("#bq .spk"))}
 // 指令列（時間減速）：放在題目卡下面的一排按鈕，不蓋住戰場
-function sCmd(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;t.phase="cmd";t.view.setTimeScale(.3);closeMenu();const S=t.E.snapshot(),cmds=t.E.commands();
+// 等一小段時間（暫停中不算）
+async function holdFor(t,ms){let left=ms;while(left>0&&alive(t)){await wait(50);if(!t.paused)left-=50}}
+async function soulNext(t,seq){await run(t,t.E.command(0));if(!alive(t)||t.seq!==seq)return;const ph=t.E.state.phase;if(ph==="end")return finish(t);if(ph==="pturn")return sQ(t);if(ph==="enemy")return sEnemy(t)}
+function sCmd(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();const S=t.E.snapshot(),cmds=t.E.commands();
+  // ATB 不夠出任何招：沒有選擇可做，直接出下一題（攻擊時間用完就直接輪到敵人）
+  if(!cmds.some(c=>c.ready)){t.phase="busy";t.view.setTimeScale(1);return soulNext(t,seq)}
+  t.phase="cmd";t.view.setTimeScale(.3);
   const ov=document.createElement("div");ov.className="cmdrow";ov.id="skov";
   ov.innerHTML=`<div class="cmdhead"><b>指令</b><span>時間減速中・ATB ${S.atb}/3</span></div><div class="cmds">${cmds.map(c=>`<button data-c="${c.k}" ${c.ready?"":"disabled"} class="${c.big?"big":""}"><b><span class="k">${c.k}</span>${c.name}</b><span class="c">ATB ${c.bars}・約 ${c.approx}</span></button>`).join("")}<button class="skip" data-c="0" id="cgo"><b><span class="k">0</span>${S.atkLeft>0?"繼續答題":"結束攻擊"}</b><span class="c">${S.atkLeft>0?"保留 ATB":"輪到敵人"}</span></button></div>`;
   $("#bq").appendChild(ov);menuOpen();
@@ -218,11 +259,14 @@ async function sEnemy(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeM
   $(".stime").insertAdjacentHTML("beforeend",`<em class="zg" style="left:${((1-d.perfectMs/d.limitMs)*100).toFixed(1)}%"></em><em class="zr" style="width:${((1-SOUL.slowAt)*100).toFixed(1)}%"></em>`);
   say("金色區內答對＝彈反（地上金圈消失前）；拖到紅色區才答對會被擦傷。","bad");
   let done=false;
-  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm.stop();t.phase="busy";mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
-    await run(t,t.E.answerDodge(ok,opt&&opt.timeout?d.limitMs+1:ms,opt||{}));if(!alive(t)||t.seq!==seq)return;const ph=t.E.state.phase;
+  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm.stop();t.phase="busy";setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
+    const evs=t.E.answerDodge(ok,opt&&opt.timeout?d.limitMs+1:ms,opt||{});
+    await run(t,evs);if(!alive(t)||t.seq!==seq)return;const ph=t.E.state.phase;
     if(ph==="end"){await wait(400);return alive(t)&&finish(t)}
     if(!$("#bqc"))return ph==="pturn"?sQ(t):sEnemy(t); // 題目卡已經被清掉（例如反擊打倒了 Boss）：直接往下走
-    const nb=document.createElement("button");nb.className="pri nextbtn";nb.id="bnx";nb.textContent="繼續 ▶";$("#bqc").appendChild(nb);t.phase="wrong";
+    // 彈反或翻滾成功（沒受傷）：約 0.8 秒後自動迎接下一擊／換玩家回合；受傷、硬擋、答錯才停下來等「繼續」
+    if(ok&&!evs.some(e=>e.type==="playerHit")){await holdFor(t,800);if(!alive(t)||t.seq!==seq)return;return ph==="pturn"?sQ(t):sEnemy(t)}
+    const nb=nextBtn("繼續 ▶");t.phase="wrong";
     {const el=$("#msg"),more=t.E.state.enemy&&t.E.state.enemy.i<t.E.state.enemy.total;if(el)el.textContent=el.textContent.replace(/（按「繼續」.*$/,"")+(more?"（按「繼續」迎接下一擊）":"（按「繼續」換你進攻）")}
     // 只能按一次：按下立刻失效並移除（連點兩下會讓下一回合開始兩次）
     nb.onclick=()=>{if(t.phase!=="wrong"||t.seq!==seq)return;t.phase="busy";nb.disabled=true;nb.remove();ph==="pturn"?sQ(t):sEnemy(t)}};
@@ -245,7 +289,7 @@ function finish(t){const r=t.E.result(),soul=t.soul,pl=t.pool;t.saved=true;endBa
   $("#again").onclick=()=>startBattle(pl,soul);$("#chg").onclick=toSetup;const rw=$("#rw");if(rw)rw.onclick=()=>startQuiz(r.wrong)}
 
 /* ---------- 鍵盤：Enter 下一題、1–4 作答、1–9 選招、0 不出招；魂系 1–3 出招、0／Enter 繼續 ---------- */
-document.addEventListener("keydown",e=>{const t=T;if(!t||!ctx.B||ctx.view!=="practice"||e.target.tagName==="INPUT")return;
+document.addEventListener("keydown",e=>{const t=T;if(!t||!ctx.B||ctx.view!=="practice"||e.target.tagName==="INPUT"||asking||t.paused)return;
   if(t.storyNext){if(e.key==="Enter"||e.key===" "){e.preventDefault();t.storyNext()}else if(e.key==="Escape")t.storySkip();return}
   if(t.phase==="ready"&&(e.key==="Enter"||e.key===" ")){e.preventDefault();const g=$("#gonext");if(g&&!g.disabled)g.click()}
   else if(t.phase==="q"&&/^[1-4]$/.test(e.key)){const b=app.querySelector(`#bopts [data-o="${+e.key-1}"]`);if(b)b.click()}

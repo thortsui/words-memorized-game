@@ -56,9 +56,9 @@ export function createMonsterScene(eng,fx,api){
   const clouds=[];{const cm=new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x9fb6c8,fog:false});
     for(const [x,y,z,s] of [[-26,17,-60,5],[4,21,-70,6.5],[30,15,-58,4.5],[-48,22,-75,6],[52,20,-72,5.5]]){const g=new THREE.Group();g.position.set(x,y,z);
       for(const [dx,dy,k] of [[0,0,1],[-1.1,-.15,.7],[1.2,-.1,.75],[.4,.35,.65]]){const m=new THREE.Mesh(sph,cm);m.position.set(dx*s,dy*s,0);m.scale.set(s*k,s*k*.55,s*k*.6);g.add(m)}env.add(g);clouds.push(g)}}
-  eng.onUpdate(dt=>{for(const c of clouds){c.position.x+=dt*.5;if(c.position.x>70)c.position.x=-70}});
+  eng.onUpdate(dt=>{if(eng.quality==="low")return;for(const c of clouds){c.position.x+=dt*.5;if(c.position.x>70)c.position.x=-70}});
   // 空中飄的花粉／花瓣
-  let pollenT=0;eng.onUpdate(dt=>{pollenT-=dt;if(pollenT<=0){pollenT=.35;fx.emitN({p:v3(rand(-5,5),rand(.3,2.6),rand(-4,2.5)),n:1,color:[0xffffff,0xfff3a0,0xffd1e8],speed:[.1,.35],dir:[1,.15,0],spread:.5,size:[.05,.1],life:[2.5,4.5],kind:2,alpha:.8})}});
+  let pollenT=0;eng.onUpdate(dt=>{pollenT-=dt;if(pollenT<=0){pollenT=.35;fx.emitN({p:v3(rand(-5,5),rand(.3,2.6),rand(-4,2.5)),n:1,color:[0xffffff,0xfff3a0,0xffd1e8],speed:[.1,.35],dir:[1,.15,0],spread:.5,size:[.05,.1],life:[2.5,4.5],kind:2,alpha:.8,deco:true})}});
 
   /* ---------- 場景模型 arena_meadow.glb（頂點色、無貼圖）：轉成卡通材質，載入失敗就維持上面的程式草原 ---------- */
   let arena=null;
@@ -66,10 +66,12 @@ export function createMonsterScene(eng,fx,api){
   const core=Promise.all([load.warm("hero_cute"),load.warm(api.foes[0]&&api.foes[0].model)]);
   const arenaP=core.then(()=>load("arena_meadow")).then(g=>{if(!g||eng.dead)return;const root=g.scene;
     root.traverse(o=>{if(!o.isMesh)return;const old=o.material;o.material=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:grad,side:old.side});old.dispose();o.frustumCulled=true});
-    env.visible=false;scene.add(root);arena=root;scene.fog.near=60;scene.fog.far=330;camera.far=400;camera.updateProjectionMatrix();
+    // 程式草原整組移出場景（只設 visible=false 的話，裡面一百多個物件每幀還是會被走訪、重算矩陣）；釋放交給 eng.track
+    env.visible=false;scene.remove(env);eng.track({dispose:()=>eng.disposeObject(env)});scene.add(root);arena=root;scene.fog.near=60;scene.fog.far=330;camera.far=400;camera.updateProjectionMatrix();
     if(eng.quality==="low")lowArena()});
-  // 低畫質：把花藏起來（面數最多、對畫面影響最小）
-  const lowArena=()=>{if(arena)arena.traverse(o=>{if(/Flowers/.test(o.name))o.visible=false})};
+  // 低畫質：場景模型壓縮後只剩一個合併的網格（一次 draw call，沒有單獨的花可以藏），這裡只把它的矩陣凍結；
+  // 省下來的主要是角色描邊（每個部位少畫一次）、粒子與每幀的矩陣更新，見 onQuality。
+  const lowArena=()=>{if(arena)arena.traverse(o=>{o.matrixAutoUpdate=false})};
 
   /* ---------- 鏡頭 ---------- */
   const rig={pos:v3(0,0,0),look:v3(0,0,0),zoom:1},CAM={},rigTok={n:0};let atBase=true;
@@ -86,7 +88,7 @@ export function createMonsterScene(eng,fx,api){
     return eng.tween(dur,k=>{if(tok!==rigTok.n)return;rig.pos.lerpVectors(p0,t.pos,k);rig.look.lerpVectors(l0,t.look,k)},ez)}
   function onResize(){presets();camera.fov=fovFor();camera.near=.3;camera.updateProjectionMatrix();fx.setScale();if(atBase){rig.pos.copy(CAM.base.pos);rig.look.copy(CAM.base.look)}}
   eng.onResize.push(onResize);
-  eng.onUpdate((dt,rdt,t)=>{camera.position.copy(rig.pos);if(!eng.rm){camera.position.x+=Math.sin(t*.45)*.07;camera.position.y+=Math.sin(t*.6)*.035}camera.lookAt(rig.look)});
+  eng.onUpdate((dt,rdt,t)=>{camera.position.copy(rig.pos);if(!eng.rm&&eng.quality!=="low"){camera.position.x+=Math.sin(t*.45)*.07;camera.position.y+=Math.sin(t*.6)*.035}camera.lookAt(rig.look)});
   function dim(k,dur=.35){const h0=hemi.intensity,s0=sun.intensity,b0=scene.backgroundIntensity;return eng.tween(dur,t=>{hemi.intensity=lerp(h0,L0.hemi*(1-k*.75),t);sun.intensity=lerp(s0,L0.sun*(1-k*.8),t);scene.backgroundIntensity=lerp(b0,1-k*.72,t)})}
 
   /* ---------- 角色 ---------- */
@@ -204,5 +206,6 @@ export function createMonsterScene(eng,fx,api){
   onResize();
   const NEED=["hero_cute",api.foes[0]&&api.foes[0].model,"arena_meadow"];
   // ready：主角＋第一隻怪物到齊；場景模型若再 2.5 秒內到就一起等，否則先用程式草原
-  return{handlers:H,hero,ready:Promise.all([hero.ready,core]).then(()=>Promise.race([arenaP,new Promise(r=>setTimeout(r,2500))])),progress:()=>load.progress(NEED),onQuality(){lowArena()},setSlow(){}};
+  return{handlers:H,hero,ready:Promise.all([hero.ready,core]).then(()=>Promise.race([arenaP,new Promise(r=>setTimeout(r,2500))])),progress:()=>load.progress(NEED),
+    onQuality(){lowArena();hero.setOutline(false);if(foe)foe.setOutline(false)},setSlow(){}};
 }

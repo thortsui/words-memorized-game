@@ -52,9 +52,12 @@ function googleSpeak(text,done,fail,lang,my){const q=chunks(text);let k=0,hi=gHo
     const p=au.play();if(p&&p.catch)p.catch(err=>{if(!alive())return;if(err&&err.name==="NotAllowedError"){cleanup();fail(q.slice(k).join(" "))}else if(err&&err.name!=="AbortError")bad()})};
   start()}
 
-// 頂端字幕條
-export function caption(label,text){let c=$("#cap");if(!c){c=document.createElement("div");c.id="cap";c.innerHTML='<b></b><span></span>';document.body.appendChild(c)}
-  clearTimeout(c._t);if(!text){c._t=setTimeout(()=>c.classList.remove("on"),700);return}c.querySelector("b").textContent=label;c.querySelector("span").textContent=text;c.classList.add("on")}
+// 字幕條：一般頁面固定在頂端；戰鬥中放進戰場（.arenawrap）底緣，不擋上面那排按鈕與血量
+export function caption(label,text){let c=$("#cap");if(!c){if(!text)return;c=document.createElement("div");c.id="cap";c.innerHTML='<b></b><span></span>';
+    // 戰場裡的血量框要依字幕高度往上讓：高度用 ResizeObserver 取（不在這裡強制重排）
+    if(typeof ResizeObserver!=="undefined")new ResizeObserver(()=>{const h=c.parentNode;if(h&&h!==document.body)h.style.setProperty("--caph",c.offsetHeight+"px")}).observe(c)}
+  const host=document.querySelector(".arenawrap")||document.body;if(c.parentNode!==host)host.appendChild(c);
+  clearTimeout(c._t);if(!text){c._t=setTimeout(()=>c.classList.remove("on"),700);return}c.querySelector("b").textContent=label;c.querySelector("span").textContent=text;c.classList.add("on");}
 
 let readFin=null;
 export function speak(text,btn,opt){opt=opt||{};if(readFin&&!opt.chain)readFin();const lang=opt.lang||"en";const shown=String(text);text=lang==="zh"?zhSay(text):sayable(text);if(!text){opt.done&&opt.done();return}const id=++spkId;
