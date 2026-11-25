@@ -18,45 +18,49 @@ OUT_GLB = os.path.join(ROOT, "public", "models", NAME + ".glb")
 PREV = os.path.join(HERE, "preview")
 TMP = os.path.join(PREV, "_frames")
 BAKED = os.path.join(HERE, "textures", "baked", NAME)
-HEIGHT = 3.5
+HEIGHT = 3.65
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 STAGE = argv[0] if argv else "all"
-SWX, SWY, GRIP = -0.78, -0.36, 2.08   # 巨劍軸與握點
-GLOW = (0.86, -0.44, 1.92)            # 左手符文光中心
+SWX, SWY, GRIP = -0.86, -0.36, 2.08   # 巨劍軸與握點
+GLOW = (0.94, -0.44, 1.92 + 0.126)            # 左手符文光中心
 
 
 # ================================================================== 材質
 def armor_mat():
-    """失去光澤的金黑板甲：黑鋼為底，稜線與大片區域露出暗金，凹縫積垢；左手附近有琥珀符文光。"""
+    """黑鋼板面＋暗金鑲邊：凸起的稜線、甲片邊緣與圓頂是金，平面與凹處是黑；金區有少量鏨刻線；左手附近有琥珀符文光。"""
     m = L.PMat("Armor")
     co = m.coord()
     gold = m.scan("Metal042B", 1.6)
     steel = m.scan("Metal046B", 1.4)
     pt = m.geom("Pointiness")
-    gcol = m.mix(1.0, m.hsv(gold["Color"], s=0.85, v=0.75), (0.58, 0.40, 0.16), "MULTIPLY")
-    gcol = m.mix(m.ramp(m.noise(5, 4), [(0.35, 0), (0.75, 0.8)]), gcol, (0.13, 0.085, 0.04))
-    bcol = m.mix(0.6, (0.028, 0.028, 0.033), m.hsv(steel["Color"], s=0.3, v=0.3))
-    patch = m.ramp(m.noise(1.3, 2, 0.45), [(0.40, 0), (0.56, 1)])                                  # 1 = 黑鋼區（邊界柔和）
-    edge = m.ramp(pt, [(0.53, 0), (0.60, 1)])                                                     # 稜線磨出金色
+    gcol = m.mix(1.0, m.hsv(gold["Color"], s=0.8, v=0.8), (0.50, 0.35, 0.14), "MULTIPLY")
+    gcol = m.mix(m.ramp(m.noise(4, 4), [(0.35, 0), (0.8, 0.7)]), gcol, (0.15, 0.10, 0.045))      # 氧化暗沉
+    bcol = m.mix(0.5, (0.022, 0.023, 0.028), m.hsv(steel["Color"], s=0.25, v=0.22))
+    trim = m.ramp(pt, [(0.504, 0), (0.520, 1)])
+    zc = m.sep(co)[2]                                                                             # 護頸與立領整圈是金
+    zone = m.math("MULTIPLY", m.ramp(m.math("MULTIPLY", zc, 0.3), [(0.785, 0), (0.792, 1)]), m.ramp(m.math("ABSOLUTE", m.sep(co)[0]), [(0.36, 1), (0.40, 0)]))
     cav = m.ramp(pt, [(0.40, 1), (0.475, 0)])                                                     # 凹縫積垢
-    isblack = m.math("MULTIPLY", patch, m.math("SUBTRACT", 1.0, m.math("MULTIPLY", edge, 0.9)))
-    col = m.mix(isblack, gcol, bcol)
-    col = m.mix(m.math("MULTIPLY", edge, 0.3), col, (0.72, 0.55, 0.26))
-    scr = m.ramp(m.noise(2.0, 4, 0.8, vec=m.mapping(scale=(26, 26, 3))), [(0.60, 0), (0.68, 1)])  # 刮痕
-    col = m.mix(m.math("MULTIPLY", scr, 0.35), col, (0.42, 0.33, 0.18))
-    col = m.mix(cav, col, (0.022, 0.018, 0.014))
-    rough = m.mix(isblack, m.ramp(gold["Roughness"], [(0, 0.56), (1, 0.74)]), m.ramp(steel["Roughness"], [(0, 0.60), (1, 0.78)]))
+    wv = m.mix(0.08, co, m.noise(3, 2, out="Color"), "ADD")
+    line = m.ramp(m.voronoi(7, "DISTANCE_TO_EDGE", vec=wv), [(0.0, 1), (0.01, 1), (0.022, 0)])
+    engr = m.math("MULTIPLY", line, trim)                                                         # 鏨刻只出現在金區
+    col = m.mix(trim, bcol, gcol)
+    col = m.mix(m.math("MULTIPLY", engr, 0.7), col, (0.05, 0.032, 0.015))
+    wear = m.ramp(pt, [(0.56, 0), (0.62, 1)])                                                     # 最凸的稜線磨亮
+    col = m.mix(m.math("MULTIPLY", wear, 0.45), col, (0.78, 0.62, 0.32))
+    scr = m.ramp(m.noise(2.0, 4, 0.8, vec=m.mapping(scale=(24, 24, 3))), [(0.62, 0), (0.70, 1)])  # 黑面上的刮痕
+    col = m.mix(m.math("MULTIPLY", m.math("MULTIPLY", scr, m.math("SUBTRACT", 1.0, trim)), 0.5), col, (0.16, 0.15, 0.15))
+    col = m.mix(cav, col, (0.015, 0.012, 0.01))
+    rough = m.mix(trim, m.ramp(steel["Roughness"], [(0, 0.42), (1, 0.60)]), m.ramp(gold["Roughness"], [(0, 0.46), (1, 0.66)]))
     rough = m.mix(cav, rough, 0.9)
     metal = m.math("SUBTRACT", 1.0, m.math("MULTIPLY", cav, 0.6))
-    n = m.bump(gold["Displacement"], 0.3, 0.004)
-    n = m.bump(m.noise(34, 2), 0.12, 0.003, normal=n)
-    wv = m.mix(0.10, co, m.noise(4, 2, out="Color"), "ADD")
+    n = m.bump(gold["Displacement"], 0.25, 0.004)
+    n = m.bump(m.math("SUBTRACT", 1.0, engr), 0.5, 0.005, normal=n)
     ln = m.node("ShaderNodeVectorMath", operation="LENGTH")
     m.set(ln.inputs[0], m.mapping(loc=tuple(-c for c in GLOW)))
-    near = m.ramp(ln.outputs["Value"], [(0.14, 1), (0.40, 0)])
-    glyph = m.math("MULTIPLY", m.ramp(m.voronoi(24, "DISTANCE_TO_EDGE", vec=wv), [(0.0, 1), (0.06, 1), (0.12, 0)]), m.ramp(m.noise(9, 2), [(0.44, 0), (0.50, 1)]))
+    near = m.ramp(ln.outputs["Value"], [(0.12, 1), (0.36, 0)])
+    glyph = m.math("MULTIPLY", m.ramp(m.voronoi(15, "DISTANCE_TO_EDGE", vec=wv), [(0.0, 1), (0.018, 1), (0.04, 0)]), m.ramp(m.noise(6, 2), [(0.47, 0), (0.53, 1)]))
     rune = m.math("MULTIPLY", glyph, near)
-    emit = m.ramp(m.math("ADD", rune, m.math("MULTIPLY", near, 0.10), clamp=True), [(0, (0, 0, 0)), (0.10, (0.22, 0.07, 0.0)), (0.6, (1.0, 0.50, 0.06)), (1, (1.0, 0.82, 0.35))])
+    emit = m.ramp(m.math("ADD", rune, m.math("MULTIPLY", near, 0.02), clamp=True), [(0, (0, 0, 0)), (0.10, (0.10, 0.03, 0.0)), (0.6, (1.0, 0.45, 0.05)), (1, (1.0, 0.75, 0.3))])
     return m.finish(col, rough, metal, n, emit=emit, emit_strength=4.0)
 
 
@@ -64,13 +68,13 @@ def bone_mat(dark_pts):
     """dark_pts: [(x, y, z, 半徑)]：眼窩、鼻腔等要壓黑的位置。"""
     m = L.PMat("Skull")
     pt = m.geom("Pointiness")
-    col = m.mix(m.noise(7, 4), (0.22, 0.18, 0.12), (0.42, 0.37, 0.27))
-    col = m.mix(m.ramp(m.noise(2.5, 3), [(0.40, 0), (0.7, 0.7)]), col, (0.17, 0.12, 0.07))
+    col = m.mix(m.noise(7, 4), (0.17, 0.135, 0.085), (0.36, 0.30, 0.20))
+    col = m.mix(m.ramp(m.noise(4.0, 4), [(0.35, 0), (0.75, 0.6)]), col, (0.12, 0.085, 0.05))
     wv = m.mix(0.1, m.coord(), m.noise(6, 2, out="Color"), "ADD")
     crack = m.ramp(m.voronoi(13, "DISTANCE_TO_EDGE", vec=wv), [(0.0, 1), (0.012, 1), (0.03, 0)])
     crack = m.math("MULTIPLY", crack, m.ramp(m.noise(3, 2), [(0.48, 0), (0.56, 1)]))
     col = m.mix(crack, col, (0.04, 0.03, 0.02))
-    col = m.mix(m.ramp(pt, [(0.40, 1), (0.50, 0)]), col, (0.02, 0.014, 0.01))
+    col = m.mix(m.ramp(pt, [(0.42, 1), (0.505, 0)]), col, (0.02, 0.014, 0.01))
     col = m.mix(m.math("MULTIPLY", m.ramp(pt, [(0.53, 0), (0.60, 1)]), 0.3), col, (0.56, 0.51, 0.40))
     dark = None
     for x, y, z, r in dark_pts:
@@ -169,7 +173,7 @@ def amber_mat():
 def cloak_pt(a, z, off=0.0):
     """披風基準面：a=0 在正後方(+Y)，a>0 往 +X。"""
     t = max(0.0, (2.50 - z) / 2.25)
-    rx = 0.56 + 0.44 * t + off
+    rx = 0.64 + 0.40 * t + off
     ry = 0.36 + 0.60 * t ** 0.9 + off
     return Vector((math.sin(a) * rx, 0.06 + math.cos(a) * ry, z))
 
@@ -185,12 +189,25 @@ def cloak_w(co, uvt=None):
     return w
 
 
+LEG = 1.08
+
+
+def zw(z):
+    return z * LEG if z < 1.58 else z + 1.58 * (LEG - 1)
+
+
+def warp(objs):
+    for o in objs:
+        for v in o.data.vertices:
+            v.co.z = zw(v.co.z)
+
+
 def build_model():
     L.reset()
     rnd = random.Random(5)
-    _p = lambda x, y, z: tuple(Vector((0, 0, 2.68)) + (Vector((x, y, z)) - Vector((0, 0, 2.68))) * 0.80)
+    _p = lambda x, y, z: tuple(Vector((0, 0, 2.68 + 1.58 * (LEG - 1))) + (Vector((x, y, z)) - Vector((0, 0, 2.68))) * 0.80)
     M_armor, M_horn = armor_mat(), horn_mat()
-    M_bone = bone_mat([(*_p(0.095, -0.17, 2.825), 0.078), (*_p(-0.095, -0.17, 2.825), 0.078), (*_p(0, -0.225, 2.76), 0.04)])
+    M_bone = bone_mat([(*_p(0.092, -0.15, 2.825), 0.085), (*_p(-0.092, -0.15, 2.825), 0.085), (*_p(0.022, -0.215, 2.765), 0.034), (*_p(-0.022, -0.215, 2.765), 0.034), (*_p(0, -0.215, 2.79), 0.026)])
     M_chain, M_cloth, M_leather, M_paper, M_blade, M_amber = chain_mat(), cloth_mat(), leather_mat(), paper_mat(), blade_mat(), amber_mat()
     AR, SK, HN, D = [], [], [], []
 
@@ -209,11 +226,16 @@ def build_model():
         return 1 + 0.075 * math.exp(-((a - 1.5 * math.pi) / 0.22) ** 2) * math.sin(min(1, t * 1.3) * math.pi) + 0.03 * math.exp(-((a - 0.5 * math.pi) / 0.3) ** 2)
 
     AR.append(L.loft("Cuirass", [(0, 0.02, 1.86), (0, 0, 2.08), (0, -0.01, 2.30), (0, 0, 2.46), (0, 0.01, 2.57)],
-                     [(0.345, 0.265), (0.44, 0.305), (0.50, 0.335), (0.44, 0.30), (0.21, 0.20)], segs=28, sub=6, shape=keel,
+                     [(0.285, 0.225), (0.42, 0.29), (0.55, 0.33), (0.50, 0.30), (0.21, 0.20)], segs=28, sub=6, shape=keel,
                      bones=[("Spine", 0), ("Chest", 0.3)], blend=0.2))
-    AR.append(lamed("Faulds", [(0, 0.02, 1.98), (0, 0.02, 1.80), (0, 0.02, 1.64), (0, 0.02, 1.48)], [(0.355, 0.275), (0.37, 0.285), (0.42, 0.32), (0.46, 0.35)], 5, 0.07, segs=28,
+    AR.append(lamed("Faulds", [(0, 0.02, 1.98), (0, 0.02, 1.82), (0, 0.02, 1.66), (0, 0.02, 1.54)], [(0.295, 0.235), (0.30, 0.24), (0.37, 0.29), (0.40, 0.31)], 4, 0.07, segs=28,
                     bones=[("Spine", 0), ("Hips", 0.45)], blend=0.2))
+    AR.append(L.ellipsoid("NeckRim", (0, 0, 2.475), (0.315, 0.285, 0.03), bones="Chest", segs=24, rings=6))
+    AR.append(L.ellipsoid("WaistRim", (0, 0.02, 2.0), (0.315, 0.25, 0.03), bones="Spine", segs=24, rings=6))
     for s in (1, -1):
+        AR.append(L.loft("ChestRidge", [(0.44 * s, -0.19, 2.44), (0.24 * s, -0.31, 2.30), (0.03 * s, -0.352, 2.13)], [0.024, 0.024, 0.02], segs=8, sub=5, bones="Chest"))
+        AR.append(L.loft("RibRidge", [(0.40 * s, -0.16, 2.24), (0.22 * s, -0.285, 2.13), (0.03 * s, -0.32, 2.04)], [0.018, 0.018, 0.016], segs=8, sub=5, bones="Chest"))
+        AR.append(L.loft("BackRidge", [(0.44 * s, 0.17, 2.44), (0.22 * s, 0.30, 2.28), (0.04 * s, 0.31, 2.08)], [0.022, 0.022, 0.018], segs=8, sub=5, bones="Chest"))
         AR.append(L.ellipsoid("PecPlate", (0.20 * s, -0.20, 2.29), (0.24, 0.13, 0.19), rot=(6, 0, 10 * s), bones="Chest"))
         AR.append(L.ellipsoid("BackPlate", (0.2 * s, 0.22, 2.24), (0.24, 0.13, 0.26), bones="Chest"))
     AR.append(lamed("Gorget", [(0, 0, 2.47), (0, 0, 2.56), (0, -0.005, 2.64)], [(0.30, 0.27), (0.22, 0.21), (0.17, 0.17)], 3, 0.10, segs=20, caps=("flat", "flat"), bones=[("Chest", 0), ("Neck", 0.7)], blend=0.3))
@@ -225,15 +247,15 @@ def build_model():
     AR.append(L.sheet("CollarGuard", col, thick=0.03, bones="Chest"))
     for s, sx in ((1, ".L"), (-1, ".R")):
         ua, fa, hd = "UpperArm" + sx, "ForeArm" + sx, "Hand" + sx
-        Sh = Vector((0.52 * s, 0, 2.42))
-        El = Vector((0.71 * s, 0.03, 1.92))
-        Wr = Vector((0.84, -0.32, 1.86)) if s > 0 else Vector((-0.75, -0.25, 2.02))
+        Sh = Vector((0.60 * s, 0, 2.42))
+        El = Vector((0.79 * s, 0.03, 1.92))
+        Wr = Vector((0.92, -0.32, 1.86)) if s > 0 else Vector((-0.83, -0.25, 2.02))
         # 肩甲：扁平大蓋＋向下疊的甲片＋立領鰭
-        AR.append(L.ellipsoid("PauldronTop" + sx, (0.56 * s, 0, 2.50), (0.26, 0.27, 0.13), rot=(0, -22 * s, 0), bones=lambda co, t, ua=ua: {"Chest": 0.45, ua: 0.55}, segs=18, rings=10))
-        AR.append(lamed("PauldronLames" + sx, [(0.60 * s, 0, 2.48), (0.70 * s, 0.005, 2.34), (0.755 * s, 0.01, 2.14)], [(0.20, 0.25), (0.185, 0.235), (0.15, 0.19)], 4, 0.10, segs=18,
+        AR.append(L.ellipsoid("PauldronTop" + sx, (0.65 * s, 0, 2.51), (0.29, 0.28, 0.13), rot=(0, -22 * s, 0), bones=lambda co, t, ua=ua: {"Chest": 0.45, ua: 0.55}, segs=18, rings=10))
+        AR.append(lamed("PauldronLames" + sx, [(0.69 * s, 0, 2.48), (0.79 * s, 0.005, 2.34), (0.84 * s, 0.01, 2.14)], [(0.20, 0.25), (0.185, 0.235), (0.15, 0.19)], 4, 0.10, segs=18,
                         bones=[("Chest", 0), (ua, 0.15)], blend=0.2))
-        AR.append(L.loft("PauldronRidge" + sx, [(0.42 * s, 0, 2.60), (0.60 * s, 0, 2.625), (0.76 * s, 0, 2.50)], [(0.03, 0.05), (0.03, 0.05), (0.02, 0.03)], segs=8, ref=(0, 1, 0), bones=ua))
-        AR.append(L.loft("PauldronFin" + sx, [(0.36 * s, 0.0, 2.58), (0.39 * s, 0.0, 2.74), (0.45 * s, 0.0, 2.88)], [(0.03, 0.16), (0.022, 0.11), (0.006, 0.02)], segs=10, sub=3,
+        AR.append(L.loft("PauldronRidge" + sx, [(0.46 * s, 0, 2.61), (0.68 * s, 0, 2.64), (0.88 * s, 0, 2.50)], [(0.03, 0.05), (0.03, 0.05), (0.02, 0.03)], segs=8, ref=(0, 1, 0), bones=ua))
+        AR.append(L.loft("PauldronFin" + sx, [(0.40 * s, 0.0, 2.58), (0.44 * s, 0.0, 2.76), (0.52 * s, 0.0, 2.92)], [(0.03, 0.16), (0.022, 0.11), (0.006, 0.02)], segs=10, sub=3,
                          caps=("flat", "round"), bones="Chest"))
         AR.append(L.loft("Rerebrace" + sx, [Sh + Vector((0.04 * s, 0, -0.10)), Sh.lerp(El, 0.55), El], [0.15, 0.135, 0.12], segs=14, bones=ua))
         AR.append(L.ellipsoid("Couter" + sx, El + Vector((0.02 * s, 0.03, 0)), (0.135, 0.15, 0.135), bones=[(fa, 0)], segs=14, rings=8))
@@ -243,10 +265,10 @@ def build_model():
         # 腿甲
         th, shn, ft = "Thigh" + sx, "Shin" + sx, "Foot" + sx
         Hp, Kn, An = Vector((0.20 * s, 0, 1.58)), Vector((0.24 * s, -0.05, 0.86)), Vector((0.24 * s, 0.03, 0.16))
-        AR.append(L.loft("Cuisse" + sx, [Hp, Hp.lerp(Kn, 0.45) + Vector((0.02 * s, -0.03, 0)), Kn], [(0.19, 0.21), (0.175, 0.20), 0.14], segs=14, bones=[("Hips", 0), (th, 0.12)], blend=0.12,
+        AR.append(L.loft("Cuisse" + sx, [Hp, Hp.lerp(Kn, 0.45) + Vector((0.02 * s, -0.03, 0)), Kn], [(0.18, 0.20), (0.165, 0.185), 0.135], segs=14, bones=[("Hips", 0), (th, 0.12)], blend=0.12,
                          shape=lambda a, t: 1 + 0.06 * math.exp(-((a - 1.5 * math.pi) / 0.3) ** 2)))
-        AR.append(L.ellipsoid("Tasset" + sx, (0.25 * s, -0.225, 1.33), (0.18, 0.045, 0.23), rot=(-8, 0, -6 * s), bones=lambda co, t, th=th: {"Hips": 0.4, th: 0.6}, segs=14, rings=8))
-        AR.append(L.ellipsoid("TassetSide" + sx, (0.44 * s, 0.02, 1.35), (0.05, 0.20, 0.22), rot=(0, 8 * s, 0), bones=lambda co, t, th=th: {"Hips": 0.4, th: 0.6}, segs=14, rings=8))
+        AR.append(L.ellipsoid("Tasset" + sx, (0.23 * s, -0.215, 1.40), (0.15, 0.04, 0.17), rot=(-8, 0, -6 * s), bones=lambda co, t, th=th: {"Hips": 0.4, th: 0.6}, segs=14, rings=8))
+        AR.append(L.ellipsoid("TassetSide" + sx, (0.39 * s, 0.02, 1.41), (0.045, 0.17, 0.16), rot=(0, 8 * s, 0), bones=lambda co, t, th=th: {"Hips": 0.4, th: 0.6}, segs=14, rings=8))
         AR.append(L.ellipsoid("Poleyn" + sx, Kn + Vector((0, -0.06, 0.0)), (0.15, 0.14, 0.165), bones=shn, segs=14, rings=8))
         AR.append(L.loft("PoleynFin" + sx, [Kn + Vector((0.12 * s, -0.02, 0.0)), Kn + Vector((0.26 * s, 0.06, 0.04))], [(0.03, 0.10), (0.004, 0.01)], segs=8, sub=2, caps=("flat", "round"), bones=shn))
         AR.append(L.loft("Greave" + sx, [Kn, Kn.lerp(An, 0.35) + Vector((0, 0.03, 0)), Kn.lerp(An, 0.8), An], [0.135, (0.14, 0.16), 0.11, 0.115], segs=14, bones=[(th, 0), (shn, 0.1), (ft, 0.97)], blend=0.1,
@@ -261,7 +283,7 @@ def build_model():
         AR.append(L.ellipsoid(f"Knuckle{k}", gc + Vector((-0.035, -0.09, -0.066 + 0.044 * k)), (0.05, 0.035, 0.024), bones="Hand.R", segs=8, rings=5))
     AR.append(L.ellipsoid("ThumbR", gc + Vector((0.07, -0.06, 0.07)), (0.04, 0.06, 0.035), bones="Hand.R", segs=8, rings=5))
     # 左手爪形護手（掌心朝上，五爪上勾）
-    palm = Vector((0.87, -0.46, 1.875))
+    palm = Vector((0.95, -0.46, 1.875))
     AR.append(L.ellipsoid("Palm.L", palm, (0.10, 0.11, 0.045), rot=(-10, 0, 0), bones="Hand.L", segs=14, rings=8))
     for k, ang in enumerate((-150, -105, -60, -15, 60)):
         a = math.radians(ang)
@@ -273,24 +295,43 @@ def build_model():
         p3 = b - d * 0.02 + Vector((0, 0, 0.29 * ln))
         AR.append(L.loft(f"Claw{k}", [b, p1, p2, p3], [0.038, 0.034, 0.026, 0.004], segs=8, sub=3, caps=("round", "point"), bones=[("Hand.L", 0), ("Fingers.L", 0.25)], blend=0.2))
 
-    armor = L.organic("ArmorBody", AR, M_armor, voxel=0.008, tris=17800, smooth=8, uv_angle=80)
+    warp(AR)
+    armor = L.organic("ArmorBody", AR, M_armor, voxel=0.008, tris=16500, smooth=7, uv_angle=85)
 
     # ------------------------------------------------ 骷髏頭（寬顎）
-    SK.append(L.ellipsoid("Cranium", (0, 0.035, 2.85), (0.19, 0.20, 0.185), bones="Head", segs=20, rings=12))
-    SK.append(L.loft("Brow", [(-0.19, -0.10, 2.90), (-0.11, -0.195, 2.905), (0, -0.215, 2.885), (0.11, -0.195, 2.905), (0.19, -0.10, 2.90)], [0.024, 0.026, 0.022, 0.026, 0.024], segs=8, ref=(0, 0, 1), bones="Head"))
-    SK.append(L.loft("Nasal", [(0, -0.225, 2.86), (0, -0.25, 2.815), (0, -0.242, 2.79)], [0.03, 0.024, 0.014], segs=8, bones="Head"))
+    SK.append(L.ellipsoid("Cranium", (0, 0.065, 2.86), (0.185, 0.215, 0.185), bones="Head", segs=20, rings=12))
+    SK.append(L.ellipsoid("Frontal", (0, -0.075, 2.935), (0.165, 0.135, 0.10), rot=(-12, 0, 0), bones="Head", segs=16, rings=10))
+    SK.append(L.loft("NasalBone", [(0, -0.198, 2.90), (0, -0.215, 2.855), (0, -0.228, 2.812)], [(0.03, 0.022), (0.02, 0.018), (0.012, 0.01)], segs=8, bones="Head"))
     for s in (1, -1):
-        SK.append(L.loft("Cheek", [(0.205 * s, -0.06, 2.78), (0.18 * s, -0.16, 2.755), (0.10 * s, -0.21, 2.73)], [0.032, 0.03, 0.026], segs=8, ref=(0, 0, 1), bones="Head"))
-        SK.append(L.ellipsoid("Temple", (0.185 * s, -0.02, 2.80), (0.04, 0.10, 0.07), bones="Head", segs=8, rings=6))
-    mx = [(-0.155, -0.07, 2.705), (-0.12, -0.195, 2.70), (0, -0.258, 2.70), (0.12, -0.195, 2.70), (0.155, -0.07, 2.705)]
-    SK.append(L.loft("Maxilla", mx, [(0.026, 0.036)] * 5, segs=8, ref=(0, 0, 1), bones="Head"))
-    for i, p in enumerate(L.polyline(mx, 18)[1:-1]):
-        SK.append(L.loft("ToothU", [p + Vector((0, -0.008, -0.015)), p + Vector((0, -0.012, -0.07 - 0.03 * (i % 3 == 0)))], [0.013, 0.004], segs=5, sub=1, caps=("flat", "point"), bones="Head"))
-    md = [(-0.205, 0.02, 2.745), (-0.21, -0.04, 2.60), (-0.165, -0.19, 2.555), (0, -0.275, 2.54), (0.165, -0.19, 2.555), (0.21, -0.04, 2.60), (0.205, 0.02, 2.745)]
-    SK.append(L.loft("Mandible", md, [(0.024, 0.04), (0.028, 0.045), (0.03, 0.036), (0.036, 0.042), (0.03, 0.036), (0.028, 0.045), (0.024, 0.04)], segs=8, sub=5, ref=(0, 0, 1), bones="Jaw"))
-    SK.append(L.ellipsoid("Chin", (0, -0.262, 2.525), (0.07, 0.04, 0.045), bones="Jaw", segs=10, rings=6))
-    for i, p in enumerate(L.polyline(md[1:-1], 22)[3:-3]):
-        SK.append(L.loft("ToothL", [p + Vector((0, 0.004, 0.015)), p + Vector((0, 0.01, 0.07 + 0.03 * (i % 4 == 1)))], [0.013, 0.004], segs=5, sub=1, caps=("flat", "point"), bones="Jaw"))
+        # 眶上緣（拱形，外側較低，不是皺眉）
+        SK.append(L.loft("OrbitTop", [(0.022 * s, -0.200, 2.875), (0.085 * s, -0.205, 2.898), (0.155 * s, -0.165, 2.885), (0.188 * s, -0.10, 2.845)], [0.02, 0.021, 0.022, 0.022], segs=8, ref=(0, 0, 1), bones="Head"))
+        # 眶下緣→顴骨→顴弓
+        SK.append(L.loft("Zygo", [(0.040 * s, -0.215, 2.765), (0.105 * s, -0.205, 2.752), (0.170 * s, -0.150, 2.765), (0.200 * s, -0.04, 2.785), (0.185 * s, 0.07, 2.79)],
+                         [(0.022, 0.03), (0.026, 0.036), (0.03, 0.04), (0.02, 0.024), (0.016, 0.02)], segs=8, ref=(0, 0, 1), bones="Head"))
+        SK.append(L.loft("OrbitSide", [(0.188 * s, -0.10, 2.845), (0.182 * s, -0.135, 2.80), (0.170 * s, -0.150, 2.765)], [0.02, 0.018, 0.022], segs=6, ref=(0, 0, 1), bones="Head"))
+        SK.append(L.loft("NoseSide", [(0.022 * s, -0.200, 2.875), (0.036 * s, -0.215, 2.81), (0.040 * s, -0.215, 2.765)], [0.014, 0.012, 0.016], segs=6, bones="Head"))
+    mx = [(-0.150, -0.06, 2.715), (-0.118, -0.185, 2.71), (0, -0.245, 2.71), (0.118, -0.185, 2.71), (0.150, -0.06, 2.715)]
+    SK.append(L.loft("Maxilla", mx, [(0.024, 0.045)] * 5, segs=8, ref=(0, 0, 1), bones="Head"))
+    SK.append(L.ellipsoid("MaxFront", (0, -0.215, 2.735), (0.075, 0.035, 0.03), bones="Head", segs=10, rings=6))
+    ut = L.polyline(mx, 16)[1:-1]
+    for i, q in enumerate(ut):
+        c = abs(i - 7)                      # 0 = 門牙
+        ln = 0.058 if c == 3 else (0.04 if c < 3 else 0.034)
+        r0 = 0.0125 if c < 3 else 0.0135
+        SK.append(L.loft("ToothU", [q + Vector((0, -0.006, -0.028)), q + Vector((0, -0.008, -0.028 - ln * 0.6)), q + Vector((0, -0.008, -0.028 - ln))],
+                         [(r0, 0.010), (r0 * 0.95, 0.009), (r0 * (0.35 if c == 3 else 0.8), 0.005)], segs=6, sub=1, caps=("flat", "round"), bones="Head"))
+    md = [(-0.205, 0.05, 2.775), (-0.218, 0.02, 2.655), (-0.212, -0.02, 2.585), (-0.165, -0.165, 2.555), (0, -0.262, 2.535), (0.165, -0.165, 2.555), (0.212, -0.02, 2.585), (0.218, 0.02, 2.655), (0.205, 0.05, 2.775)]
+    SK.append(L.loft("Mandible", md, [(0.02, 0.045), (0.022, 0.055), (0.034, 0.05), (0.03, 0.046), (0.04, 0.056), (0.03, 0.046), (0.034, 0.05), (0.022, 0.055), (0.02, 0.045)],
+                     segs=8, sub=5, ref=(0, 0, 1), bones="Jaw"))
+    SK.append(L.ellipsoid("Chin", (0, -0.258, 2.515), (0.085, 0.04, 0.05), bones="Jaw", segs=10, rings=6))
+    for s in (1, -1):
+        SK.append(L.ellipsoid("JawAngle", (0.212 * s, 0.0, 2.60), (0.03, 0.06, 0.06), bones="Jaw", segs=8, rings=6))
+    lt = L.polyline(md[2:-2], 20)[3:-3]
+    for i, q in enumerate(lt):
+        c = abs(i - 7)
+        ln = 0.052 if c == 3 else (0.036 if c < 3 else 0.03)
+        SK.append(L.loft("ToothL", [q + Vector((0, 0.0, 0.03)), q + Vector((0, 0.004, 0.03 + ln * 0.6)), q + Vector((0, 0.004, 0.03 + ln))],
+                         [(0.0115, 0.009), (0.011, 0.008), (0.0115 * (0.35 if c == 3 else 0.8), 0.005)], segs=6, sub=1, caps=("flat", "round"), bones="Jaw"))
     PIV, HS = Vector((0, 0, 2.68)), 0.80
 
     def rescale(objs, f):
@@ -299,7 +340,8 @@ def build_model():
             o.data.transform(Mx)
 
     rescale(SK, HS)
-    skull = L.organic("SkullHead", SK, M_bone, voxel=0.005, tris=4200, smooth=4)
+    warp(SK)
+    skull = L.organic("SkullHead", SK, M_bone, voxel=0.004, tris=5200, smooth=2)
 
     # ------------------------------------------------ 扭曲黑角王冠
     def twist(a, t):
@@ -313,6 +355,7 @@ def build_model():
         HN.append(L.loft("HornSmall", [(0.05 * s, -0.09, 2.99), (0.055 * s, -0.12, 3.10), (0.04 * s, -0.17, 3.19)], [0.032, 0.024, 0.004], segs=8, sub=4, caps=("flat", "point"), bones="Head"))
         HN.append(L.loft("HornBack", [(0.12 * s, 0.15, 2.92), (0.20 * s, 0.26, 3.02), (0.22 * s, 0.30, 3.16)], [0.04, 0.03, 0.004], segs=8, sub=4, caps=("flat", "point"), shape=twist, bones="Head"))
     rescale(HN, 0.93)
+    warp(HN)
     horns = L.organic("Horns", HN, M_horn, voxel=0.006, tris=2800, smooth=3)
 
     # ------------------------------------------------ 直接建模的零件
@@ -323,7 +366,7 @@ def build_model():
         return o
 
     for s in (1, -1):
-        ep = PIV + (Vector((0.092 * s, -0.150, 2.825)) - PIV) * HS
+        ep = PIV + (Vector((0.092 * s, -0.118, 2.825)) - PIV) * HS
         add(L.ellipsoid("Eye", ep, (0.012, 0.01, 0.011), bones="Head", mat=M_amber, segs=8, rings=5))
     # 鎖子甲：頸、腰裙、肘彎
     add(L.loft("Coif", [(0, 0.01, 2.52), (0, 0.01, 2.64), (0, 0.02, 2.76)], [0.15, 0.125, 0.135], segs=14, sub=3, caps=("open", "open"), bones=[("Chest", 0), ("Neck", 0.3), ("Head", 0.85)], blend=0.3, mat=M_chain))
@@ -332,12 +375,12 @@ def build_model():
         k = L._sst((1.50 - co.z) / 0.3) * 0.6
         return {"Hips": 1 - k, ("Thigh.L" if co.x > 0 else "Thigh.R"): k}
 
-    add(L.loft("MailSkirt", [(0, 0.02, 1.58), (0, 0.02, 1.40), (0, 0.02, 1.12)], [(0.40, 0.31), (0.44, 0.34), (0.47, 0.37)], segs=28, sub=4, caps=("open", "open"), bones=skirt_w, mat=M_chain,
+    add(L.loft("MailSkirt", [(0, 0.02, 1.58), (0, 0.02, 1.46), (0, 0.02, 1.30)], [(0.36, 0.28), (0.39, 0.30), (0.41, 0.32)], segs=28, sub=4, caps=("open", "open"), bones=skirt_w, mat=M_chain,
                shape=lambda a, t: 1 + 0.03 * t * math.sin(9 * a)))
     # 腰帶、扣環、鐵鍊、前擋布
-    belt = [[Vector((math.sin(a) * (0.425 + 0.004 * k), 0.02 - math.cos(a) * (0.325 + 0.004 * k), z)) for a in [2 * math.pi * j / 28 for j in range(28)]] for k, z in enumerate((1.685, 1.59))]
+    belt = [[Vector((math.sin(a) * (0.385 + 0.004 * k), 0.02 - math.cos(a) * (0.30 + 0.004 * k), z)) for a in [2 * math.pi * j / 28 for j in range(28)]] for k, z in enumerate((1.685, 1.59))]
     add(L.sheet("Belt", belt, thick=0.03, wrap=True, bones="Hips", mat=M_leather))
-    add(L.box("Buckle", (0, -0.335, 1.637), (0.13, 0.035, 0.12), bones="Hips", mat=M_blade, bevel=0.012), 40)
+    add(L.box("Buckle", (0, -0.31, 1.637), (0.13, 0.035, 0.12), bones="Hips", mat=M_blade, bevel=0.012), 40)
     for pts in ([(-0.36, -0.19, 1.60), (-0.20, -0.36, 1.36), (0.05, -0.40, 1.24), (0.30, -0.30, 1.42), (0.40, -0.12, 1.60)],
                 [(-0.20, -0.30, 1.60), (-0.12, -0.38, 1.20), (0.0, -0.40, 1.02), (0.16, -0.36, 1.26), (0.24, -0.29, 1.60)]):
         add(L.loft("ChainLoop", pts, [0.017] * 5, segs=5, sub=4, bones=skirt_w, mat=M_chain))
@@ -345,7 +388,7 @@ def build_model():
     for i in range(9):
         v = i / 8
         z = 1.60 - 0.88 * v
-        tab.append([Vector((x * (1 + 0.15 * v), -0.345 - 0.07 * v - 0.02 * math.cos(x * 9), z)) for x in (-0.17, -0.085, 0, 0.085, 0.17)])
+        tab.append([Vector((x * (1 + 0.15 * v), -0.315 - 0.07 * v - 0.02 * math.cos(x * 12), z)) for x in (-0.12, -0.06, 0, 0.06, 0.12)])
     for j in range(5):
         tab[-1][j].z += rnd.uniform(-0.10, 0.08)
         tab[-2][j].z += rnd.uniform(-0.03, 0.03)
@@ -364,7 +407,7 @@ def build_model():
     n_pages = 0
     z = 2.44
     while z > 0.42:
-        arc = math.radians(236) * (0.56 + 0.44 * (2.50 - z) / 2.25)
+        arc = math.radians(236) * (0.64 + 0.40 * (2.50 - z) / 2.25)
         n = int(arc / 0.185)
         for k in range(n):
             a = math.radians(-116 + 232 * (k + 0.5 + rnd.uniform(-0.3, 0.3)) / n)
@@ -443,19 +486,21 @@ def build_model():
     # ------------------------------------------------ 骨架
     B = [("Root", (0, 0, 0), (0, 0.4, 0), None),
          ("Hips", (0, 0.02, 1.60), (0, 0.02, 1.80), "Root"), ("Spine", (0, 0.02, 1.80), (0, 0, 2.08), "Hips"), ("Chest", (0, 0, 2.08), (0, 0, 2.50), "Spine"),
-         ("Neck", (0, 0, 2.52), (0, -0.01, 2.68), "Chest"), ("Head", (0, -0.01, 2.68), (0, -0.02, 2.95), "Neck"), ("Jaw", (0, 0.016, 2.72), (0, -0.216, 2.576), "Head"),
-         ("UpperArm.R", (-0.52, 0, 2.42), (-0.71, 0.03, 1.92), "Chest"), ("ForeArm.R", (-0.71, 0.03, 1.92), (-0.75, -0.25, 2.02), "UpperArm.R"),
-         ("Hand.R", (-0.75, -0.25, 2.02), (SWX, SWY, GRIP), "ForeArm.R"), ("Sword", (SWX, SWY, GRIP), (SWX, SWY, 2.40), "Hand.R"),
-         ("UpperArm.L", (0.52, 0, 2.42), (0.71, 0.03, 1.92), "Chest"), ("ForeArm.L", (0.71, 0.03, 1.92), (0.84, -0.32, 1.86), "UpperArm.L"),
-         ("Hand.L", (0.84, -0.32, 1.86), (0.87, -0.46, 1.88), "ForeArm.L"), ("Fingers.L", (0.87, -0.46, 1.88), (0.88, -0.50, 2.06), "Hand.L"),
+         ("Neck", (0, 0, 2.52), (0, -0.01, 2.68), "Chest"), ("Head", (0, -0.01, 2.68), (0, -0.02, 2.95), "Neck"), ("Jaw", (0, 0.04, 2.756), (0, -0.21, 2.565), "Head"),
+         ("UpperArm.R", (-0.60, 0, 2.42), (-0.79, 0.03, 1.92), "Chest"), ("ForeArm.R", (-0.79, 0.03, 1.92), (-0.83, -0.25, 2.02), "UpperArm.R"),
+         ("Hand.R", (-0.83, -0.25, 2.02), (SWX, SWY, GRIP), "ForeArm.R"), ("Sword", (SWX, SWY, GRIP), (SWX, SWY, 2.40), "Hand.R"),
+         ("UpperArm.L", (0.60, 0, 2.42), (0.79, 0.03, 1.92), "Chest"), ("ForeArm.L", (0.79, 0.03, 1.92), (0.92, -0.32, 1.86), "UpperArm.L"),
+         ("Hand.L", (0.92, -0.32, 1.86), (0.95, -0.46, 1.88), "ForeArm.L"), ("Fingers.L", (0.95, -0.46, 1.88), (0.96, -0.50, 2.06), "Hand.L"),
          ("Cloak1", (0, 0.42, 2.40), (0, 0.58, 1.75), "Chest"), ("Cloak2", (0, 0.58, 1.75), (0, 0.76, 1.05), "Cloak1"), ("Cloak3", (0, 0.76, 1.05), (0, 0.92, 0.35), "Cloak2"),
          ("Tabard", (0, -0.35, 1.50), (0, -0.42, 0.78), "Hips")]
     for s, sx in ((1, ".L"), (-1, ".R")):
         B += [("Thigh" + sx, (0.20 * s, 0, 1.58), (0.24 * s, -0.05, 0.86), "Hips"), ("Shin" + sx, (0.24 * s, -0.05, 0.86), (0.24 * s, 0.03, 0.16), "Thigh" + sx),
               ("Foot" + sx, (0.24 * s, 0.03, 0.16), (0.26 * s, -0.36, 0.05), "Shin" + sx)]
+    warp(D)
+    B = [(n, (h[0], h[1], zw(h[2])), (t[0], t[1], zw(t[2])), par) for n, h, t, par in B]
     arm = L.make_armature("Devourer", B)
     orgs = [(armor[0], armor[1], armor[2], M_armor), (skull[0], skull[1], skull[2], M_bone), (horns[0], horns[1], horns[2], M_horn)]
-    L.assemble("DevourerMesh", arm, orgs, D, BAKED, size=1024, emit_strength=4.0, emit_size=512, extrusion=0.02, ao_dist=0.6, uv_margin=0.006, normal_strength=0.6)
+    L.assemble("DevourerMesh", arm, orgs, D, BAKED, size=1024, emit_strength=4.0, emit_size=512, extrusion=0.055, ao_dist=0.6, uv_margin=0.008, normal_strength=0.85, atlas2=[M_armor, M_bone])
     bpy.ops.wm.save_as_mainfile(filepath=MODEL_BLEND)
 
 
@@ -578,7 +623,11 @@ def render_all(A=None):
     if A:
         A.show(None, 1)
     L.render_views(cam, TMP, NAME, HEIGHT, center=(0, 0.1, HEIGHT * 0.49), extra=0.95)
-    L.aim(cam, (0.05, 0, 2.55), 3.6, -25, 4)
+    L.aim(cam, (0.05, 0, 2.70), 3.6, -25, 4)
+    L.render(os.path.join(TMP, NAME + "_close.png"), (900, 760))
+    L.aim(cam, (0, -0.1, 2.93), 1.5, -18, 2)
+    L.render(os.path.join(TMP, NAME + "_face.png"), (760, 760))
+    L.aim(cam, (0.05, 0, 2.70), 3.6, -25, 4)
     L.render(os.path.join(TMP, NAME + "_close.png"), (900, 760))
     return cam
 

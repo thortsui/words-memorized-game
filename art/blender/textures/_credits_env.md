@@ -2,7 +2,7 @@
 
 全部是 CC0 1.0（公眾領域貢獻）的 PBR 掃描／程序材質，可商用、不需署名；這裡留紀錄方便追溯。
 Boss 的掃描材質只當作「烘焙來源」：在 Blender 以方盒投影混合後，烘成每隻 Boss 一組 1024² 圖集
-（`textures/baked/<model>_basecolor|normal|orm|emissive.jpg`），GLB 內只有烘好的圖集。
+（`textures/baked/<model>_basecolor|normal|orm|emissive.jpg`；魔王多一組 `_b_*` 給板甲與頭骨），GLB 內只有烘好的圖集。
 
 ## Boss 用（`textures/boss/<ID>/`，ambientCG 1K-JPG，2026-11-26 下載）
 
@@ -22,7 +22,6 @@ zip 只解出 jpg；NormalDX／NormalGL／IdMask／Opacity 沒有用到，已刪
 | Chainmail002 | 魔王鎖子甲 |
 | Fabric029 | 魔王披風底布、前擋布 |
 | Paper006 | 魔王書頁披風 |
-| Rock048、Fabric043、Snow006、Paper004、Metal025、Rust005 | 已下載作候選，目前腳本沒有用到 |
 
 ## 教堂競技場（`textures/cathedral/`，處理後各 ≤1024² JPEG）
 

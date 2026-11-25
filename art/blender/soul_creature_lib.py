@@ -684,14 +684,19 @@ def set_mode(mat, mode, image=None):
 
 
 # ------------------------------------------------------------------ 組裝、圖集烘焙、最終材質
-def pack_uv(ob, margin=0.008):
+def pack_uv(ob, margin=0.008, hide=None):
+    """hide: 每個面一個 bool，True 的面不參與這次打包（給第二組圖集用）。"""
     activate(ob)
     ob.data.uv_layers.active = ob.data.uv_layers["UVMap"]
+    if hide is not None:
+        ob.data.polygons.foreach_set("hide", hide)
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.select_all(action="SELECT")
     bpy.ops.uv.average_islands_scale()
     bpy.ops.uv.pack_islands(margin=margin, rotate=True, merge_overlap=True)
+    if hide is not None:
+        bpy.ops.mesh.reveal()
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
@@ -712,7 +717,7 @@ def _px(img):
     return a.reshape(img.size[1], img.size[0], 4)
 
 
-def bake_atlas(final, organics, out_prefix, size=1024, ao_mix=0.75, extrusion=0.025, emit_size=512, quality=88, ao_dist=0.5):
+def bake_atlas(final, organics, out_prefix, size=1024, ao_mix=0.75, extrusion=0.025, emit_size=512, quality=88, ao_dist=0.5, only=None):
     """final: 已合併且 UV 已打包的低模；organics: [(high物件, PMat)]。其餘材質槽自我烘焙。
     產生 <prefix>_basecolor.jpg / _normal.jpg / _orm.jpg / _emissive.jpg 並回傳路徑 dict。"""
     sc = bpy.context.scene
@@ -728,10 +733,13 @@ def bake_atlas(final, organics, out_prefix, size=1024, ao_mix=0.75, extrusion=0.
         imgs[k] = im
     omats = [m.mat for _, m in organics]
     allm = [s.material for s in final.material_slots]
-    temps = [(_subset(final, [m.mat], "bk_" + m.mat.name), [h]) for h, m in organics]
-    dm = [m for m in allm if m not in omats]
+    inc = [m for m in allm if only is None or m in only]
+    temps = [(_subset(final, [m.mat], "bk_" + m.mat.name), [h]) for h, m in organics if m.mat in inc]
+    dm = [m for m in inc if m not in omats]
     if dm:
         temps.append((_subset(final, dm, "bk_direct"), None))
+    rest = [m for m in allm if m not in inc]
+    occ = _subset(final, rest, "bk_occluder") if rest else None  # 另一組圖集的面只當 AO 遮擋物
     final.hide_render = True
     bk = sc.render.bake
     bk.margin = 3
@@ -756,6 +764,8 @@ def bake_atlas(final, organics, out_prefix, size=1024, ao_mix=0.75, extrusion=0.
         set_mode(m, "full")
     for t, _ in temps:
         bpy.data.objects.remove(t)
+    if occ:
+        bpy.data.objects.remove(occ)
     final.hide_render = False
     col, ao, orm = _px(imgs["color"]), _px(imgs["ao"]), _px(imgs["orm"])
     col[..., :3] *= (1 - ao_mix) + ao_mix * ao[..., :1]
@@ -816,7 +826,7 @@ def final_material(name, paths, emit_strength=1.0, has_emit=True, normal_strengt
     return m
 
 
-def assemble(name, arm, organics, directs, out_prefix, size=1024, emit_strength=3.0, uv_margin=0.008, normal_strength=1.0, **bake_kw):
+def assemble(name, arm, organics, directs, out_prefix, size=1024, emit_strength=3.0, uv_margin=0.008, normal_strength=1.0, atlas2=None, **bake_kw):
     """organics: [(high, low, src, PMat)]；directs: 已有 UVMap／權重／PMat 的零件。回傳最終蒙皮網格。"""
     lows = [o[1] for o in organics]
     # 每個零件的 UV 先錯開，只有同一個 "uvg" 群組（例如共用版面的書頁）會重疊並在打包時合併成同一塊
@@ -831,12 +841,25 @@ def assemble(name, arm, organics, directs, out_prefix, size=1024, emit_strength=
     base = directs[0] if directs else lows[0]
     final = join([base] + [o for o in directs + lows if o is not base], name)
     final.data.uv_layers.active = final.data.uv_layers["UVMap"]
-    pack_uv(final, uv_margin)
-    paths = bake_atlas(final, [(o[0], o[3]) for o in organics], out_prefix, size=size, **bake_kw)
-    fm = final_material(name + "_mat", paths, emit_strength, normal_strength=normal_strength)
+    mats2 = [m.mat for m in (atlas2 or [])]
+    is2 = [final.material_slots[p.material_index].material in mats2 for p in final.data.polygons]
+    org = [(o[0], o[3]) for o in organics]
+    if mats2:
+        # atlas2 內的材質（例如板甲）獨占第二組圖集
+        pack_uv(final, uv_margin, hide=is2)
+        pack_uv(final, uv_margin, hide=[not f for f in is2])
+        m1 = [sl.material for sl in final.material_slots if sl.material not in mats2]
+        pa = bake_atlas(final, org, out_prefix, size=size, only=m1, **bake_kw)
+        pb = bake_atlas(final, org, out_prefix + "_b", size=size, only=mats2, **bake_kw)
+        fms = [final_material(name + "_mat", pa, emit_strength, normal_strength=normal_strength),
+               final_material(name + "_mat_b", pb, emit_strength, normal_strength=normal_strength)]
+    else:
+        pack_uv(final, uv_margin)
+        fms = [final_material(name + "_mat", bake_atlas(final, org, out_prefix, size=size, **bake_kw), emit_strength, normal_strength=normal_strength)]
     final.data.materials.clear()
-    final.data.materials.append(fm)
-    final.data.polygons.foreach_set("material_index", [0] * len(final.data.polygons))
+    for fm in fms:
+        final.data.materials.append(fm)
+    final.data.polygons.foreach_set("material_index", [1 if f else 0 for f in is2])
     if "puv" in final.data.uv_layers:
         final.data.uv_layers.remove(final.data.uv_layers["puv"])
     for o in organics:

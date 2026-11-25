@@ -16,7 +16,7 @@ ACTIONS = ["Idle", "Enter", "Telegraph", "Attack", "Attack2", "Hit", "Stagger", 
 SPEC = {
     "boss_gargoyle.glb": dict(tris=30000, mb=3.0, tex=1024, actions=ACTIONS, sets=2),
     "boss_priest.glb": dict(tris=30000, mb=3.0, tex=1024, actions=ACTIONS, sets=2),
-    "boss_devourer.glb": dict(tris=30000, mb=3.0, tex=1024, actions=ACTIONS, sets=2),
+    "boss_devourer.glb": dict(tris=30000, mb=3.5, tex=1024, actions=ACTIONS, sets=2),
     "arena_cathedral.glb": dict(tris=60000, mb=5.0, tex=1024, actions=[], sets=4, firepoints=4),
     "arena_meadow.glb": dict(tris=60000, mb=5.0, tex=1024, actions=[], sets=4),
 }
