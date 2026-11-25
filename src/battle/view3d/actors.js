@@ -5,21 +5,55 @@
 // 模型約定：臉朝 +Z、原點在腳底。載入後會依 height 等比縮放。
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import MODEL_FILES from 'virtual:model-list';
 import { ease, lerp } from './engine.js';
 
 /* ---------- 模型載入（同一場戰鬥內快取；清單由 vite.config.js 讀 public/models 產生，避免對不存在的檔案發請求） ---------- */
+// 兩層快取：
+//   MEM（記憶體）：已解析的 GLTF 原件，整個分頁生命週期共用；每場戰鬥用 SkeletonUtils.clone 複製一份來用（材質也另外複製，原件不會被改到）。
+//   Cache Storage：GLB 原始檔。第二次進戰鬥不必重新下載，離線時也拿得到進過的模型。快取鍵帶「大小-修改時間」，模型換檔後自動失效。
+// 已接上 Meshopt 解碼器；WebP 貼圖（EXT_texture_webp）GLTFLoader 本身就支援。之後換成壓縮過的 GLB 不必改程式。
+const MEM=new Map(),VER=MODEL_FILES.ver||{},CACHE="vc-models-v1";
+const gltfLoader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+async function fetchGLB(name,st){const url=import.meta.env.BASE_URL+"models/"+name+".glb",key=url+"?v="+(VER[name+".glb"]||"0");
+  let cache=null;try{if(typeof caches!=="undefined")cache=await caches.open(CACHE)}catch(e){}
+  if(cache){const hit=await cache.match(key).catch(()=>null);if(hit){st.cached=true;return hit.arrayBuffer()}}
+  const res=await fetch(url);if(!res.ok)throw new Error("HTTP "+res.status);
+  const total=+res.headers.get("content-length")||0;st.total=total;let buf;
+  if(res.body&&total){const rd=res.body.getReader(),chunks=[];let n=0;for(;;){const{done,value}=await rd.read();if(done)break;chunks.push(value);n+=value.length;st.loaded=n}
+    const u=new Uint8Array(n);let o=0;for(const c of chunks){u.set(c,o);o+=c.length}buf=u.buffer}
+  else buf=await res.arrayBuffer();
+  if(cache){try{await cache.put(key,new Response(buf.slice(0),{headers:{"content-type":"model/gltf-binary"}}));
+      for(const r of await cache.keys())if(r.url!==new URL(key,location.href).href&&r.url.split("?")[0].endsWith("/"+name+".glb"))cache.delete(r)}catch(e){}} // 清掉同一個檔的舊版本
+  return buf}
+function master(name,st){if(MEM.has(name)){st.done=true;return MEM.get(name)}
+  const p=fetchGLB(name,st).then(buf=>new Promise((res,rej)=>gltfLoader.parse(buf,"",res,rej))).then(g=>{
+      // 每個片段的時間平移到從 0 開始（匯出時多半從 0.033 秒起算，不處理的話循環會卡一格）；只需對原件做一次
+      for(const clip of g.animations||[]){let t0=Infinity;for(const tr of clip.tracks)if(tr.times.length)t0=Math.min(t0,tr.times[0]);if(t0>1e-4&&t0<Infinity){for(const tr of clip.tracks)tr.shift(-t0);clip.resetDuration()}}
+      return g})
+    .catch(()=>{MEM.delete(name);return null}); // 失敗不留在快取裡，下一場再試
+  MEM.set(name,p);return p}
+// 從原件複製一份給這場戰鬥用（骨架、材質各自獨立；幾何與貼圖共用）
+function instance(g){if(!g)return null;const scene=cloneSkinned(g.scene);
+  scene.traverse(o=>{if(o.material)o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone()});return{scene,animations:g.animations}}
 export function createLoader(){
-  const loader=new GLTFLoader(),cache=new Map();
-  return name=>{if(!name)return Promise.resolve(null);if(cache.has(name))return cache.get(name);
-    const p=!MODEL_FILES.includes(name+".glb")?Promise.resolve(null)
-      :new Promise(res=>loader.load(import.meta.env.BASE_URL+"models/"+name+".glb",g=>res(g),undefined,()=>res(null)));
-    cache.set(name,p);return p};
+  const prog=new Map();
+  // warm：只確保原件已下載並解析（預載用）；load：再複製一份給呼叫者（每次呼叫都是新的一份）
+  const warm=name=>{if(!name||!MODEL_FILES.includes(name+".glb"))return Promise.resolve(null);let st=prog.get(name);if(!st){st={loaded:0,total:0,done:false};prog.set(name,st)}
+    return master(name,st).then(g=>{st.done=true;return g},()=>{st.done=true;return null})};
+  const load=name=>warm(name).then(instance);load.warm=warm;
+  // 指定幾個模型的整體下載進度（0–1）
+  load.progress=names=>{let a=0,n=0;for(const k of names){if(!k||!MODEL_FILES.includes(k+".glb"))continue;const s=prog.get(k);n++;if(!s)continue;a+=s.done?1:s.total?Math.min(.99,s.loaded/s.total):0}return n?a/n:1};
+  return load;
 }
 
 /* ---------- 卡通材質與描邊（打怪模式用） ---------- */
 export function toonGradient(){const d=new Uint8Array([110,110,110,255,185,185,185,255,255,255,255,255]);const t=new THREE.DataTexture(d,3,1,THREE.RGBAFormat);t.minFilter=t.magFilter=THREE.NearestFilter;t.needsUpdate=true;return t}
-function toonify(obj,grad){obj.traverse(o=>{if(!o.isMesh)return;const conv=m=>{if(m.isMeshToonMaterial||m.isMeshBasicMaterial)return m;
+function toonify(obj,grad){obj.traverse(o=>{if(!o.isMesh)return;const conv=m=>{if(m.isMeshToonMaterial||m.isMeshBasicMaterial||m.isMeshPhongMaterial)return m;
+    // 史萊姆的膠體身體保留高光（Phong），其他都轉成卡通漸層
+    if(/SlimeBody/.test(m.name)){const g=new THREE.MeshPhongMaterial({color:m.color.clone(),specular:0xffffff,shininess:70,transparent:m.transparent,opacity:m.opacity,side:m.side,name:m.name});g.emissive.copy(m.color).multiplyScalar(.16);m.dispose();return g}
     const t=new THREE.MeshToonMaterial({color:m.color?m.color.clone():0xffffff,map:m.map||null,gradientMap:grad,transparent:m.transparent,opacity:m.opacity,side:m.side,alphaTest:m.alphaTest||0,name:m.name});
     if(m.emissive){t.emissive.copy(m.emissive);t.emissiveIntensity=m.emissiveIntensity==null?1:m.emissiveIntensity;t.emissiveMap=m.emissiveMap||null}
     if(m.vertexColors)t.vertexColors=true;m.dispose();return t};
@@ -28,11 +62,27 @@ const outlineMat=th=>{const m=new THREE.MeshBasicMaterial({color:0x232038,side:T
   m.onBeforeCompile=s=>{s.vertexShader=s.vertexShader.replace("#include <begin_vertex>",`#include <begin_vertex>\ntransformed+=normalize(normal)*${th.toFixed(5)};`)};
   m.customProgramCacheKey=()=>"outline"+th.toFixed(5);m.userData.outline=true;return m};
 // 反向外殼描邊：只描夠大的不透明部位（身體），小零件不描
-function addOutline(obj,worldH,scale){const list=[];obj.traverse(o=>{if(!o.isMesh||o.userData.noOutline)return;const m=Array.isArray(o.material)?o.material[0]:o.material;if(!m||m.transparent||m.userData.outline)return;
-    if(!o.geometry.boundingSphere)o.geometry.computeBoundingSphere();if(o.geometry.boundingSphere.radius*scale<worldH*.2)return;list.push(o)});
-  for(const o of list){const mat=outlineMat(worldH*.022/scale);let c;
+// 不描邊的小零件（五官、頭髮尖刺、冰刺、寶石…）：尖刺用反向外殼會結成黑塊
+const NO_OUTLINE=/Eye|Iris|Pupil|Shine|Blush|Mouth|Tongue|Fang|Glass|Ink|Hair|Spike|Gem|Stem|Leaf|Blade|Line/i;
+function addOutline(obj,worldH,scale){const list=[];obj.traverse(o=>{if(!o.isMesh||o.userData.noOutline)return;const m=Array.isArray(o.material)?o.material[0]:o.material;if(!m||m.transparent||m.userData.outline||NO_OUTLINE.test(m.name||""))return;
+    if(!o.geometry.boundingSphere)o.geometry.computeBoundingSphere();if(o.geometry.boundingSphere.radius*scale<worldH*.1)return;list.push(o)});
+  for(const o of list){const mat=outlineMat(worldH*.012/scale);let c;
     if(o.isSkinnedMesh){c=new THREE.SkinnedMesh(o.geometry,mat);c.bind(o.skeleton,o.bindMatrix)}else c=new THREE.Mesh(o.geometry,mat);
     c.position.copy(o.position);c.quaternion.copy(o.quaternion);c.scale.copy(o.scale);c.userData.isOutline=true;c.frustumCulled=o.frustumCulled;o.parent.add(c)}}
+
+/* ---------- 命中時間表（秒，從片段開頭算起；逐格量測的結果見 tests/playtest/art/data） ----------
+   數字＝武器／身體實際打到對手的那一格；陣列＝連段各擊；{f}＝片長比例。查不到才用片長的 45%。 */
+const IMPACT={
+  hero_cute:{Slash:.47,Combo:[.22,.48,1.0]},
+  hero_knight:{Slash:.5,HeavySlash:.8,Combo:[.37,.67,1.08]},
+  boss_sentinel:{Attack:.27,Attack2:.83,PhaseShift:{f:.3}},
+  boss_gargoyle:{Attack:.3,Attack2:.92,PhaseShift:{f:.3}},
+  boss_priest:{Attack:.38,Attack2:.45,PhaseShift:{f:.3}},
+  boss_executioner:{Attack:.38,Attack2:.75,PhaseShift:{f:.3}},
+  boss_devourer:{Attack:.42,Attack2:.6,PhaseShift:{f:.3}},
+};
+// 怪物攻擊片段自帶的前衝距離（身高的倍數）：場景移動怪物時要扣掉，才不會衝過頭
+export const LUNGE={slime:1.57,bat:2.08};
 
 /* ---------- 程式補間動作 ----------
    每個動作：{dur 總長, impact 命中時間點, hold 播完停在最後姿勢, run(a, T) }；T(obj, props, 秒, easing) 是補間。
@@ -118,12 +168,14 @@ export class Actor{
     if(this.o.toon)toonify(c.group,this.o.toon);
     if(this.o.outline)addOutline(c.group,this.h,c.group.scale.x);
     this.mats=[];c.group.traverse(m=>{if(!m.isMesh)return;if(this.o.castShadow&&!m.userData.isOutline)m.castShadow=true;
-      for(const mt of Array.isArray(m.material)?m.material:[m.material]){if(mt.userData.outline||this.mats.find(x=>x.m===mt))continue;this.mats.push({m:mt,e0:mt.emissive?mt.emissive.clone():null,o0:mt.opacity,t0:mt.transparent})}});
+      for(const mt of Array.isArray(m.material)?m.material:[m.material]){if(mt.userData.outline||this.mats.find(x=>x.m===mt))continue;this.mats.push({m:mt,e0:mt.emissive?mt.emissive.clone():null,o0:mt.opacity,t0:mt.transparent,glow:/Glow/i.test(mt.name||"")||!!mt.emissiveMap||(isStandin&&mt.emissive&&mt.emissiveIntensity>1.5)})}});
     this._tint=true}
   _setGLB(g){const sc=g.scene;sc.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(sc),hh=Math.max(.001,box.max.y-box.min.y),s=this.h/hh;
-    sc.scale.multiplyScalar(s);sc.position.y-=box.min.y*s;
+    // 飛行怪（keepOrigin）保留模型原點：模型本來就懸在空中，不要用包圍盒壓到地面
+    sc.scale.multiplyScalar(s);if(this.o.keepOrigin)this.baseY=box.min.y*s;else{sc.position.y-=box.min.y*s;this.baseY=0}
     sc.traverse(o=>{if(o.isSkinnedMesh)o.frustumCulled=false});
     this._setContent({group:sc},false);
+    this.eng.container.dataset.glb=(+this.eng.container.dataset.glb||0)+1; // 已換上真模型的角色數（檢查用）
     this.mixer=new THREE.AnimationMixer(sc);this.actions={};for(const clip of g.animations||[])this.actions[clip.name]=this.mixer.clipAction(clip);
     // 換上真模型後接續目前的循環動作
     this.curAct=null;const loop=this._loopName||"Idle";if(this.actions[loop]){this.curAct=this.actions[loop];this.curAct.play()}else if(this.actions.Idle){this.curAct=this.actions.Idle;this.curAct.play()}
@@ -131,7 +183,11 @@ export class Actor{
 
   has(name){return !!this.actions[name]}
   // 命中時間點（秒）：真模型的動作抓片長的 45%，補間動作用表定值
-  impactTime(name,speed=1){const a=this.actions[name];if(a)return a.getClip().duration*.45/speed;const p=PROC[name];return p?(p.impact==null?p.dur*.5:p.impact)/speed:.2}
+  impactTime(name,speed=1){const a=this.actions[name];
+    if(a){const d=a.getClip().duration,v=(IMPACT[this.name]||{})[name];const t=v==null?d*.45:Array.isArray(v)?v[0]:typeof v==="object"?d*v.f:v;return Math.min(t,d)/speed}
+    const p=PROC[name];return p?(p.impact==null?p.dur*.5:p.impact)/speed:.2}
+  // 連段各擊的命中時間（秒）。真模型查表；補間動作平均分布
+  comboTimes(name="Combo",n=3){const v=(IMPACT[this.name]||{})[name];if(this.actions[name]&&Array.isArray(v))return v;const d=this.duration(name);return Array.from({length:n},(_,i)=>d*(.22+.56*i/Math.max(1,n-1)))}
   duration(name,speed=1){const a=this.actions[name];if(a)return a.getClip().duration/speed;const p=PROC[name];return p?p.dur/speed:.3}
 
   resetPose(){const E=this.eng,P=this.pose;E.kill(P.position);E.kill(P.rotation);E.kill(P.scale);P.position.set(0,0,0);P.rotation.set(0,0,0);P.scale.set(1,1,1);this.tremble=0;
@@ -178,7 +234,14 @@ export class Actor{
     // 閃白衰減、發光（發光量除以材質的發光強度，避免本來就會發光的材質整個過曝）
     if(this.flashK>0){this.flashK=Math.max(0,this.flashK-dt*5.5);this._tint=true}
     if(this.glowK!==this._g0){this._g0=this.glowK;this._tint=true}
-    if(this._tint){this._tint=this.flashK>0;for(const x of this.mats){if(!x.e0)continue;x.m.emissive.copy(x.e0);if(this.glowK>0){const g=this.glowK*.25/Math.max(1,x.m.emissiveIntensity||1);x.m.emissive.r+=this.glowC.r*g;x.m.emissive.g+=this.glowC.g*g;x.m.emissive.b+=this.glowC.b*g}if(this.flashK>0)x.m.emissive.lerp(this.flashC,Math.min(1,this.flashK))}}
+    if(this._tint){this._tint=this.flashK>0;const soft=this.o.soft,fk=Math.min(soft?.07:1,this.flashK); // 魂系場景很暗，自發光只要一點點就很亮
+      for(const x of this.mats){if(!x.e0)continue;x.m.emissive.copy(x.e0);
+        if(this.glowK>0){
+          if(soft){ // 魂系：只讓「本來就會發光」的部位（眼睛、裂縫）換色變亮，身體只帶一點點色
+            if(x.glow)x.m.emissive.lerp(this.glowC,Math.min(1,this.glowK));
+            else{const g=this.glowK*.006;x.m.emissive.r+=this.glowC.r*g;x.m.emissive.g+=this.glowC.g*g;x.m.emissive.b+=this.glowC.b*g}}
+          else{const g=this.glowK*.25/Math.max(1,x.m.emissiveIntensity||1);x.m.emissive.r+=this.glowC.r*g;x.m.emissive.g+=this.glowC.g*g;x.m.emissive.b+=this.glowC.b*g}}
+        if(fk>0)x.m.emissive.lerp(this.flashC,fk/(soft?Math.max(1,x.m.emissiveIntensity||1):1))}}
     // 假陰影跟著腳下，跳高時縮小
     const r=this.root,s=this.shadow;s.position.x=r.position.x;s.position.z=r.position.z;s.visible=r.visible;
     const lift=Math.max(0,r.position.y+this.pose.position.y+y),k=(this.o.shadow||h*.42)*2*Math.max(.35,1-lift/(h*2.5))*((this.pose.scale.x+1)/2);s.scale.setScalar(k)}
@@ -186,7 +249,7 @@ export class Actor{
   // 面向某個世界座標（只轉 Y 軸）
   face(p){this.root.rotation.y=Math.atan2(p.x-this.root.position.x,p.z-this.root.position.z)}
   // 身體中心的世界座標（特效用）
-  center(out=new THREE.Vector3(),k=.5){return out.set(this.root.position.x,this.root.position.y+this.pose.position.y+(this.isStandin?(this.o.fly||0):0)+this.h*k,this.root.position.z)}
+  center(out=new THREE.Vector3(),k=.5){return out.set(this.root.position.x,this.root.position.y+this.pose.position.y+(this.isStandin?(this.o.fly||0):(this.baseY||0))+this.h*k,this.root.position.z)}
   remove(){this.gone=true;this._off();this.eng.scene.remove(this.root);this.eng.scene.remove(this.shadow);this.shadow.material.dispose();if(this.mixer){this.mixer.stopAllAction();this.mixer.uncacheRoot(this.content)}this.eng.disposeObject(this.root)}
 }
 export { PROC };

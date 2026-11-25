@@ -1,0 +1,641 @@
+{
+ "hard1.jpg": [
+  {
+   "en": "modern",
+   "pos": "adj.",
+   "zh": "現代的；近代的",
+   "ex": "Modern buildings stand next to the ancient temple.",
+   "blank": "Modern",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "burn",
+   "pos": "v.",
+   "zh": "燃燒；燒傷",
+   "ex": "Be careful not to burn your fingers on the stove.",
+   "blank": "burn",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "clean",
+   "pos": "adj., v.",
+   "zh": "乾淨的；打掃",
+   "ex": "Please clean your room before dinner.",
+   "blank": "clean",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "corn",
+   "pos": "n.",
+   "zh": "玉米",
+   "ex": "The farmer grows corn and wheat in his fields.",
+   "blank": "corn",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "ill",
+   "pos": "adj.",
+   "zh": "生病的",
+   "ex": "My brother has been ill since last Friday.",
+   "blank": "ill",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "paint",
+   "pos": "v., n.",
+   "zh": "油漆；繪畫",
+   "ex": "The painter painted the wall blue.",
+   "blank": "painted",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "desert",
+   "pos": "n.",
+   "zh": "沙漠",
+   "ex": "Camels can live in the desert for weeks without water.",
+   "blank": "desert",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "dessert",
+   "pos": "n.",
+   "zh": "甜點",
+   "ex": "We had ice cream for dessert.",
+   "blank": "dessert",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "quite",
+   "pos": "adv.",
+   "zh": "相當；很",
+   "ex": "The movie was quite interesting.",
+   "blank": "quite",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "quiet",
+   "pos": "adj.",
+   "zh": "安靜的",
+   "ex": "Please be quiet in the library.",
+   "blank": "quiet",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "weekend",
+   "pos": "n.",
+   "zh": "週末",
+   "ex": "We went hiking last weekend.",
+   "blank": "weekend",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "future",
+   "pos": "n.",
+   "zh": "未來；將來",
+   "ex": "Nobody knows what will happen in the future.",
+   "blank": "future",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "already",
+   "pos": "adv.",
+   "zh": "已經",
+   "ex": "The train had already left when we arrived.",
+   "blank": "already",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "soldier",
+   "pos": "n.",
+   "zh": "士兵；軍人",
+   "ex": "The soldier wrote a letter to his family.",
+   "blank": "soldier",
+   "unit": "NO.307 Unit 8"
+  }
+ ],
+ "hard2.png": [
+  {
+   "en": "achieve",
+   "pos": "v.",
+   "zh": "達成；實現",
+   "ex": "After years of hard work, she finally achieved her goal of becoming a doctor.",
+   "blank": "achieved",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "behavior",
+   "pos": "n.",
+   "zh": "行為；舉止",
+   "ex": "The teacher was pleased with the students' good behavior during the trip.",
+   "blank": "behavior",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "community",
+   "pos": "n.",
+   "zh": "社區；群體",
+   "ex": "The whole community helped to clean up the park after the storm.",
+   "blank": "community",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "decrease",
+   "pos": "v., n.",
+   "zh": "減少；降低",
+   "ex": "The number of visitors decreased sharply during the rainy season.",
+   "blank": "decreased",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "environment",
+   "pos": "n.",
+   "zh": "環境",
+   "ex": "We should do our best to protect the environment for our children.",
+   "blank": "environment",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "frequently",
+   "pos": "adv.",
+   "zh": "經常地；頻繁地",
+   "ex": "Buses run frequently between the airport and the city center.",
+   "blank": "frequently",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "government",
+   "pos": "n.",
+   "zh": "政府",
+   "ex": "The government plans to build a new hospital in the countryside.",
+   "blank": "government",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "deal with",
+   "pos": "片語",
+   "zh": "處理；應付",
+   "ex": "",
+   "blank": "",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "in charge of",
+   "pos": "片語",
+   "zh": "負責；掌管",
+   "ex": "",
+   "blank": "",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "come up with",
+   "pos": "片語",
+   "zh": "想出；提出",
+   "ex": "",
+   "blank": "",
+   "unit": "Key Phrases"
+  }
+ ],
+ "hard3.jpg": [
+  {
+   "en": "abandon",
+   "pos": "v.",
+   "zh": "放棄；拋棄",
+   "ex": "The sailors abandoned the damaged ship.",
+   "blank": "abandoned",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "dye",
+   "pos": "v./n.",
+   "zh": "將……染色；染（頭髮、布料等）；染料、染劑",
+   "ex": "Mary dyed her hair red for a fresh look.",
+   "blank": "dyed",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "appreciate",
+   "pos": "v.",
+   "zh": "感激；欣賞",
+   "ex": "Emma appreciated her neighbor taking care of her dog.",
+   "blank": "appreciated",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "appreciation",
+   "pos": "n.",
+   "zh": "感激；欣賞",
+   "ex": "",
+   "blank": "",
+   "unit": "Unit 3",
+   "optional": true
+  },
+  {
+   "en": "be famous for ~",
+   "pos": "片語",
+   "zh": "以……聞名",
+   "ex": "Tainan is famous for its delicious street food.",
+   "blank": "",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "responsible",
+   "pos": "adj.",
+   "zh": "負責任的；應負責的",
+   "ex": "Parents are responsible for their children's safety and well-being at home.",
+   "blank": "responsible",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "e-mail",
+   "pos": "n.",
+   "zh": "電子郵件",
+   "ex": "Please send me an e-mail when you arrive.",
+   "blank": "e-mail",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "take sb/sth for granted",
+   "pos": "片語",
+   "zh": "把……視為理所當然",
+   "ex": "We should not take clean water for granted.",
+   "blank": "",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "lie",
+   "pos": "v.",
+   "zh": "躺；位於；說謊",
+   "ex": "The town lies at the foot of the mountain.",
+   "blank": "lies",
+   "unit": "Unit 3"
+  },
+  {
+   "en": "experiment",
+   "pos": "n.",
+   "zh": "實驗",
+   "ex": "The students did an interesting experiment on plants in the science laboratory yesterday.",
+   "blank": "experiment",
+   "unit": "Unit 3"
+  }
+ ],
+ "hard4.jpg": [
+  {
+   "en": "modern",
+   "pos": "adj.",
+   "zh": "現代的；近代的",
+   "ex": "Modern buildings stand next to the ancient temple.",
+   "blank": "Modern",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "burn",
+   "pos": "v.",
+   "zh": "燃燒；燒傷",
+   "ex": "Be careful not to burn your fingers on the stove.",
+   "blank": "burn",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "clean",
+   "pos": "adj., v.",
+   "zh": "乾淨的；打掃",
+   "ex": "Please clean your room before dinner.",
+   "blank": "clean",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "corn",
+   "pos": "n.",
+   "zh": "玉米",
+   "ex": "The farmer grows corn and wheat in his fields.",
+   "blank": "corn",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "ill",
+   "pos": "adj.",
+   "zh": "生病的",
+   "ex": "My brother has been ill since last Friday.",
+   "blank": "ill",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "paint",
+   "pos": "v., n.",
+   "zh": "油漆；繪畫",
+   "ex": "The painter painted the wall blue.",
+   "blank": "painted",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "desert",
+   "pos": "n.",
+   "zh": "沙漠",
+   "ex": "Camels can live in the desert for weeks without water.",
+   "blank": "desert",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "dessert",
+   "pos": "n.",
+   "zh": "甜點",
+   "ex": "We had ice cream for dessert.",
+   "blank": "dessert",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "quite",
+   "pos": "adv.",
+   "zh": "相當；很",
+   "ex": "The movie was quite interesting.",
+   "blank": "quite",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "quiet",
+   "pos": "adj.",
+   "zh": "安靜的",
+   "ex": "Please be quiet in the library.",
+   "blank": "quiet",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "weekend",
+   "pos": "n.",
+   "zh": "週末",
+   "ex": "We went hiking last weekend.",
+   "blank": "weekend",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "future",
+   "pos": "n.",
+   "zh": "未來；將來",
+   "ex": "Nobody knows what will happen in the future.",
+   "blank": "future",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "already",
+   "pos": "adv.",
+   "zh": "已經",
+   "ex": "The train had already left when we arrived.",
+   "blank": "already",
+   "unit": "NO.307 Unit 8"
+  },
+  {
+   "en": "soldier",
+   "pos": "n.",
+   "zh": "士兵；軍人",
+   "ex": "The soldier wrote a letter to his family.",
+   "blank": "soldier",
+   "unit": "NO.307 Unit 8"
+  }
+ ],
+ "hard5.png": [
+  {
+   "en": "abandon",
+   "pos": "v.",
+   "zh": "放棄；拋棄",
+   "ex": "The sailors abandoned the damaged ship.",
+   "blank": "abandoned",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "dye",
+   "pos": "v./n.",
+   "zh": "染色；染料",
+   "ex": "Mary dyed her hair red for a fresh look.",
+   "blank": "dyed",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "paint",
+   "pos": "v.",
+   "zh": "油漆；繪畫",
+   "ex": "The painter painted the wall blue.",
+   "blank": "painted",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "social",
+   "pos": "adj.",
+   "zh": "社交的；社會的",
+   "ex": "Amy shares photos on social media every day.",
+   "blank": "social",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "be famous for ~",
+   "pos": "片語",
+   "zh": "以……聞名",
+   "ex": "Tainan is famous for its delicious street food.",
+   "blank": "",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "It is said that ...",
+   "pos": "片語",
+   "zh": "據說……",
+   "ex": "It is said that the old house is haunted.",
+   "blank": "",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "responsible",
+   "pos": "adj.",
+   "zh": "負責任的；應負責的；可靠的；值得信賴的；需承擔責任的；有責任感的；盡責的",
+   "ex": "Parents are responsible for their children's safety.",
+   "blank": "responsible",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "lead",
+   "pos": "v.",
+   "zh": "帶領；導致",
+   "ex": "The guide led us to the top of the hill.",
+   "blank": "led",
+   "unit": "Unit 4"
+  },
+  {
+   "en": "experiment",
+   "pos": "n.",
+   "zh": "實驗",
+   "ex": "The students did an interesting experiment on plants.",
+   "blank": "experiment",
+   "unit": "Unit 4"
+  }
+ ],
+ "hard2b.png": [
+  {
+   "en": "achieve",
+   "pos": "v.",
+   "zh": "達成；實現",
+   "ex": "After years of hard work, she finally achieved her goal of becoming a doctor.",
+   "blank": "achieved",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "behavior",
+   "pos": "n.",
+   "zh": "行為；舉止",
+   "ex": "The teacher was pleased with the students' good behavior during the trip.",
+   "blank": "behavior",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "community",
+   "pos": "n.",
+   "zh": "社區；群體",
+   "ex": "The whole community helped to clean up the park after the storm.",
+   "blank": "community",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "decrease",
+   "pos": "v., n.",
+   "zh": "減少；降低",
+   "ex": "The number of visitors decreased sharply during the rainy season.",
+   "blank": "decreased",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "environment",
+   "pos": "n.",
+   "zh": "環境",
+   "ex": "We should do our best to protect the environment for our children.",
+   "blank": "environment",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "frequently",
+   "pos": "adv.",
+   "zh": "經常地；頻繁地",
+   "ex": "Buses run frequently between the airport and the city center.",
+   "blank": "frequently",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "government",
+   "pos": "n.",
+   "zh": "政府",
+   "ex": "The government plans to build a new hospital in the countryside.",
+   "blank": "government",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "deal with",
+   "pos": "片語",
+   "zh": "處理；應付",
+   "ex": "The manager has to deal with many complaints.",
+   "blank": "deal with",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "in charge of",
+   "pos": "片語",
+   "zh": "負責；掌管",
+   "ex": "Ms. Lin is in charge of the sales department.",
+   "blank": "in charge of",
+   "unit": "Key Phrases"
+  }
+ ],
+ "hard2c.png": [
+  {
+   "en": "achieve",
+   "pos": "v.",
+   "zh": "達成；實現",
+   "ex": "After years of hard work, she finally achieved her goal of becoming a doctor.",
+   "blank": "achieved",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "behavior",
+   "pos": "n.",
+   "zh": "行為；舉止",
+   "ex": "The teacher was pleased with the students' good behavior during the trip.",
+   "blank": "behavior",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "community",
+   "pos": "n.",
+   "zh": "社區；群體",
+   "ex": "The whole community helped to clean up the park after the storm.",
+   "blank": "community",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "decrease",
+   "pos": "v., n.",
+   "zh": "減少；降低",
+   "ex": "The number of visitors decreased sharply during the rainy season.",
+   "blank": "decreased",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "environment",
+   "pos": "n.",
+   "zh": "環境",
+   "ex": "We should do our best to protect the environment for our children.",
+   "blank": "environment",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "frequently",
+   "pos": "adv.",
+   "zh": "經常地；頻繁地",
+   "ex": "Buses run frequently between the airport and the city center.",
+   "blank": "frequently",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "government",
+   "pos": "n.",
+   "zh": "政府",
+   "ex": "The government plans to build a new hospital in the countryside.",
+   "blank": "government",
+   "unit": "Unit 9"
+  },
+  {
+   "en": "give away",
+   "pos": "片語",
+   "zh": "贈送、分送",
+   "ex": "The store is giving away free samples today.",
+   "blank": "giving away",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "pick up",
+   "pos": "片語",
+   "zh": "撿起；接（某人）",
+   "ex": "She picked up the coins from the floor.",
+   "blank": "picked up",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "look forward to",
+   "pos": "片語",
+   "zh": "期待",
+   "ex": "We look forward to seeing you again soon.",
+   "blank": "look forward to",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "run out of",
+   "pos": "片語",
+   "zh": "用完",
+   "ex": "The car ran out of gas on the highway.",
+   "blank": "",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "take care of",
+   "pos": "片語",
+   "zh": "照顧",
+   "ex": "Nurses take care of patients in the hospital.",
+   "blank": "take care of",
+   "unit": "Key Phrases"
+  }
+ ]
+}

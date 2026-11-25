@@ -12,7 +12,7 @@ export function difficulty(recent){const r=recent.slice(-SOUL.paceWindow);
   if(r.length<SOUL.paceMin)return{d:0,pace:null,limitMul:1,extra:0,perfectMs:SOUL.perfectMs,dmgMul:1};
   const pace=r.reduce((a,x)=>a+(x.ok?Math.min(x.ms/1000,SOUL.wrongAs):SOUL.wrongAs),0)/r.length;
   const d=clamp((SOUL.paceCenter-pace)/SOUL.paceSpan,-1,1);
-  return{d,pace,limitMul:1-SOUL.limitSwing*d,extra:d>=SOUL.extraAt?1:d<=-SOUL.extraAt?-1:0,perfectMs:Math.round(SOUL.perfectMs-SOUL.perfectSwing*d),dmgMul:1+SOUL.dmgBonus*Math.max(0,d)}}
+  return{d,pace,limitMul:1-SOUL.limitSwing*d,extra:d>=SOUL.extraAt?1:(SOUL.easeDown&&d<=-SOUL.extraAt)?-1:0,perfectMs:Math.round(SOUL.perfectMs-SOUL.perfectSwing*d),dmgMul:1+SOUL.dmgBonus*Math.max(0,d)}}
 
 // 閃避判定：回傳 parry（彈反）／dodge（閃避）／graze（擦傷）／hit（中招）
 export function gradeDodge(ok,ms,limitMs,perfectMs){if(!ok||ms>limitMs)return"hit";if(ms<=Math.min(perfectMs,limitMs*.5))return"parry";if(ms<=limitMs*SOUL.slowAt)return"dodge";return"graze"}
@@ -39,8 +39,9 @@ export function createSoulBattle({pool,mode,rng=Math.random,onEvent}){
     return B.mhp<=0}
   function faint(ev){const b=boss();B.kills++;ev("faint",{boss:b,index:B.mi,lastBoss:B.mi+1>=SOUL_BOSSES.length});
     if(B.mi+1>=SOUL_BOSSES.length){B.phase="end";B.over="win";ev("win",{});return}
-    const heal=Math.min(HEAL_ON_KILL,PLAYER_HP-B.hp);B.hp+=heal;if(heal)ev("heal",{amount:heal,hp:B.hp});
-    B.mi++;B.mhp=boss().hp;B.bphase=0;B.enemy=null;ev("bossEnter",{boss:boss(),index:B.mi});playerTurn(ev)}
+    const heal=Math.min(SOUL.healOnKill??HEAL_ON_KILL,PLAYER_HP-B.hp);B.hp+=heal;if(heal)ev("heal",{amount:heal,hp:B.hp});
+    B.mi++;B.mhp=boss().hp;B.bphase=0;B.enemy=null;B.atb=0; // 換下一隻 Boss：ATB 歸零（不能把上一場存的大招帶過來秒殺）
+    ev("bossEnter",{boss:boss(),index:B.mi});playerTurn(ev)}
   function playerTurn(ev){B.atkLeft=SOUL.windowMs;addStamina(SOUL.staminaTurn);B.phase="pturn";ev("playerTurn",{windowMs:SOUL.windowMs})}
   function enemyTurn(ev){const b=boss(),p=ph(),d=diff();const total=Math.max(1,b.attacks+(p?p.extra:0)+d.extra);B.enemy={i:0,total,cur:null};B.phase="enemy";ev("enemyTurn",{boss:b,total,d:d.d})}
   const cmds=()=>{const big=SOUL_BIG[B.mi%SOUL_BIG.length];return[...SOUL_CMDS,{k:3,id:"big",name:big.name,bars:3,move:big.move,hits:big.hits,big:true}]};
@@ -55,7 +56,9 @@ export function createSoulBattle({pool,mode,rng=Math.random,onEvent}){
     // 攻擊時間用完回傳 null（接著呼叫 startEnemyTurn）
     nextAttackQuestion(){if(B.atkLeft<=0)return null;const w=nextWord();B.w=w;B.phase="q";return{w,mode:B.mode,leftMs:B.atkLeft,windowMs:SOUL.windowMs}},
     // ms：這一題花掉的攻擊時間（朗讀、選單、動畫期間不計）
-    answerAttack(ok,ms){const out=[],ev=mk(out);if(B.phase!=="q")return out;const w=B.w;B.atkLeft=Math.max(0,B.atkLeft-ms);B.n++;record(ok,ms);
+    answerAttack(ok,ms){const out=[],ev=mk(out);if(B.phase!=="q")return out;const w=B.w;
+      // 每題至少消耗 minCostMs 的攻擊時間；答錯再多扣 missPenaltyMs（速度記錄仍用實際作答時間）
+      B.atkLeft=Math.max(0,B.atkLeft-Math.max(ms,SOUL.minCostMs||0)-(ok?0:SOUL.missPenaltyMs||0));B.n++;record(ok,ms);
       if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);B.atb=Math.min(SOUL.atbMax,B.atb+1);addStamina(SOUL.staminaHit);ev("atb",{gain:1,ms});
         // 很快答對：追加一記不耗 ATB 的迅擊
         if(ms<=SOUL.quickMs){if(damage(ev,"quickSlash",{move:"quick",name:"迅擊"},[SOUL.quickDmg])){faint(ev);return out}}}
@@ -89,11 +92,14 @@ export function createSoulBattle({pool,mode,rng=Math.random,onEvent}){
       if(g==="dodge"){if(B.stamina>=SOUL.dodgeCost){addStamina(-SOUL.dodgeCost);ev("dodge",{move:cur.move,ms})}
         else{g="guard";B.stamina=0;dmg=Math.max(1,Math.round(full*SOUL.guardRate))}}
       else if(g==="graze"){addStamina(-SOUL.grazeCost);dmg=Math.max(1,Math.round(full*SOUL.grazeRate))}
+      // 答錯或超時：耐力足夠就硬擋下來（扣耐力、只受格擋傷害），耐力不足才吃全額
+      else if(B.stamina>=SOUL.blockCost){g="guard";addStamina(-SOUL.blockCost);dmg=Math.max(1,Math.round(full*SOUL.blockRate))}
       else dmg=full;
-      if(dmg){ev(g==="hit"?"foeHit":g,{move:cur.move,ms,timeout:!!opt.timeout});
+      if(dmg){ev(g==="hit"?"foeHit":g,{move:cur.move,ms,timeout:!!opt.timeout,blocked:g==="guard"&&!ok});
         B.hp=Math.max(0,B.hp-dmg);ev("playerHit",{dmg,hp:B.hp,kind:g,lethal:B.hp<=0,source:b.id,move:cur.move,timeout:!!opt.timeout});
         if(B.hp<=0){B.phase="end";B.over="lose";ev("lose",{});return out}}
       return out},
-    startPlayerTurn(){const out=[],ev=mk(out);if(B.phase==="end")return out;B.enemy=null;playerTurn(ev);return out},
+    // 只有敵人回合結束時才能呼叫；重複呼叫（例如按鈕被連點）不會再開一次回合
+    startPlayerTurn(){const out=[],ev=mk(out);if(B.phase!=="enemy")return out;B.enemy=null;playerTurn(ev);return out},
     result(){return{win:B.over==="win",kills:B.kills,total:SOUL_BOSSES.length,right:B.right,n:B.n,best:B.best,fast:B.fast,wrong:B.wrong,parries:B.parries}}
   }}

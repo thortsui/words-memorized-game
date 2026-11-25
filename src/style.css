@@ -93,6 +93,23 @@ label{display:block}
 @media(max-width:600px){h1{font-size:27px}.rev .rc{grid-template-columns:repeat(2,minmax(0,1fr))}.rev .rc .f2,.rev .rc .f3,.rev .rc .f4{grid-column:span 1}.rev .rc .wide{grid-column:1/-1}nav a{padding:8px 10px}}
 @media(prefers-reduced-motion:reduce){.bar i{transition:none}}
 
+/* ---------- 網站頁面修正（試用回報：長字串換行、手機字典內頁、觸控目標） ---------- */
+/* 沒有空白的長字串（字典名稱、長單字、確認視窗、提示訊息）一律可以斷行，不撐破版面 */
+h1,h2,.dname,.sub,.note,.list .it,.fb,.opts button,.cloze,.chip,.modal p,.toast,#prog{overflow-wrap:anywhere}
+.modal>div{max-height:calc(100dvh - 36px);overflow:auto}
+.toast{width:max-content;text-align:center}
+.btn.sm{min-height:36px;padding:5px 11px;font-size:14px}
+a.back{display:inline-flex;align-items:center;min-height:44px;padding-right:12px}
+/* 手機：字典內頁每一列的文字佔滿寬度，朗讀／編輯／刪除按鈕移到下一列靠右 */
+@media(max-width:600px){.list .it.acts{grid-template-columns:minmax(0,1fr)}.list .it.acts>.row{justify-content:flex-end}}
+/* 觸控裝置與窄螢幕：可點的東西至少 44px（桌機用滑鼠時維持較緊湊的尺寸） */
+@media(pointer:coarse),(max-width:600px){
+  button.sm,.btn.sm{min-height:44px;min-width:44px}
+  .spk{width:44px;height:44px;min-height:44px}
+  .chip{min-height:44px}
+  label:has(>input[type=checkbox]){min-height:44px;padding:0 4px;cursor:pointer}
+}
+
 /* 朗讀字幕條 */
 #cap{position:fixed;left:50%;top:10px;transform:translate(-50%,-140%);z-index:40;max-width:min(92vw,720px);background:#14163d;color:#fff;border:2.5px solid #fff;box-shadow:0 0 0 2.5px #14163d,0 8px 24px rgb(0 0 0/.25);border-radius:10px;padding:8px 14px;display:flex;gap:10px;align-items:baseline;pointer-events:none;transition:transform .25s cubic-bezier(.2,.8,.2,1);font-size:16px;line-height:1.4}
 #cap.on{transform:translate(-50%,0)}#cap b{flex:none;color:#ffd23f;font-size:13px}#cap span{font-family:Lexend,"Noto Sans TC",sans-serif;overflow-wrap:anywhere}
@@ -162,7 +179,7 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .tv-l.big{font-weight:800;font-size:16px}.tv-l.good{color:#0b6b34}.tv-l.bad{color:#b0181f}.tv-l.dmg{font-family:Lexend,"Noto Sans TC";font-weight:700}
 .bwrap.soul .tv-l.good{color:#9dffb8}.bwrap.soul .tv-l.bad{color:#ff9d9d}
 .tv-note{position:absolute;left:0;right:0;bottom:6px;font-size:11px;opacity:.6}
-.arena.slowmo{filter:saturate(.45) brightness(.92)}
+.arena.slowmo{filter:saturate(.22) brightness(.86) contrast(1.08)}
 
 /* ===== 掃描上傳：雙引擎核對清單（狀態徽章、差異並排、存入門檻） ===== */
 .eng .engrow{display:flex;align-items:center;gap:10px;margin-top:8px}.eng .engrow>.small{flex:none;width:4.5em}
@@ -186,7 +203,30 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .rev mark.dfc{background:var(--bad);color:#fff;border-radius:3px;padding:0 1px;white-space:pre-wrap}
 .rev .why{color:var(--bad);font-weight:700;font-size:14px}.rev .why.soft{color:var(--or)}.rev .why ul{margin:2px 0 0;padding-left:1.3em;font-weight:400}
 .rev .unote{color:var(--or)}
-@media(max-width:600px){.rev .dfrow{grid-template-columns:minmax(0,1fr)}.rev .dfk{font-weight:700}.vsum{top:46px;padding:6px 10px}.vsum.todo .tallies,.vsum.todo .long{display:none}.rev .crop{overflow-x:auto}.rev .crop canvas:not(.whole){max-width:none;width:max(100%,520px)}.eng .engrow{align-items:flex-start;flex-direction:column;gap:4px}}
+.badge.b-man{color:var(--mut);background:var(--tab)}
+.rev .rc input:not([type=checkbox]),.rev .rc textarea,.rev .pp input{min-height:44px}
+.rev .rc textarea{width:100%;padding:8px 9px;font:inherit;line-height:1.45;resize:vertical;overflow:hidden;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);display:block}
+.rev .keepl{gap:2px;cursor:pointer;min-height:44px;padding-right:4px}
+.rev .ck{appearance:none;-webkit-appearance:none;width:44px;height:44px;min-height:44px;margin:0;padding:0;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;flex:none}
+.rev .ck::before{content:"";width:24px;height:24px;border:2px solid var(--mut);border-radius:6px;background:var(--bg);color:#fff;font:700 17px/20px system-ui;text-align:center}
+.rev .ck:checked::before{content:"✓";background:var(--or);border-color:var(--or)}
+.rev .ck:focus-visible::before{outline:3px solid var(--or);outline-offset:2px}
+.rev .dfv.ro{cursor:default}.rev .dfv.ro:hover{border-color:var(--line)}.rev .df.raw{background:var(--orbg)}.rev .df.raw summary{cursor:pointer;min-height:32px}
+.rev .pp{border:1.5px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px;background:var(--tab)}
+.rev .pp.todo{border-color:var(--bad)}.rev .pp.done{border-color:var(--ok)}.rev .pp.flash{outline:3px solid var(--or);outline-offset:2px}
+.rev .pphead{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}.rev .pphead b{font-size:17px}
+.rev .pphead label{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.rev .pphead input{width:5.5em;padding:6px 9px}
+.rev .lo{display:grid;gap:8px}.rev .lohd{font-weight:700;color:var(--bad)}.rev .pp.done .lohd{color:var(--ink)}
+.rev .lomap{display:block;max-width:100%;height:auto;border:1.5px solid var(--line);border-radius:6px;background:#fff}
+.rev .loi{display:flex;gap:8px;background:var(--bg);border:1.5px solid var(--bad);border-radius:8px;padding:8px}
+.rev .loi:not(.st-todo){border-color:var(--line);opacity:.75}
+.rev .lon{flex:none;width:24px;height:24px;border-radius:50%;background:var(--bad);color:#fff;font-size:13px;font-weight:700;display:grid;place-items:center}
+.rev .loi:not(.st-todo) .lon{background:var(--mut)}
+.rev .lob{flex:1;min-width:0;overflow-x:auto}.rev .lob canvas{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:4px;background:#fff}
+.rev .lotx{margin-top:4px;font-size:15px;overflow-wrap:anywhere}
+.rev .rc,.rev .pp{scroll-margin-top:140px}
+.rev .upick{background:var(--orbg);border-radius:8px;padding:8px 10px}.rev .upick button{min-height:44px}
+@media(max-width:600px){.rev .dfrow{grid-template-columns:minmax(0,1fr)}.rev .dfk{font-weight:700}.vsum{top:46px;padding:6px 10px}.vsum.todo .tallies,.vsum.todo .long{display:none}.vsum{font-size:13px}.rev .lob canvas{max-width:none}.rev .pphead label{width:100%}.rev .crop{overflow-x:auto}.rev .crop canvas:not(.whole){max-width:none;width:max(100%,520px)}.eng .engrow{align-items:flex-start;flex-direction:column;gap:4px}}
 
 /* ---------- 3D 戰鬥畫面（src/battle/view3d/） ---------- */
 .v3-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#14163d;opacity:.7}
@@ -207,7 +247,7 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .v3-t.soul.gold{color:#ffe2a0;text-shadow:0 0 10px #ffb84a,0 0 3px #000}.v3-t.soul.big{font-size:24px}
 .v3-t.soul.blue{color:#9fd4ff}.v3-t.soul.heal{color:#c9f5cf;font-size:18px}.v3-t.soul.warn{font:900 40px/1 Lexend,sans-serif;color:#ff3a2a;text-shadow:0 0 14px #ff2a1a,0 0 4px #000}
 /* 招式名／階段名橫幅 */
-.v3-banner{position:absolute;left:0;right:0;top:36%;display:flex;justify-content:center;will-change:transform,opacity}
+.v3-banner{position:absolute;left:0;right:0;top:14%;display:flex;justify-content:center;will-change:transform,opacity}
 .v3-banner span{font:900 clamp(20px,5.2vw,30px)/1.2 "Noto Sans TC",sans-serif;padding:6px 22px;letter-spacing:.08em}
 .v3-banner.cute span{background:#14163d;color:#ffd23f;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 3px #14163d;transform:rotate(-3deg)}
 .v3-banner.soul span{color:#e8e4dc;font-weight:500;letter-spacing:.4em;background:linear-gradient(90deg,transparent,rgb(0 0 0/.72) 20%,rgb(0 0 0/.72) 80%,transparent);padding:10px 56px;text-shadow:0 0 8px #000}
@@ -215,7 +255,129 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 /* 全畫面暈影：不透明度由程式設定 */
 .v3-vig{position:absolute;inset:0;opacity:0;will-change:opacity}
 .v3-vig.red{background:radial-gradient(ellipse at center,transparent 45%,rgb(200 20 10/.75) 100%)}
-.v3-vig.blue{background:radial-gradient(ellipse at center,transparent 40%,rgb(20 60 140/.55) 100%);transition:opacity .25s}
+.v3-vig.blue{background:radial-gradient(ellipse at center,rgb(40 110 220/.1) 20%,rgb(24 80 190/.72) 100%);transition:opacity .25s}
 .v3-vig.white{background:#fff}
 .v3-vig.dark{background:radial-gradient(ellipse at center,rgb(0 0 0/.2) 30%,rgb(0 0 0/.9) 100%);transition:opacity 1.5s}
 @media(max-width:480px){.v3-t{font-size:17px}.v3-t.dmg{font-size:22px}.v3-t.dmg.big{font-size:30px}.v3-t.ono{font-size:18px}.v3-t.ono.big{font-size:24px}}
+
+/* ---------- 戰鬥介面修正（第一輪試玩回報） ---------- */
+/* 朗讀字幕條：接近全寬、最多兩行，沒內容時完全隱藏（不露出邊框） */
+#cap{left:50%;width:min(calc(100vw - 16px),720px);max-width:none;transform:translate(-50%,-160%);visibility:hidden;opacity:0;transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .2s,visibility 0s .25s;padding:6px 12px;font-size:15px;line-height:1.35}
+#cap.on{transform:translate(-50%,0);visibility:visible;opacity:1;transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .2s}
+#cap span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;flex:1}
+/* 版面高度跟著 visualViewport（軟鍵盤彈出時題目與輸入框仍在畫面內） */
+.bwrap{height:calc(var(--vvh,100dvh) - 16px);min-height:min(520px,calc(var(--vvh,100dvh) - 16px))}
+body.kbd .bwrap{min-height:0}body.kbd .arenawrap{min-height:72px}body.kbd .hpbox.me{display:none}
+/* 觸控目標至少 44px */
+.btop button{min-height:44px}.skov .skip.sm{min-height:44px}
+.bqcard .spk,.ansline .spk{width:44px;height:44px;min-height:44px}
+.bqcard .row>.small{flex:none;white-space:nowrap}
+/* 答錯後的「下一題／繼續」：放在卡片最下面一整列，不蓋住題目 */
+.nextbtn{position:static;display:flex;width:100%;margin-top:8px;min-height:48px;font-size:17px}
+/* 招式選單：上緣留給怪物血條、開著時收起已作答的選項，選單內不必捲動 */
+.skov{max-height:calc(100% - 62px)}
+/* 選單開著時怪物血條縮成一小條貼在最上面，選單就不會蓋到它 */
+.bwrap.menuopen:not(.soul) .hpbox.foe{top:6px;left:2%;padding:3px 10px 5px;min-width:min(190px,44%)}.bwrap.menuopen:not(.soul) .hpbox.foe #fhpt{display:none}
+.bwrap.menuopen #bopts,.bwrap.menuopen #btf{display:none}
+.bwrap.menuopen .hpbox.me{visibility:hidden}
+@media(max-width:480px){.skov{padding:6px 8px}.skov .chl{font-size:11px;line-height:1.25;margin:0}.skov .chl b{font-size:12px}.skov .skills button .c{font-size:10.5px}}
+
+/* ---------- 魂系專用介面：暗色、細線、不沿用可愛風的粗框 ---------- */
+body.soulmode{background:#0a0b0e;color:#d9d4c8}
+.bwrap.soul{--card:#121317;--ink:#e3ddd0;--mut:#9a9486;--line:#4a463c;--tab:#22232a;--ok:#86c795;--okbg:#14241a;--bad:#e2725f;--badbg:#2c1412;--or:#c9a24a;color:var(--ink);gap:5px}
+.bwrap.soul .btop button,.bwrap.soul .btop .small{color:#9a9486}
+.bwrap.soul .arenawrap{border:1px solid #3d3a33;border-radius:2px;box-shadow:none}
+.bwrap.soul .hpbox{background:linear-gradient(rgb(6 7 10/.82),rgb(6 7 10/.55));color:#e3ddd0;border:0;border-radius:0;box-shadow:none;padding:5px 10px 6px;min-width:0}
+.bwrap.soul .hpbox b{font-weight:500;letter-spacing:.14em;font-size:13px}.bwrap.soul .hpbox .small{color:#9a9486;font-size:11px}
+.bwrap.soul .hp,.bwrap.soul .enb{color:#a39c8a;font-weight:600;font-size:10px;letter-spacing:.08em}
+.bwrap.soul .hp>div,.bwrap.soul .enb>div{height:6px;border:1px solid #7d7566;border-radius:0;background:#17171a}
+.bwrap.soul .hp i,.bwrap.soul .hp i[data-c=y]{background:#9c2f27}.bwrap.soul .hp i[data-c=r]{background:#d8442e}
+.bwrap.soul .enb.sta{color:#8fa583}.bwrap.soul .enb.sta i{background:#5f8f4e}
+.bwrap.soul .enb{color:#c9a24a;margin-top:0}.bwrap.soul .enb i{background:#c9a24a}
+.bwrap.soul .hp b,.bwrap.soul .enb b{font-size:10px;font-weight:600;letter-spacing:0;min-width:1.8em}
+/* Boss：畫面上緣一整條細血條；玩家：貼底的一列細橫條（不擋主角腳下的倒數圈） */
+.bwrap.soul .hpbox.foe{left:0;right:0;top:0;border-bottom:1px solid rgb(125 117 102/.5);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:2px 10px}
+.bwrap.soul .hpbox.foe>.row{flex-wrap:nowrap}.bwrap.soul .hpbox.foe .hp>span{display:none}.bwrap.soul .hpbox.foe #fhpt{font:600 10px Lexend,sans-serif;color:#9a9486}
+.bwrap.soul .hpbox.me{left:0;right:0;bottom:0;border-top:1px solid rgb(125 117 102/.5);display:flex;align-items:center;gap:10px;padding:4px 10px}
+.bwrap.soul .hpbox.me>.row{flex:none;gap:6px}.bwrap.soul .hpbox.me>.row>b{display:none}.bwrap.soul .hpbox.me>.row #diff{margin-left:0!important}
+.bwrap.soul .hpbox.me>.hp{flex:2 1 0}.bwrap.soul .hpbox.me>.enb.sta{flex:1.4 1 0}.bwrap.soul .hpbox.me>.enb{flex:1 1 0}
+.bwrap.soul .msgbox{background:#0d0e11;color:#d9d4c8;border:0;border-top:1px solid #4a463c;border-bottom:1px solid #4a463c;border-radius:0;box-shadow:none;font-weight:500;letter-spacing:.06em;padding:5px 10px}
+.bwrap.soul .msgbox.good{color:#c9d8b4}.bwrap.soul .msgbox.bad{color:#e2907f}
+.bwrap.soul .bqcard{border:1px solid #4a463c;box-shadow:none;border-radius:2px}
+.bwrap.soul .chainq{box-shadow:0 0 0 1px #a8322a,0 0 16px rgb(168 50 42/.4)}
+.bwrap.soul .bopts button{background:#191a1f;color:var(--ink);border:1px solid #5a5548;border-radius:2px}
+.bwrap.soul .bopts button.right{background:var(--okbg);border-color:var(--ok);color:var(--ok)}.bwrap.soul .bopts button.wrong{background:var(--badbg);border-color:var(--bad);color:var(--bad)}
+.bwrap.soul .bprompt{font-weight:600}.bwrap.soul .spk{background:#22232a;color:var(--ink)}
+.bwrap.soul button.pri{background:#2a1d18;border:1px solid #a8322a;color:#f0e6d8;box-shadow:none}
+.bwrap.soul .nextbtn{border:1px solid #a8322a;box-shadow:none;border-radius:2px}
+.bwrap.soul input{background:#191a1f;border:1px solid #5a5548;border-radius:2px;color:var(--ink)}
+.bwrap.soul .shud{color:#a39c8a;font-weight:600;letter-spacing:.08em;font-size:12px}
+.bwrap.soul .stime{height:7px;border:1px solid #7d7566;border-radius:0;background:#17171a}.bwrap.soul .stime i{background:linear-gradient(90deg,#d8442e,#c9a24a 45%,#8fa583)}
+.bwrap.soul .satb b{border:1px solid #7d7566;background:#17171a;height:8px}.bwrap.soul .satb b.on{background:#c9a24a}
+.bwrap.soul .tline{background:#22232a}
+.bwrap.soul .skov{background:rgb(8 9 12/.93);border:1px solid #6b6455;border-radius:0;box-shadow:none;max-height:calc(100% - 40px)}
+.bwrap.soul .skov .skills button{border:1px solid #5a5548;border-radius:2px}.bwrap.soul .skov .skills button .c,.bwrap.soul .skov .small{color:#c9a24a!important}
+.bwrap.soul .skov .chainb{border-color:#c9a24a!important}.bwrap.soul .skov .chainb b{color:#e6c877}
+.bwrap.soul .sbox{background:#0d0e11;color:#e3ddd0;border:1px solid #6b6455;box-shadow:none;font-weight:500;letter-spacing:.04em}
+.bwrap.soul .sbox button{background:#191a1f;color:#e3ddd0;border:1px solid #5a5548}.bwrap.soul .sbox button.pri{background:#2a1d18;border-color:#a8322a;color:#f0e6d8}
+.bwrap.soul .sskip{background:#191a1f;color:#e3ddd0;border:1px solid #5a5548}
+
+/* ---------- 第二批（魂系手機試玩回報） ---------- */
+/* 載入進度 */
+.v3-loading{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgb(10 11 14/.82);color:#e8e4dc;text-align:center;padding:16px;transition:opacity .3s}
+.v3-loading.done{opacity:0;pointer-events:none}.v3-loading b{font-size:16px;letter-spacing:.06em}.v3-loading span{font-size:12px;opacity:.75}
+.v3-loading i{width:min(220px,70%);height:6px;background:rgb(255 255 255/.16);border-radius:3px;overflow:hidden;margin-top:4px}.v3-loading u{display:block;height:100%;width:0;background:#e0b25a;transition:width .2s}
+.v3d.cute .v3-loading{background:rgb(20 22 61/.8)}.v3d.cute .v3-loading u{background:#5ad1ff}
+/* 暫停（切到背景後回來） */
+.pauseov{position:fixed;inset:0;z-index:60;border:0;border-radius:0;background:rgb(8 9 12/.78);color:#fff;display:flex;flex-direction:column;gap:6px;font-size:16px;min-height:0}
+.pauseov b{font-size:24px;letter-spacing:.2em}.pauseov span{opacity:.85}
+/* 戰場最小高度（手機）：題目卡再高也留 300px 給 3D 畫面 */
+@media(max-width:600px){.arenawrap{min-height:300px}}
+/* 選項文字過長：縮字、最多兩行 */
+.bopts button .ot{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;flex:1}
+.bopts button.long{font-size:12.5px;line-height:1.2}
+/* 魂系指令列：題目卡下面的一排，不蓋戰場 */
+.cmdrow{margin-top:6px}.cmdhead{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:#7fb4ff;letter-spacing:.06em;margin-bottom:4px}.cmdhead b{font-weight:600;color:var(--ink)}
+.cmds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.cmds button{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-height:50px;padding:4px 7px;font-size:13px;line-height:1.2;background:#191a1f;color:var(--ink);border:1px solid #5a5548;border-radius:2px;text-align:left}
+.cmds button b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.cmds button .k{display:none}.cmds button .c{font:600 10px Lexend,"Noto Sans TC";color:#c9a24a;white-space:nowrap}
+.cmds button.big{border-color:#c9a24a}.cmds button.skip{border-style:dashed}.cmds button:disabled{opacity:.35}
+@media(min-width:601px){.cmds button .k{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-right:4px;color:var(--mut)}}
+/* 閃避倒數條的分區：右邊金色＝彈反時間，左邊紅色＝太慢會擦傷 */
+.stime{position:relative}.stime em{position:absolute;top:0;bottom:0;pointer-events:none}
+.stime .zg{right:0;background:rgb(255 215 90/.38);border-left:2px solid #ffd75a}.stime .zr{left:0;background:rgb(216 68 46/.4);border-right:2px solid #d8442e}
+.exsay{display:inline-flex;align-items:center;gap:4px;margin-left:auto}
+/* 魂系結算頁：暗色 */
+.soulres{--card:#121317;--ink:#e3ddd0;--mut:#9a9486;--line:#4a463c;--tab:#22232a;--ok:#86c795;--okbg:#14241a;--bad:#e2725f;--badbg:#2c1412;--or:#c9a24a;--orbg:#2a2418;--bg:#0a0b0e;
+  background:#0a0b0e;color:var(--ink);margin:-24px calc(50% - 50vw) -40px;padding:28px max(16px,calc(50vw - 430px)) 60px;min-height:100dvh}
+.soulres .big{letter-spacing:.12em;font-weight:600}.soulres button{background:#191a1f;color:var(--ink);border:1px solid #5a5548;border-radius:2px}.soulres button.pri{background:#2a1d18;border-color:#a8322a;color:#f0e6d8}
+.soulres .cut{background:var(--card);border-color:var(--line)}.soulres h2{color:var(--ink)}
+/* 設定頁：手機上「開始」固定在畫面底部，不用捲到最下面 */
+@media(max-width:600px){.row:has(>#start){position:sticky;bottom:0;z-index:5;margin:18px -12px 0!important;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 28%)}}
+
+/* ---------- 第三批（桌機／穩定性回報） ---------- */
+/* 寬螢幕：戰鬥區放大（依視窗高度等比，最多 1180px） */
+@media(min-width:900px){body.inbattle main{max-width:min(1180px,max(760px,calc(100dvh*1.3)))}}
+/* 手機橫式（矮視窗）：左邊 3D、右邊訊息與題目卡，不需捲動 */
+@media(orientation:landscape) and (max-height:520px){
+  body.inbattle main{padding:6px 8px;max-width:none}
+  .bwrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:4px 8px;height:calc(var(--vvh,100dvh) - 12px);min-height:0}
+  .bwrap .arenawrap{grid-column:1;grid-row:1/-1;min-height:0}.bwrap .btop{grid-column:2;grid-row:1}.bwrap .msgbox{grid-column:2;grid-row:2;font-size:13px;padding:3px 8px}
+  .bwrap #bq{grid-column:2;grid-row:3;overflow-y:auto;min-height:0}
+  .btop button{min-height:44px;padding-top:0;padding-bottom:0}.bprompt{font-size:20px}.bqcard{padding:8px 10px}.bopts{gap:5px;margin-top:6px}.bopts button{min-height:44px;font-size:13.5px;padding:4px 8px}
+  .go{min-height:52px}.ansline{margin-top:4px}.nextbtn{min-height:44px;margin-top:6px}
+  .cmds button{min-height:44px}.skov{max-height:calc(100% - 8px);left:1%;right:1%;bottom:1%}
+  .bwrap:not(.soul).menuopen .hpbox.foe{left:auto;right:3%;top:auto;bottom:3%;z-index:5;transform:scale(.8);transform-origin:right bottom}
+}
+/* 小螢幕直式：招式選單再緊一點，開著時把訊息列收起來讓出高度 */
+@media(max-width:400px),(max-height:660px){.bwrap.menuopen:not(.soul) .msgbox{display:none}.skov .chl{display:none}.skov .skills{gap:4px}}
+/* 深色模式：主要按鈕改深色字（白字配亮橘只有 2.5:1）；寫死的黑框線改成看得見的顏色 */
+button.pri,.btn.pri{color:light-dark(#fff,#1d0f08)}
+.bopts button,.skills button,.bqcard,.go,.nextbtn{border-color:light-dark(#111,#a79e97)}
+.bqcard{box-shadow:4px 4px 0 light-dark(#111,#000)}
+.bwrap.soul button.pri{color:#f0e6d8}.bwrap.soul .bqcard{border-color:#4a463c;box-shadow:none}.bwrap.soul .bopts button{border-color:#5a5548}.bwrap.soul .nextbtn{border-color:#a8322a}
+.skov .skills button{border-color:#5a5f9e}.bwrap.soul .skov .skills button{border-color:#5a5548}
+/* 橫式的指令列：欄位窄，字縮小、不顯示鍵位數字 */
+@media(orientation:landscape) and (max-height:520px){.cmds button{font-size:12px;padding:3px 5px}.cmds button b{font-size:12px}.cmds button .k{display:none}.cmds button .c{font-size:9.5px}}
+/* 魂系結算頁：站台頁首也跟著變暗 */
+body:has(.soulres){background:#0a0b0e}body:has(.soulres) header{background:#0d0e11;border-color:#3d3a33;color:#d9d4c8}body:has(.soulres) header a,body:has(.soulres) header .logo{color:#d9d4c8}

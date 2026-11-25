@@ -66,16 +66,21 @@ function circleTexture(){const S=256,c=document.createElement("canvas");c.width=
   for(let i=0;i<6;i++){const a=i*Math.PI/3+Math.PI/6;x.beginPath();x.arc(Math.cos(a)*81,Math.sin(a)*81,7,0,7);x.stroke()}
   return new THREE.CanvasTexture(c)}
 
+// 光柱用的上下漸層：底部最亮、往上淡出，底端也收掉硬邊
+function beamTexture(){const c=document.createElement("canvas");c.width=4;c.height=128;const x=c.getContext("2d"),g=x.createLinearGradient(0,128,0,0);
+  g.addColorStop(0,"rgba(255,255,255,0)");g.addColorStop(.06,"rgba(255,255,255,1)");g.addColorStop(.35,"rgba(255,255,255,.55)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,4,128);return new THREE.CanvasTexture(c)}
+
 export function createFx(eng,{soul=false}={}){
   const {scene,camera}=eng;
   const add=makePool(eng,soul?700:500,true),norm=makePool(eng,400,false);
   const setScale=()=>{const s=eng.height*eng.dpr*.5/Math.tan(camera.fov*Math.PI/360);add.mat.uniforms.uScale.value=s;norm.mat.uniforms.uScale.value=s};
   eng.onResize.push(setScale);
   eng.onUpdate(dt=>{add.update(dt);norm.update(dt)});
-  const glowTex=eng.track(glowTexture()),blobTex=eng.track(blobTexture()),circTex=eng.track(circleTexture());
+  const glowTex=eng.track(glowTexture()),blobTex=eng.track(blobTexture()),circTex=eng.track(circleTexture()),beamTex=eng.track(beamTexture());
   const G={
     arc:new THREE.RingGeometry(.72,1,28,1,0,Math.PI*.95),
     ring:new THREE.RingGeometry(.86,1,40),
+    ringThin:new THREE.RingGeometry(.972,1,56),
     plane:new THREE.PlaneGeometry(1,1),
     cyl:new THREE.CylinderGeometry(1,1,1,16,1,true),
     capsule:new THREE.CapsuleGeometry(.5,1,3,8),
@@ -87,17 +92,24 @@ export function createFx(eng,{soul=false}={}){
   for(const k in G)eng.track(G[k]);
   const basic=(color,o={})=>new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false,blending:o.normal?THREE.NormalBlending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false,...(o.map?{map:o.map}:{})});
   // 暫時性的網格：加進場景、播 update(k)、結束後移除並釋放材質
-  function temp(mesh,dur,update,ez=ease.lin){scene.add(mesh);mesh.renderOrder=12;
+  function temp(mesh,dur,update,ez=ease.lin){scene.add(mesh);mesh.renderOrder=12;update(0,0); // 先套用第 0 格，否則會以全不透明的樣子閃一格
     return eng.tween(dur,(k,r)=>update(k,r),ez).then(()=>{scene.remove(mesh);mesh.traverse(o=>{if(o.material)o.material.dispose()})})}
 
   /* ---------- DOM 浮字 ---------- */
   // cls：dmg（傷害數字）、ono（擬聲字）、good、bad、gold、soul…（樣式在 style.css 的 .v3-t）
   function text(pos,str,cls="",o={}){if(eng.dead)return Promise.resolve();const el=document.createElement("div");el.className="v3-t "+cls;el.textContent=str;el.style.opacity=0;eng.overlay.appendChild(el);
-    const p=V(pos).clone(),dx=o.dx==null?rand(-14,14):o.dx,rise=o.rise==null?46:o.rise,dur=o.dur||.95,rot=o.rot==null?rand(-8,8):o.rot;
+    const p=V(pos).clone(),dx=o.dx==null?rand(-14,14):o.dx,dy=o.dy||0,rise=o.rise==null?46:o.rise,dur=o.dur||.95,rot=o.rot==null?rand(-8,8):o.rot;
+    // HUD 血條框的位置（相對戰場），字不要被它蓋住，也不要超出戰場被切掉
+    const host=eng.container.parentElement,hb=host?host.getBoundingClientRect():null,boxes=host?[...host.querySelectorAll(".hpbox")].map(b=>{const r=b.getBoundingClientRect();return{l:r.left-hb.left-6,r:r.right-hb.left+6,t:r.top-hb.top-6,b:r.bottom-hb.top+6,top:r.top-hb.top<hb.height/2}}):[];
+    const hw=el.offsetWidth/2+4,hh=el.offsetHeight/2+2;
+    const place=(x,y)=>{x=Math.max(hw,Math.min(eng.width-hw,x));y=Math.max(hh,Math.min(eng.height-hh,y));
+      for(const b of boxes){if(x+hw>b.l&&x-hw<b.r&&y+hh>b.t&&y-hh<b.b){if(b.top)y=b.b+hh;else y=b.t-hh}}return[x,Math.max(hh,Math.min(eng.height-hh,y))]};
     return eng.tween(dur,(k,r)=>{const s=eng.project(p);
       // 彈出（過衝）→ 停留 → 上飄淡出；bounce＝落地彈跳的傷害數字
       const sc=r<.22?ease.back(r/.22):1,up=o.bounce?-Math.abs(Math.sin(r*Math.PI*2.2))*20*(1-r)-rise*r*.5:-rise*ease.out(r),op=r>.7?1-(r-.7)/.3:1;
-      el.style.opacity=op;el.style.transform=`translate(-50%,-50%) translate(${(s.x+dx).toFixed(1)}px,${(s.y+up).toFixed(1)}px) scale(${(sc*(o.scale||1)).toFixed(3)}) rotate(${rot}deg)`},ease.lin).then(()=>el.remove())}
+      // anchor：'l'＝字的左緣對齊該點（往右長）、'r'＝右緣對齊（往左長），讓數字與擬聲字不互疊
+      const [x,y]=place(s.x+dx+(o.anchor==="l"?hw:o.anchor==="r"?-hw:0),s.y+dy+up);
+      el.style.opacity=op;el.style.transform=`translate(-50%,-50%) translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${(sc*(o.scale||1)).toFixed(3)}) rotate(${rot}deg)`},ease.lin).then(()=>el.remove())}
   // 橫幅：招式名、階段名（用真實時間，不受慢動作影響）
   function banner(str,cls="",dur=1.1){if(eng.dead)return Promise.resolve();const el=document.createElement("div");el.className="v3-banner "+cls;el.innerHTML="<span></span>";el.firstChild.textContent=str;el.style.opacity=0;eng.overlay.appendChild(el);
     return eng.tween(dur,(k,r)=>{const a=r<.18?ease.out(r/.18):r>.8?1-(r-.8)/.2:1;el.style.opacity=a;el.style.transform=`translateX(${((1-Math.min(1,r/.18))*-40+(r>.8?(r-.8)*200:0)).toFixed(1)}px)`},ease.lin,{real:true}).then(()=>el.remove())}
@@ -109,12 +121,12 @@ export function createFx(eng,{soul=false}={}){
   /* ---------- 網格特效 ---------- */
   // 斬痕：面向鏡頭的月牙，沿弧線掃過並淡出。ang＝月牙的傾斜角（弧度）
   function slash(pos,{color=0xffffff,size=1,ang=0,dur=.28,sweep=1.3,flip=false}={}){const m=new THREE.Mesh(G.arc,basic(color));m.position.copy(V(pos));const sg=flip?-1:1;
-    return temp(m,dur,(k,r)=>{m.quaternion.copy(camera.quaternion);m.rotateZ(ang+sg*sweep*(ease.out3(r)-.5)-Math.PI*.475);m.scale.setScalar(size*(.75+.45*ease.out(r)));m.material.opacity=r<.15?r/.15:1-ease.in((r-.15)/.85)})}
-  // 地面衝擊環
-  function ring(pos,{color=0xffffff,r0=.2,r1=2,dur=.45,y=.03,opacity=.9,normal=false}={}){const m=new THREE.Mesh(G.ring,basic(color,{normal}));const p=V(pos);m.position.set(p.x,y,p.z);m.rotation.x=-Math.PI/2;
+    return temp(m,dur,(k,r)=>{m.quaternion.copy(camera.quaternion);m.rotateZ(ang+sg*sweep*(ease.out3(r)-.5)-Math.PI*.475);m.scale.setScalar(size*(.75+.45*ease.out(r)));m.material.opacity=(soul?.55:1)*(r<.15?r/.15:1-ease.in((r-.15)/.85))})}
+  // 地面衝擊環（魂系預設用細線）
+  function ring(pos,{color=0xffffff,r0=.2,r1=2,dur=.45,y=.03,opacity=.9,normal=false,thin=soul}={}){const m=new THREE.Mesh(thin?G.ringThin:G.ring,basic(color,{normal}));const p=V(pos);m.position.set(p.x,y,p.z);m.rotation.x=-Math.PI/2;
     return temp(m,dur,(k,r)=>{m.scale.setScalar(lerp(r0,r1,ease.out3(r)));m.material.opacity=opacity*(1-r)})}
   // 面向鏡頭的衝擊環（彈反、命中）
-  function burstRing(pos,{color=0xffffff,r0=.1,r1=1.2,dur=.3}={}){const m=new THREE.Mesh(G.ring,basic(color));m.position.copy(V(pos));
+  function burstRing(pos,{color=0xffffff,r0=.1,r1=1.2,dur=.3,thin=soul}={}){const m=new THREE.Mesh(thin?G.ringThin:G.ring,basic(color));m.position.copy(V(pos));
     return temp(m,dur,(k,r)=>{m.quaternion.copy(camera.quaternion);m.scale.setScalar(lerp(r0,r1,ease.out3(r)));m.material.opacity=1-r})}
   const spriteMat=(color,opacity=1)=>new THREE.SpriteMaterial({map:glowTex,color,opacity,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
   // 閃光（Sprite）
@@ -123,9 +135,10 @@ export function createFx(eng,{soul=false}={}){
   // 持續發光的光球（火球、蓄力），回傳 {sprite, remove()}
   function orb(pos,{color=0xffaa44,size=.6,opacity=1}={}){const m=new THREE.Sprite(spriteMat(color,opacity));m.position.copy(V(pos));m.scale.setScalar(size);m.renderOrder=12;scene.add(m);
     return{sprite:m,remove(){scene.remove(m);m.material.dispose()}}}
-  // 光柱
-  function pillar(pos,{color=0xfff2b0,r=.6,h=9,dur=.5}={}){const m=new THREE.Mesh(G.cyl,basic(color));const p=V(pos);m.position.set(p.x,h/2,p.z);
-    return temp(m,dur,(k,r2)=>{const w=r*(r2<.15?r2/.15:1-ease.in((r2-.15)/.85));m.scale.set(Math.max(.001,w),h,Math.max(.001,w));m.material.opacity=.85*(1-r2*.6)})}
+  // 光柱：加色混合＋上下漸層的圓柱，外加一道細亮芯；魂系更細長
+  function pillar(pos,{color=0xfff2b0,r=.6,h=9,dur=.5}={}){const p=V(pos),g=new THREE.Group(),rr=soul?r*.3:r;
+    const outer=new THREE.Mesh(G.cyl,basic(color,{map:beamTex})),core=new THREE.Mesh(G.cyl,basic(0xffffff,{map:beamTex}));g.add(outer,core);g.position.set(p.x,h/2,p.z);
+    return temp(g,dur,(k,r2)=>{const w=rr*(r2<.15?r2/.15:1-ease.in((r2-.15)/.85));outer.scale.set(Math.max(.001,w),h,Math.max(.001,w));core.scale.set(Math.max(.001,w*.3),h,Math.max(.001,w*.3));outer.material.opacity=(soul?.55:.7)*(1-r2*.6);core.material.opacity=.8*(1-r2)})}
   // 閃電：鋸齒狀的帶狀網格（面向鏡頭）
   function bolt(a,b,{color=0xcfe8ff,width=.14,dur=.22,jag=.45,seg=9}={}){const A=V(a),B=V(b),pts=[];const side=new THREE.Vector3().subVectors(B,A).cross(camera.getWorldDirection(new THREE.Vector3())).normalize();
     for(let i=0;i<=seg;i++){const t=i/seg,p=new THREE.Vector3().lerpVectors(A,B,t);if(i&&i<seg)p.addScaledVector(side,rand(-jag,jag)).add(new THREE.Vector3(rand(-jag,jag)*.3,0,rand(-jag,jag)*.3));pts.push(p)}
@@ -137,11 +150,12 @@ export function createFx(eng,{soul=false}={}){
     let alive=true,target=r*2,sc=.01;const off=eng.onUpdate(dt=>{m.rotation.z+=spin*dt;sc=lerp(sc,target,Math.min(1,dt*9));m.scale.setScalar(sc)});
     return{mesh:m,setRadius(v){target=v*2},setColor(c){m.material.color.set(c)},remove(){if(!alive)return;alive=false;eng.tween(.25,k=>{m.material.opacity=1-k}).then(()=>{off();scene.remove(m);m.material.dispose()})}}}
   // 殘影：膠囊剪影
-  function ghost(pos,{h=1.7,color=0x9fc4ff,dur=.4,lean=0,rotY=0,opacity=.5}={}){const m=new THREE.Mesh(G.capsule,basic(color));const p=V(pos);m.position.set(p.x,p.y+h*.5,p.z);m.rotation.set(lean,rotY,0,"YXZ");m.scale.set(h*.3,h*.5,h*.24);
+  function ghost(pos,{h=1.7,color=0x9fc4ff,dur=.4,lean=0,rotY=0,opacity=.5}={}){if(soul)return Promise.resolve(); // 魂系不用膠囊殘影
+    const m=new THREE.Mesh(G.capsule,basic(color));const p=V(pos);m.position.set(p.x,p.y+h*.5,p.z);m.rotation.set(lean,rotY,0,"YXZ");m.scale.set(h*.3,h*.5,h*.24);
     return temp(m,dur,(k,r)=>{m.material.opacity=opacity*(1-r)})}
   // 假陰影圓片
   function blob(r=.6,opacity=1){const m=new THREE.Mesh(G.plane,new THREE.MeshBasicMaterial({map:blobTex,transparent:true,depthWrite:false,opacity,color:0x000000}));m.rotation.x=-Math.PI/2;m.position.y=.02;m.scale.setScalar(r*2);m.renderOrder=1;return m}
 
-  return{emit:o=>add.emit(o),emitN:o=>norm.emit(o),text,banner,setVig,pulseVig,slash,ring,burstRing,flash,orb,pillar,bolt,circle,ghost,blob,temp,basic,G,glowTex,setScale,
+  return{emit:o=>add.emit(o),emitN:o=>norm.emit(o),text,banner,setVig,pulseVig,slash,ring,burstRing,flash,orb,pillar,bolt,circle,ghost,blob,temp,basic,G,glowTex,beamTex,setScale,
     get particleCount(){return add.alive+norm.alive}};
 }

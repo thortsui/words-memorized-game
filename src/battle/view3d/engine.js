@@ -40,7 +40,7 @@ export function createEngine(container,{reducedMotion=false}={}){
   const durK=1;
   // fn(k, rawT)：k 是套過 easing 的 0..1。回傳 Promise，播完才 resolve。
   E.tween=(dur,fn,ez=ease.io,opt={})=>new Promise(res=>{
-    if(E.dead)return res();
+    if(E.dead||E.lost)return res(); // context 遺失期間不播演出，直接往下走
     tweens.push({t:0,dur:Math.max(.0001,dur*durK),fn,ez,res,real:!!opt.real,target:opt.target||null})});
   E.wait=(dur,opt)=>E.tween(dur,null,ease.lin,opt);
   // 把物件的數值屬性從目前值補間到目標值，例如 E.to(mesh.position,{x:1,y:2},.3)
@@ -63,7 +63,9 @@ export function createEngine(container,{reducedMotion=false}={}){
   E.resize=()=>{const w=Math.max(1,container.clientWidth),h=Math.max(1,container.clientHeight);
     if(w===E.width&&h===E.height&&!E._forceResize)return;E._forceResize=false;
     E.width=w;E.height=h;E.aspect=w/h;renderer.setSize(w,h,false);camera.aspect=E.aspect;camera.updateProjectionMatrix();
-    for(const f of E.onResize)f(w,h)};
+    for(const f of E.onResize)f(w,h)
+    // setSize 會清空畫布；立刻補畫一格，否則到下一個 rAF 之前會閃一下空白
+    if(E._started&&!E.dead){try{renderer.render(scene,camera)}catch(e){}}};
   const ro=typeof ResizeObserver!=="undefined"?new ResizeObserver(()=>E.resize()):null;ro&&ro.observe(container);
   const onWinResize=()=>E.resize();window.addEventListener("resize",onWinResize);
 
@@ -82,7 +84,9 @@ export function createEngine(container,{reducedMotion=false}={}){
   function frame(now){raf=requestAnimationFrame(frame);
     let rdt=(now-last)/1000;last=now;if(rdt<=0)return;if(rdt>.1)rdt=.1;
     fpsTick(rdt);
-    let k=E.timeScale;if(now<freezeUntil)k*=.02;else if(now<slowUntil)k*=slowK;
+    if(E.paused){renderer.render(scene,camera);return} // 暫停：畫面留著，時間不走
+    let k=E.timeScale*(E.fast||1); // fast：跳過演出時的快轉倍率
+    if(E.fast>1)rdt=Math.min(rdt,.034);if(now<freezeUntil)k*=.02;else if(now<slowUntil)k*=slowK;
     const dt=rdt*k;E.time+=dt;E.dt=dt;E.rdt=rdt;
     // 補間
     const n=tweens.length;let anyDone=false;
@@ -102,9 +106,13 @@ export function createEngine(container,{reducedMotion=false}={}){
   // 頁面隱藏時暫停渲染（動畫也跟著停，回來再接著播）
   const onVis=()=>{document.hidden?stop():start()};document.addEventListener("visibilitychange",onVis);
   // WebGL context 遺失時不要讓瀏覽器丟例外；回來後繼續畫
-  const onLost=e=>{e.preventDefault();stop()},onRestored=()=>start();
+  // context 遺失：先讓進行中的演出全部結束（不然每個事件都要等保險的 15 秒），再試著恢復；恢復不了由 scene.js 換成文字畫面
+  E.onLost=[];const loseExt=renderer.getContext().getExtension("WEBGL_lose_context");
+  const onLost=e=>{e.preventDefault();E.lost=true;stop();const tw=tweens;tweens=[];for(const t of tw)if(!t.done){t.done=true;t.res()}for(const f of E.onLost)f();
+    setTimeout(()=>{if(E.lost&&!E.dead){try{loseExt&&loseExt.restoreContext()}catch(err){}}},400)};
+  const onRestored=()=>{E.lost=false;E._forceResize=true;E.resize();start()};
   canvas.addEventListener("webglcontextlost",onLost);canvas.addEventListener("webglcontextrestored",onRestored);
-  E.start=()=>{E.resize();if(!document.hidden)start()};
+  E.start=()=>{E.resize();E._started=true;if(!document.hidden)start()};
 
   /* ---------- 把 3D 座標投影到畫面（給 DOM 浮字用） ---------- */
   const pv=new THREE.Vector3();

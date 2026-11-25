@@ -25,7 +25,9 @@ export const EVENTS={
 };
 
 // 先用一個丟棄式 canvas 確認 WebGL 能用，不能用就不必下載 three.js
-function webglOK(){try{const c=document.createElement("canvas");const gl=c.getContext("webgl2")||c.getContext("webgl");if(!gl)return false;
+let glProbe=null; // 探測結果快取：整個分頁只建立一次探測用的 context，用完立刻釋放
+function webglOK(){if(glProbe!==null)return glProbe;return glProbe=probe()}
+function probe(){try{const c=document.createElement("canvas");const gl=c.getContext("webgl2")||c.getContext("webgl");if(!gl)return false;
   const ext=gl.getExtension("WEBGL_lose_context");ext&&ext.loseContext();return true}catch(e){return false}}
 
 export function mount(container,api){
@@ -39,6 +41,8 @@ export function mount(container,api){
     play(name,payload){if(dead)return Promise.resolve();return ready.then(v=>v&&!dead?v.play(name,payload):undefined)},
     setTimeScale(s){scale=s;impl&&impl.setTimeScale(s)},
     resize(){impl&&impl.resize()},
+    skip(){impl&&impl.skip&&impl.skip()},              // 快轉目前這段演出（Boss 登場可點畫面跳過）
+    setPaused(v){impl&&impl.setPaused&&impl.setPaused(v)}, // 頁面切到背景時暫停
     dispose(){dead=true;if(impl){try{impl.dispose()}catch(e){}impl=null}container.classList.remove("slowmo");container.innerHTML=""},
   };
 }

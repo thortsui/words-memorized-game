@@ -1,0 +1,9 @@
+
+### 目前數值
+高手 0.45–0.85s 100%     {"win%":100,"kills":5,"dist":"0/0/0/0/0/100","q":36,"eTurns":4,"eTurnsPerBoss":"0/1/1/1/1","atk":14,"parry":14,"dodge":0,"guard":0,"graze":0,"hit":0,"minSta":100,"avgD":1}
+熟練 1.2–2.0s 90%        {"win%":100,"kills":5,"dist":"0/0/0/0/0/100","q":54.38,"eTurns":6.27,"eTurnsPerBoss":"0.3/1.33/1.35/1.81/1.47","atk":18.77,"parry":1.91,"dodge":12.79,"guard":2.5,"graze":1.03,"hit":0.55,"minSta":6.86,"avgD":0.65}
+普通 2–3s 75%            {"win%":41,"kills":4.3,"dist":"0/0/0/10/49/41","q":78.93,"eTurns":13.65,"eTurnsPerBoss":"1.08/2.63/3.05/3.9/2.99","atk":30.06,"parry":0,"dodge":15.54,"guard":7.57,"graze":2.89,"hit":4.05,"minSta":0.54,"avgD":-0.14}
+偏慢 3–4.5s 60%          {"win%":0,"kills":2.08,"dist":"0/16/61/23/1/0","q":57,"eTurns":15.63,"eTurnsPerBoss":"3.33/6.27/4.84/1.17/0.01","atk":23.89,"parry":0,"dodge":8.24,"guard":6.07,"graze":4.67,"hit":4.91,"minSta":2.17,"avgD":-0.79}
+很差 3–6s 40%            {"win%":0,"kills":0.85,"dist":"18/79/3/0/0/0","q":38.41,"eTurns":14.97,"eTurnsPerBoss":"7.69/7.15/0.13/0/0","atk":15.87,"parry":0,"dodge":2.4,"guard":6.08,"graze":2.22,"hit":5.17,"minSta":3.91,"avgD":-0.93}
+亂點 0.3–0.9s 25%        {"win%":0,"kills":1.35,"dist":"1/66/30/3/0/0","q":61.13,"eTurns":13.65,"eTurnsPerBoss":"4.4/7.58/1.53/0.13/0","atk":17.21,"parry":4.26,"dodge":0,"guard":7.48,"graze":0,"hit":5.46,"minSta":4.35,"avgD":-0.74}
+亂點＋聰明出招 25%            {"win%":0,"kills":1.61,"dist":"1/50/38/11/1/0","q":61.26,"eTurns":13.12,"eTurnsPerBoss":"3.77/6.64/2.19/0.5/0.03","atk":17.56,"parry":4.38,"dodge":0,"guard":7.42,"graze":0,"hit":5.77,"minSta":4.16,"avgD":-0.74}

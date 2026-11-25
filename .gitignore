@@ -14,3 +14,10 @@ art/blender/source/hero_knight.blend
 art/blender/source/boss_*.blend
 art/blender/source/arena_*.blend
 art/blender/preview/_tiles/
+
+# 試玩測試的截圖與紀錄（體積大，只留掃描測試用的圖）
+tests/playtest/*
+!tests/playtest/site/
+tests/playtest/site/*
+!tests/playtest/site/img/
+art/screenshots/fix1/

@@ -48,7 +48,7 @@ export function mountText(container,api){
   return {
     play(name,payload){if(dead)return Promise.resolve();const h=H[name];return h?Promise.resolve(h(payload||{})):Promise.resolve()},
     setTimeScale(s){scale=s;container.classList.toggle("slowmo",s<1)},
-    resize(){},
+    resize(){},skip(){},setPaused(){},
     dispose(){dead=true;container.classList.remove("slowmo");container.innerHTML=""},
   };
 }

@@ -41,24 +41,23 @@ export function createMoves(ctx){
     else if(move==="holy"){ctx.dim(.5,.4);ctx.cam("sky");
       // 巨大光劍在敵人上空成形
       const c=foeC(0),g=new THREE.Group(),s=Math.max(1,ctx.foe().h*.9);
-      const blade=new THREE.Mesh(fx.G.box,fx.basic(pal.holy)),tip=new THREE.Mesh(fx.G.cone,fx.basic(pal.holy)),guard=new THREE.Mesh(fx.G.box,fx.basic(0xffffff)),grip=new THREE.Mesh(fx.G.box,fx.basic(pal.holy));
-      blade.scale.set(.5*s,3.2*s,.12*s);blade.position.y=2.2*s;tip.scale.set(.5*s,.7*s,.12*s);tip.rotation.z=Math.PI;tip.rotation.y=Math.PI/6;tip.position.y=.25*s;guard.scale.set(1.5*s,.22*s,.2*s);guard.position.y=3.9*s;grip.scale.set(.2*s,.9*s,.16*s);grip.position.y=4.4*s;
+      const blade=new THREE.Mesh(fx.G.box,fx.basic(pal.holy,{map:fx.beamTex})),tip=new THREE.Mesh(fx.G.cone,fx.basic(pal.holy)),guard=new THREE.Mesh(fx.G.box,fx.basic(0xffffff)),grip=new THREE.Mesh(fx.G.box,fx.basic(pal.holy));
+      blade.scale.set(.42*s,4.2*s,.1*s);blade.position.y=2.7*s;blade.rotation.z=Math.PI; /* 漸層貼圖亮的一端朝下（劍尖） */tip.scale.set(.5*s,.7*s,.12*s);tip.rotation.z=Math.PI;tip.rotation.y=Math.PI/6;tip.position.y=.25*s;guard.scale.set(1.3*s,.14*s,.14*s);guard.position.y=3.9*s;grip.scale.set(.14*s,.8*s,.12*s);grip.position.y=4.35*s;guard.material.opacity=grip.material.opacity=.5;
       g.add(blade,tip,guard,grip);g.position.set(c.x,7.5,c.z);g.rotation.y=Math.atan2(eng.camera.position.x-c.x,eng.camera.position.z-c.z);eng.scene.add(g);st.sword=g;st.swordS=s;
-      const setOp=o=>g.children.forEach(m=>m.material.opacity=o);setOp(0);
+      const setOp=o=>g.children.forEach((m,i)=>m.material.opacity=o*(i>1?.45:1));setOp(0);
       await eng.tween(.7,k=>{setOp(k*.9);g.position.y=7.5-1.6*k;if(Math.random()<.7)fx.emit({p:v3(c.x+rand(-.5,.5)*s,g.position.y+rand(0,4)*s,c.z),n:1,color:[pal.holy,0xffffff],speed:[.1,.5],size:[.1,.2],life:[.3,.6],kind:1})},ease.out)}
     else await eng.wait(.3)}
 
   async function hit(p){if(!st)st={move:p.move||"slash",n:0,melee:true};const move=st.move,i=p.index||0,h=hero.h,f=ctx.foe(),c=foeC();
     if(melee(move)){
-      // 連斬：真模型有 Combo 片段就整段播一次，各段傷害平均分在片長裡；否則每段各揮一刀
-      let waitT;
-      if(move==="gale"&&hero.has("Combo")){if(i===0){hero.play("Combo");st.gap=hero.duration("Combo")/(p.total+.6)}waitT=st.gap}
-      else{const sp=move==="gale"?1.7:move==="quick"||move==="counter"?1.35:1;hero.play("Slash",{speed:sp});waitT=hero.impactTime("Slash",sp)}
-      await eng.wait(waitT);
+      // 連斬：整段 Combo 只播一次，各段傷害對在片段裡實際揮到的那幾格（秒數表在 actors.js 的 IMPACT）
+      if(move==="gale"){if(i===0){st.times=hero.comboTimes("Combo",p.total);st.t0=eng.time;hero.play("Combo")}
+        const at=st.times[Math.min(i,st.times.length-1)]+(i>=st.times.length?.22*(i-st.times.length+1):0);await eng.wait(Math.max(0,st.t0+at-eng.time))}
+      else{const sp=move==="quick"||move==="counter"?1.35:1;hero.play("Slash",{speed:sp});await eng.wait(hero.impactTime("Slash",sp))}
       const ang=move==="gale"?[.6,-.7,1.6][i%3]:rand(.3,.9);
       fx.slash(c,{color:pal.slash,size:Math.min(1.9,f.h*(p.last&&move==="gale"?1.25:.95)+.2),ang,flip:i%2===1});
       await ctx.impact(p,{power:move==="gale"?(p.last?1.3:.8):move==="counter"?1.4:1,ono:move==="gale"?(p.last?"斬！！":"唰"):"斬！",color:pal.slash});
-      if(move==="gale"&&!p.last)await eng.wait(.04)}
+      }
     else if(move==="fire"){const o=st.orb.sprite,from=o.position.clone();hero.play("Slash");
       await eng.tween(.3,k=>{o.position.lerpVectors(from,c,k);o.position.y+=Math.sin(k*Math.PI)*.5;fx.emit({p:o.position,n:2,color:[pal.fire,0xffd36a,0xff5a1a],speed:[.2,1],size:[.12,.28],life:[.25,.5],grow:-.6})},ease.in);
       st.orb.remove();st.orb=null;
@@ -80,13 +79,13 @@ export function createMoves(ctx){
       if(big){fx.ring(f.root.position,{color:pal.ice,r1:f.h*2+1});fx.flash(c,{color:pal.ice,size:f.h*2.6})}
       await ctx.impact(p,{power:big?1.7:.75,ono:big?"碎！！":"鏘",color:pal.ice})}
     else if(move==="meteorEnd"){const r=hero.root.position,from=r.clone(),dir=v3().subVectors(from,f.root.position).setY(0).normalize(),to=f.root.position.clone().addScaledVector(dir,f.h*.45+h*.35);to.y=0;
-      hero.play("HeavySlash",{speed:1.4});
+      hero.play("HeavySlash",{speed:1.4});await eng.wait(Math.max(0,hero.impactTime("HeavySlash",1.4)-.17));
       await eng.tween(.17,k=>{r.lerpVectors(from,to,k);if(st.glow)st.glow.sprite.position.copy(hero.center());fx.emit({p:hero.center(),n:3,color:[pal.meteor,0xffffff],speed:[.2,1.2],size:[.16,.34],life:[.25,.5]})},ease.in);
       if(st.glow){st.glow.remove();st.glow=null}
       fx.slash(c,{color:pal.meteor,size:f.h*1.5+.4,ang:-1.2,sweep:1.8});fx.ring(f.root.position,{color:pal.meteor,r1:f.h*2.2+1.2});fx.flash(c,{color:0xffffff,size:f.h*3});
       fx.emit({p:v3(c.x,.1,c.z),n:40,color:[pal.meteor,0xffffff,0xffe08a],speed:[2,7],flat:.35,up:2,size:[.12,.3],life:[.35,.8],gravity:6,kind:1});
       await ctx.impact(p,{power:2.6,ono:"流星斬！",color:pal.meteor})}
-    else if(move==="holy"){const g=st.sword,s=st.swordS,y0=g.position.y;hero.play("HeavySlash");
+    else if(move==="holy"){const g=st.sword,s=st.swordS,y0=g.position.y;hero.play("HeavySlash");await eng.wait(Math.max(0,hero.impactTime("HeavySlash")-.2));
       await eng.tween(.2,k=>{g.position.y=y0+(-.35*s-y0)*k},ease.in3);
       const gp=v3(c.x,0,c.z);fx.pillar(gp,{color:pal.holy,r:f.h*.8+.5,h:14,dur:.7});fx.pulseVig("white",.85,.4);fx.ring(gp,{color:pal.holy,r1:f.h*3+2,dur:.6});fx.ring(gp,{color:0xffffff,r1:f.h*2+1,dur:.4});
       fx.flash(c,{color:0xffffff,size:f.h*5,dur:.4});

@@ -21,6 +21,8 @@ const au=new Audio();
 function chunks(t){const out=[];let s="";for(const p of t.split(/(?<=[.!?,;])\s+/)){if((s+" "+p).trim().length>180){if(s)out.push(s);s=p}else s=(s+" "+p).trim()}if(s)out.push(s);return out}
 
 const KEEP=[]; // 保留 utterance 參考，避免被回收
+// utterance 的事件處理器會抓住當時的按鈕（進而抓住整個戰鬥畫面的 DOM）：離開戰鬥時清掉
+export const releaseSpeech=()=>{KEEP.length=0};
 function deviceSpeak(text,done,fail,lang,my){if(!hasSys()){fail(text);return}
   const ss=speechSynthesis,alive=()=>my===spkId;
   const go=()=>{if(!alive())return;let u;try{u=new SpeechSynthesisUtterance(text)}catch(e){fail(text);return}KEEP.push(u);if(KEEP.length>12)KEEP.shift();

@@ -1,6 +1,7 @@
 // 掃描上傳的端對端測試（Playwright）。這個檔案是一個 async (page)=>{…} 函式，交給 Playwright 的 page 執行：
 //   先 npm run dev，用 Playwright 把瀏覽器開到掃描上傳頁（/#upload 或 /tests/scan-harness.html）、調好視窗大小，再呼叫這個函式。
 //   想留截圖：先在頁面執行 sessionStorage.setItem('__shot','截圖檔名開頭')。
+// 注意：window.__vcScanTamper 只在開發模式（npm run dev）存在，正式建置已移除，所以這支只能對 dev 伺服器跑。
 // 流程：上傳 tests/fixtures 的三張合成書頁 → 兩個本機引擎提取 → 核對清單；
 //   用 window.__vcScanTamper 故意改錯四筆，檢查它們都被標成需確認、存入被擋下；逐筆確認後才能存入。
 async (page) => {
