@@ -152,9 +152,9 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .sbox{background:#fff;color:#111;border:3px solid #111;box-shadow:5px 5px 0 #c0262d;padding:14px 16px;width:100%;max-width:560px;font-weight:700;font-size:clamp(16px,3.6vw,20px)}
 .sbox p{margin:0;min-height:2.6em}
 .sbox button{color:#111;background:#fff}.sbox button.pri{color:#fff;background:#dc4f22}
-@media(max-height:700px){.bprompt{font-size:22px}.bopts button{min-height:40px;font-size:14px}.msgbox{font-size:14px;padding:4px 10px}}
+@media(max-height:700px){.bprompt{font-size:22px}.bopts button{min-height:44px;font-size:14px}.msgbox{font-size:14px;padding:4px 10px}}
 
-/* 暫時的文字戰鬥畫面（之後由 3D 場景取代） */
+/* 文字戰鬥畫面（WebGL 不可用時的退回方案，見 src/battle/view3d/textview.js） */
 .tview{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:56px 12px 70px;color:#111;text-align:center}
 .bwrap.soul .tview{color:#e8e4dc}
 .tv-foe{font:800 clamp(20px,5vw,30px)/1.2 "Noto Sans TC",sans-serif}
@@ -163,3 +163,59 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .bwrap.soul .tv-l.good{color:#9dffb8}.bwrap.soul .tv-l.bad{color:#ff9d9d}
 .tv-note{position:absolute;left:0;right:0;bottom:6px;font-size:11px;opacity:.6}
 .arena.slowmo{filter:saturate(.45) brightness(.92)}
+
+/* ===== 掃描上傳：雙引擎核對清單（狀態徽章、差異並排、存入門檻） ===== */
+.eng .engrow{display:flex;align-items:center;gap:10px;margin-top:8px}.eng .engrow>.small{flex:none;width:4.5em}
+.eng .adv{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;font-size:14px}.eng .adv summary{cursor:pointer;color:var(--mut)}
+.warnline{color:var(--bad);margin-top:6px}
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:700;border:1.5px solid currentColor;white-space:nowrap}
+.badge.b-ok{color:var(--ok);background:var(--okbg)}.badge.b-bad{color:var(--bad);background:var(--badbg)}.badge.b-one,.badge.b-wait{color:var(--or);background:var(--orbg)}
+.badge.b-okd{color:var(--ok);background:transparent}.badge.b-off{color:var(--mut);background:var(--tab)}
+.vsum{position:sticky;top:52px;z-index:3;background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px;display:grid;gap:6px}
+.vsum.todo{border-color:var(--bad)}.vsum.done{border-color:var(--ok)}.vsum .tallies{display:flex;flex-wrap:wrap;gap:6px}
+.rev .rc{border-style:solid}.rev .rc.st-ok{border-color:var(--ok)}.rev .rc.st-okd{border-color:var(--ok);border-style:dashed}
+.rev .rc.st-bad{border-color:var(--bad)}.rev .rc.st-one,.rev .rc.st-wait{border-color:var(--or)}.rev .rc.st-off{opacity:.5;border-style:dashed}
+.rev .rc.flash{outline:3px solid var(--or);outline-offset:2px}
+.rev .rchead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rev .df{background:var(--badbg);border-radius:8px;padding:8px 10px;display:grid;gap:8px}
+.rev .dfrow{display:grid;grid-template-columns:4.5em minmax(0,1fr) minmax(0,1fr);gap:6px;align-items:stretch}
+.rev .dfk{font-size:13px;color:var(--mut);align-self:center}
+.rev .dfv{display:grid;gap:2px;text-align:left;padding:6px 9px;min-height:44px;background:var(--bg);border:1.5px solid var(--line);border-radius:8px;font:inherit;color:inherit;cursor:pointer;overflow-wrap:anywhere}
+.rev .dfv:hover{border-color:var(--or)}.rev .dfv.on{border-color:var(--ok);background:var(--okbg)}
+.rev .dfv .who{font-size:12px;color:var(--mut)}.rev .dfv .val{font-size:15px;line-height:1.45}
+.rev mark.dfc{background:var(--bad);color:#fff;border-radius:3px;padding:0 1px;white-space:pre-wrap}
+.rev .why{color:var(--bad);font-weight:700;font-size:14px}.rev .why.soft{color:var(--or)}.rev .why ul{margin:2px 0 0;padding-left:1.3em;font-weight:400}
+.rev .unote{color:var(--or)}
+@media(max-width:600px){.rev .dfrow{grid-template-columns:minmax(0,1fr)}.rev .dfk{font-weight:700}.vsum{top:46px;padding:6px 10px}.vsum.todo .tallies,.vsum.todo .long{display:none}.rev .crop{overflow-x:auto}.rev .crop canvas:not(.whole){max-width:none;width:max(100%,520px)}.eng .engrow{align-items:flex-start;flex-direction:column;gap:4px}}
+
+/* ---------- 3D 戰鬥畫面（src/battle/view3d/） ---------- */
+.v3-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#14163d;opacity:.7}
+.bwrap.soul .v3-load{color:#b9b4a8}
+.v3d{position:absolute;inset:0;overflow:hidden;animation:v3in .5s ease-out}
+@keyframes v3in{from{opacity:0}to{opacity:1}}
+.v3-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation;transition:filter 1.2s}
+.v3-canvas.v3-gray{filter:grayscale(.85) brightness(.75)}
+.v3-ovl{position:absolute;inset:0;overflow:hidden;pointer-events:none;contain:strict}
+/* 浮字：位置與縮放由程式每幀寫入 transform */
+.v3-t{position:absolute;left:0;top:0;white-space:nowrap;will-change:transform,opacity;font:800 20px/1 Lexend,"Noto Sans TC",sans-serif;color:#fff;text-shadow:0 2px 0 #14163d,0 -2px 0 #14163d,2px 0 0 #14163d,-2px 0 0 #14163d,1.5px 1.5px 0 #14163d,-1.5px 1.5px 0 #14163d,1.5px -1.5px 0 #14163d,-1.5px -1.5px 0 #14163d}
+.v3-t.dmg{font-size:26px;color:#ff7a1a}.v3-t.dmg.big{font-size:36px;color:#ff4d2e}.v3-t.dmg.hurt{color:#ff5a6e}
+.v3-t.ono{font-size:22px;color:#fff3a0;font-family:"Noto Sans TC",sans-serif;font-weight:900}.v3-t.ono.big{font-size:30px;color:#ffe14d}
+.v3-t.good{color:#9dffb8;font-size:18px}.v3-t.bad{color:#ff9d9d;font-size:20px}.v3-t.gold{color:#ffd23f;font-size:20px}
+/* 魂系的字：細、冷、不描粗邊 */
+.v3-t.soul{font:600 15px/1 "Noto Sans TC",sans-serif;letter-spacing:.14em;color:#e8e4dc;text-shadow:0 0 6px #000,0 1px 2px #000}
+.v3-t.soul.dmg{font:700 22px/1 Lexend,sans-serif;letter-spacing:0;color:#f3efe6}.v3-t.soul.dmg.big{font-size:30px;color:#ffd9a0}.v3-t.soul.dmg.hurt{color:#ff5a4a}
+.v3-t.soul.gold{color:#ffe2a0;text-shadow:0 0 10px #ffb84a,0 0 3px #000}.v3-t.soul.big{font-size:24px}
+.v3-t.soul.blue{color:#9fd4ff}.v3-t.soul.heal{color:#c9f5cf;font-size:18px}.v3-t.soul.warn{font:900 40px/1 Lexend,sans-serif;color:#ff3a2a;text-shadow:0 0 14px #ff2a1a,0 0 4px #000}
+/* 招式名／階段名橫幅 */
+.v3-banner{position:absolute;left:0;right:0;top:36%;display:flex;justify-content:center;will-change:transform,opacity}
+.v3-banner span{font:900 clamp(20px,5.2vw,30px)/1.2 "Noto Sans TC",sans-serif;padding:6px 22px;letter-spacing:.08em}
+.v3-banner.cute span{background:#14163d;color:#ffd23f;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 3px #14163d;transform:rotate(-3deg)}
+.v3-banner.soul span{color:#e8e4dc;font-weight:500;letter-spacing:.4em;background:linear-gradient(90deg,transparent,rgb(0 0 0/.72) 20%,rgb(0 0 0/.72) 80%,transparent);padding:10px 56px;text-shadow:0 0 8px #000}
+.v3-banner.soul.phase span{color:#ff8a70}
+/* 全畫面暈影：不透明度由程式設定 */
+.v3-vig{position:absolute;inset:0;opacity:0;will-change:opacity}
+.v3-vig.red{background:radial-gradient(ellipse at center,transparent 45%,rgb(200 20 10/.75) 100%)}
+.v3-vig.blue{background:radial-gradient(ellipse at center,transparent 40%,rgb(20 60 140/.55) 100%);transition:opacity .25s}
+.v3-vig.white{background:#fff}
+.v3-vig.dark{background:radial-gradient(ellipse at center,rgb(0 0 0/.2) 30%,rgb(0 0 0/.9) 100%);transition:opacity 1.5s}
+@media(max-width:480px){.v3-t{font-size:17px}.v3-t.dmg{font-size:22px}.v3-t.dmg.big{font-size:30px}.v3-t.ono{font-size:18px}.v3-t.ono.big{font-size:24px}}

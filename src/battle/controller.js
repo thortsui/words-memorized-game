@@ -30,7 +30,7 @@ export function startBattle(ws,soul){if(!ws.length)return;ctx.Q=null;stopSpeech(
    <div id="ovl"></div></div>
   <div class="msgbox" id="msg"></div><div id="bq"></div></div>`;
   t.view=mount($("#arena"),{kind:soul?"soul":"monster",getState:()=>t.E.snapshot(),foes:soul?SOUL_BOSSES:MON,reducedMotion:RM});
-  $("#bgmb").onclick=bgmToggle;bgmStart();
+  $("#bgmb").onclick=bgmToggle;bgmStart(soul?"soul":"bright");
   $("#run").onclick=async()=>{if(await ask("要逃跑嗎？這場戰鬥的進度不會保留。")){endBattle();toSetup()}};
   hud(t.E.snapshot());
   const key=soul?"vc-story-soul":"vc-story";
