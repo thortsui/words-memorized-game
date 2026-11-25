@@ -1,0 +1,165 @@
+/* VOICE: a friendly, focused study tool for a high-school vocab book
+   IDEA: the book's own cut-out cards — dashed cut lines, scissors, grey side tabs, orange headwords
+   COLOUR and TYPE: white paper, warm ink, the book's orange-red; Lexend for English, Noto Sans TC for Chinese
+   LAYOUT: one column up to 900px, sticky tab bar, cards stack on phones */
+:root{color-scheme:light dark;
+--bg:light-dark(#ffffff,#151312);--ink:light-dark(#1f1b19,#f2ede8);--mut:light-dark(#6d6560,#a79e97);
+--line:light-dark(#d9d3ce,#3b3532);--tab:light-dark(#eeebe8,#262220);--or:light-dark(#dc4f22,#ff7d50);--orbg:light-dark(#fdeee8,#3a1f15);
+--ok:light-dark(#1d7a46,#5fd393);--okbg:light-dark(#e7f6ed,#13301f);--bad:light-dark(#c0262d,#ff7178);--badbg:light-dark(#fcebec,#3a1517);
+--card:light-dark(#ffffff,#1c1917)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans TC","Lexend",system-ui,sans-serif;overflow-x:clip}
+.en{font-family:"Lexend","Noto Sans TC",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1.5px dashed var(--line)}
+.hd{max-width:900px;margin:auto;display:flex;align-items:center;gap:12px;padding:10px max(4vw,14px);flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:19px;margin-right:auto}
+.logo svg{color:var(--or)}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav a{text-decoration:none;color:var(--mut);padding:9px 14px;border-radius:10px;font-weight:500;min-height:44px;display:flex;align-items:center}
+nav a.on{color:var(--or);background:var(--orbg)}
+main{max-width:900px;margin:auto;padding:22px max(4vw,14px) 80px}
+h1{font-size:32px;line-height:1.1;margin:0 0 6px;text-wrap:balance}
+h2{font-size:21px;margin:26px 0 10px}
+.sub{color:var(--mut);margin:0 0 18px}
+.small{font-size:13px;color:var(--mut)}
+button,.btn{font:inherit;font-weight:500;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:11px;padding:9px 16px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--or);outline-offset:2px}
+button.pri,.btn.pri{background:var(--or);border-color:var(--or);color:#fff}
+button.ghost{border-color:transparent;background:transparent}
+button.sm{min-height:36px;padding:5px 11px;font-size:14px}
+button:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:9px 11px;min-height:44px;width:100%}
+textarea{min-height:90px}
+label{display:block}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.cut{position:relative;border:1.5px dashed var(--line);border-radius:6px;background:var(--card);display:grid;grid-template-columns:38px minmax(0,1fr)}
+.cut .tab{background:var(--tab);border-radius:4px;margin:10px 0 10px 8px;display:flex;align-items:center;justify-content:center}
+.cut .tab span{writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;color:var(--mut);white-space:nowrap;font-family:Lexend}
+.cut .body{padding:16px 18px}
+.scis{position:absolute;top:-11px;left:12px;background:var(--bg);color:var(--mut);padding:0 3px;line-height:0}
+.dicts{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.dname{font-weight:700;font-size:18px;margin:0 0 2px}
+.stat{font-family:Lexend;font-size:30px;font-weight:600;color:var(--or);line-height:1.1}
+.w{font-family:Lexend;font-weight:600;color:var(--or)}
+.list .it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.list .it:last-child{border:0}
+.pos{font-size:13px;color:var(--mut);font-style:italic;margin-left:6px}
+.ex{color:var(--mut);font-size:15px}
+.spk{width:40px;height:40px;min-height:40px;padding:0;border-radius:50%;border-color:transparent;background:var(--tab);color:var(--ink);flex:none}
+.spk.on{background:var(--or);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border-radius:999px;padding:8px 14px;min-height:42px}
+.chip.on{background:var(--orbg);border-color:var(--or);color:var(--or)}
+.qcard .body{padding:26px 22px 22px}
+.prompt{font-size:clamp(28px,7vw,44px);line-height:1.15;font-weight:600;margin:4px 0 6px;overflow-wrap:anywhere}
+.prompt.zh{font-family:"Noto Sans TC";font-weight:700}
+.cloze{font-size:clamp(19px,4.6vw,24px);line-height:1.6;font-family:Lexend}
+.blank{display:inline-block;min-width:4em;border-bottom:2.5px solid var(--or);text-align:center;color:var(--or)}
+.opts{display:grid;gap:10px;margin-top:18px}
+.opts button{justify-content:flex-start;text-align:left;padding:12px 16px;min-height:54px;font-size:17px}
+.opts button .k{font-family:Lexend;font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-right:4px}
+.opts button.right{background:var(--okbg);border-color:var(--ok);color:var(--ok)}
+.opts button.wrong{background:var(--badbg);border-color:var(--bad);color:var(--bad)}
+.fb{margin-top:16px;border-radius:12px;padding:14px 16px}
+.fb.ok{background:var(--okbg)}.fb.no{background:var(--badbg)}
+.fb b.t{display:block;font-size:17px}
+.fb.ok b.t{color:var(--ok)}.fb.no b.t{color:var(--bad)}
+.bar{height:8px;border-radius:9px;background:var(--tab);overflow:hidden;margin:6px 0 16px}
+.bar i{display:block;height:100%;background:var(--or);transition:width .3s}
+.stage{position:relative;background:var(--tab);border-radius:10px;overflow:hidden;touch-action:none;user-select:none}
+.stage canvas{display:block;width:100%;height:auto}
+.stage svg{position:absolute;inset:0;width:100%;height:100%}
+.thumbs{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.thumbs button{flex:none;width:76px;height:96px;padding:3px;position:relative}
+.thumbs img{width:100%;height:100%;object-fit:cover;border-radius:7px}
+.thumbs button.on{border-color:var(--or)}
+.thumbs .st{position:absolute;bottom:4px;right:4px;font-size:11px;background:var(--bg);border-radius:5px;padding:0 4px}
+.rev{display:grid;gap:12px}
+.rev .rc{border:1.5px dashed var(--line);border-radius:8px;padding:12px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.rev .rc .f2{grid-column:span 2}.rev .rc .f3{grid-column:span 3}.rev .rc .f4{grid-column:span 4}.rev .rc .f6{grid-column:1/-1}
+.rev .rc input{min-height:40px;padding:7px 9px}
+.rev .rc .dup{border-color:var(--or)}
+.rev .crop canvas{display:block;max-width:100%;height:auto;border:1.5px solid var(--line);border-radius:6px;margin-top:4px;background:#fff}
+.rev .crop canvas.whole{max-height:260px;width:auto}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:28px 16px;text-align:center;display:block;cursor:pointer}
+.drop:hover{border-color:var(--or)}
+.note{background:var(--orbg);border-radius:10px;padding:10px 14px;font-size:14px}
+.big{font-family:Lexend,"Noto Sans TC";font-size:clamp(56px,14vw,92px);font-weight:700;color:var(--or);line-height:1.1}
+.modal{position:fixed;inset:0;background:rgb(0 0 0/.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
+.modal>div{background:var(--bg);border-radius:14px;padding:20px;max-width:420px;width:100%}
+.hide{display:none!important}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;z-index:30;font-size:15px;max-width:90vw}
+@media(max-width:600px){h1{font-size:27px}.rev .rc{grid-template-columns:repeat(2,minmax(0,1fr))}.rev .rc .f2,.rev .rc .f3,.rev .rc .f4{grid-column:span 1}.rev .rc .wide{grid-column:1/-1}nav a{padding:8px 10px}}
+@media(prefers-reduced-motion:reduce){.bar i{transition:none}}
+
+/* 朗讀字幕條 */
+#cap{position:fixed;left:50%;top:10px;transform:translate(-50%,-140%);z-index:40;max-width:min(92vw,720px);background:#14163d;color:#fff;border:2.5px solid #fff;box-shadow:0 0 0 2.5px #14163d,0 8px 24px rgb(0 0 0/.25);border-radius:10px;padding:8px 14px;display:flex;gap:10px;align-items:baseline;pointer-events:none;transition:transform .25s cubic-bezier(.2,.8,.2,1);font-size:16px;line-height:1.4}
+#cap.on{transform:translate(-50%,0)}#cap b{flex:none;color:#ffd23f;font-size:13px}#cap span{font-family:Lexend,"Noto Sans TC",sans-serif;overflow-wrap:anywhere}
+button.reading{opacity:.75}
+
+/* ---------- 戰鬥畫面（HUD 是 DOM；中間的 #arena 交給 view3d） ---------- */
+body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8px;max-width:760px}
+.bwrap{height:calc(100vh - 16px);height:calc(100dvh - 16px);display:flex;flex-direction:column;gap:6px;min-height:520px}
+.btop{flex:none}
+.arenawrap{flex:1 1 auto;min-height:190px;position:relative;border:4px solid #111;border-radius:3px;box-shadow:6px 6px 0 #111;overflow:hidden;background:#7cc4ff}
+.bwrap.soul .arenawrap{background:#0e0f14;border-color:#000;box-shadow:6px 6px 0 #000}
+.arena{position:absolute;inset:0;overflow:hidden}
+#ovl{position:absolute;inset:0;pointer-events:none;z-index:4}#ovl>*{pointer-events:auto}
+.hpbox{position:absolute;z-index:2;background:#14163d;color:#fff;border:3px solid #fff;border-radius:8px;padding:5px 12px 7px;box-shadow:0 0 0 3px #14163d;min-width:min(210px,44%)}
+.hpbox.foe{left:3%;top:5%}.hpbox.me{right:3%;bottom:5%}
+.hpbox b{font-size:15px}.hpbox .small{color:#c9cdf2}
+.hp,.enb{display:flex;align-items:center;gap:6px;font:800 11px Lexend,"Noto Sans TC";color:#ffd23f}
+.hp>div,.enb>div{flex:1;height:11px;background:#3a3d6b;border:2px solid #fff;border-radius:3px;overflow:hidden}
+.hp i,.enb i{display:block;height:100%;transform-origin:left;transition:transform .6s cubic-bezier(.2,.8,.2,1),background-color .3s;background:#2fd36b;will-change:transform}
+.hp i[data-c=y]{background:#ffc41f}.hp i[data-c=r]{background:#ff3d3d}
+.hp b,.enb b{font-size:11px;min-width:2.2em;text-align:right}
+.enb i{background:#5ad1ff}
+.enb{margin-top:4px;color:#5ad1ff}
+.enb.sta{color:#9dffb8}.enb.sta i{background:#9dffb8}
+.msgbox{flex:none;margin-top:0;border:3px solid #fff;border-radius:8px;padding:6px 12px;font-size:15px;font-weight:700;min-height:0;background:#14163d;color:#fff;box-shadow:0 0 0 3px #14163d;letter-spacing:.02em}
+.msgbox.good{color:#9dffb8}.msgbox.bad{color:#ff9d9d}
+#bq{flex:none}
+.bqcard{position:relative;margin-top:0;border:3px solid #111;padding:10px 12px 10px;background:var(--card);box-shadow:4px 4px 0 #111}
+.bprompt{font-size:clamp(22px,5.5vw,32px);font-weight:700;line-height:1.15;overflow-wrap:anywhere}
+.bopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+.bopts button,.skills button{justify-content:flex-start;text-align:left;min-height:46px;padding:6px 10px;font-size:15px;line-height:1.3;border:2.5px solid #111;border-radius:6px}
+.bopts button .k,.skills .k{font-family:Lexend;font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-right:4px}
+.bopts button.right{background:var(--okbg);border-color:var(--ok);color:var(--ok)}.bopts button.wrong{background:var(--badbg);border-color:var(--bad);color:var(--bad)}
+.go{width:100%;min-height:58px;font-size:20px;font-weight:800;border:3px solid #111;box-shadow:4px 4px 0 #111;flex-direction:column;gap:0}
+.go:active{transform:translate(3px,3px);box-shadow:1px 1px 0 #111}
+.chaingo{background:#c0262d!important;border-color:#111!important}
+.tline{position:absolute;left:0;right:0;top:0;height:5px;background:var(--tab);overflow:hidden}.tline i{position:absolute;inset:0;background:linear-gradient(90deg,#ff3d3d,#ffc41f 40%,#2fd36b);transform-origin:left}
+.chainq{box-shadow:0 0 0 3px #c0262d,4px 4px 0 #111}.chainq .tline{height:8px}.chainq .tline i{background:#ff3d3d}
+.ansline{margin-top:6px;padding:4px 8px;border-radius:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:15px}.ansline.ok{background:var(--okbg)}.ansline.no{background:var(--badbg)}.ansline .spk{width:32px;height:32px;min-height:32px}
+.nextbtn{position:absolute;right:8px;top:8px;min-height:40px;padding:4px 14px;font-weight:800;border:2.5px solid #111;box-shadow:3px 3px 0 #111}
+.skov{position:absolute;left:2%;right:2%;bottom:2%;max-height:96%;overflow:auto;background:rgb(20 22 61/.96);color:#fff;border:3px solid #fff;border-radius:8px;box-shadow:0 0 0 3px #14163d;padding:8px 10px}
+.skov .skills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:0}
+.skov .skills button{flex-direction:column;align-items:flex-start;gap:0;min-height:44px;padding:4px 8px!important;font-size:14px;background:transparent;color:#fff;border:2px solid #5a5f9e}
+.skov .skills button:not(:disabled):hover,.skov .skills button:not(:disabled):focus-visible{border-color:#fff}
+.skov .skills button:disabled{opacity:.38}
+.skov .skills button b{font-size:14px}.skov .skills button .c{font:700 11px Lexend,"Noto Sans TC";color:#5ad1ff}
+.skov .k{color:#c9cdf2;border-color:#5a5f9e}
+.skov .skip{background:transparent;color:#fff;border:2px solid #5a5f9e}
+.skov .chl{grid-column:1/-1;font-size:12px;color:#c9cdf2;margin-top:2px}.skov .chl b{color:#ffd23f;font-size:13px}
+.skov .chainb{border-color:#ffd23f!important}.skov .chainb b{color:#ffd23f}
+.cmdov .skills{grid-template-columns:repeat(2,minmax(0,1fr))}
+.shud{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-weight:800;font-size:13px}
+.stime{flex:1;height:12px;border:2.5px solid #111;background:#fff;overflow:hidden;border-radius:3px}.stime i{display:block;height:100%;background:linear-gradient(90deg,#ff3d3d,#ffc41f 35%,#2fd36b);transform-origin:left}
+.satb{display:flex;align-items:center;gap:3px;font:800 12px Lexend}.satb b{display:inline-block;width:18px;height:10px;border:2px solid #111;background:#ddd}.satb b.on{background:#5ad1ff}
+.sskip{position:absolute;top:8px;right:8px;z-index:2}
+.story{cursor:pointer;position:absolute;inset:0;background:rgb(10 10 10/.82);display:flex;align-items:flex-end;justify-content:center;padding:4%}
+.sbox{background:#fff;color:#111;border:3px solid #111;box-shadow:5px 5px 0 #c0262d;padding:14px 16px;width:100%;max-width:560px;font-weight:700;font-size:clamp(16px,3.6vw,20px)}
+.sbox p{margin:0;min-height:2.6em}
+.sbox button{color:#111;background:#fff}.sbox button.pri{color:#fff;background:#dc4f22}
+@media(max-height:700px){.bprompt{font-size:22px}.bopts button{min-height:40px;font-size:14px}.msgbox{font-size:14px;padding:4px 10px}}
+
+/* 暫時的文字戰鬥畫面（之後由 3D 場景取代） */
+.tview{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:56px 12px 70px;color:#111;text-align:center}
+.bwrap.soul .tview{color:#e8e4dc}
+.tv-foe{font:800 clamp(20px,5vw,30px)/1.2 "Noto Sans TC",sans-serif}
+.tv-log{display:flex;flex-direction:column;gap:2px;font-size:14px;min-height:8.5em;justify-content:flex-end}
+.tv-l.big{font-weight:800;font-size:16px}.tv-l.good{color:#0b6b34}.tv-l.bad{color:#b0181f}.tv-l.dmg{font-family:Lexend,"Noto Sans TC";font-weight:700}
+.bwrap.soul .tv-l.good{color:#9dffb8}.bwrap.soul .tv-l.bad{color:#ff9d9d}
+.tv-note{position:absolute;left:0;right:0;bottom:6px;font-size:11px;opacity:.6}
+.arena.slowmo{filter:saturate(.45) brightness(.92)}
