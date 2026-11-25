@@ -16,7 +16,7 @@ export const PROMPT=`你是英文單字書的 OCR 助手。附圖是同一頁單
 export function toPageBBox(x){const a=+x.y0,b=+x.y1;if(!isFinite(a)||!isFinite(b)||b<=a)return null;const off=+x.img===2?(1-TOP)*100:0;const c=v=>Math.max(0,Math.min(100,off+v*TOP));return{y0:c(a),y1:c(b)}}
 
 export const claudeEngine={
-  id:"claude",label:"Claude AI（最準，需 API 金鑰）",needsKey:true,
+  id:"claude",label:"Claude AI（自備金鑰，會計費）",needsKey:true,local:false,
   note:"約 20–60 秒",
   ready:()=>!!lsGet("vc-key","").trim(),
   async extract(canvas,{onProgress}={}){const key=lsGet("vc-key","").trim();onProgress&&onProgress("Claude 正在讀取單字…（約 20–60 秒）");

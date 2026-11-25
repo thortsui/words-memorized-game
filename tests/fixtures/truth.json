@@ -1,0 +1,216 @@
+{
+ "page1.png": [
+  {
+   "en": "abandon",
+   "pos": "v.",
+   "zh": "放棄；拋棄",
+   "ex": "The sailors abandoned the damaged ship.",
+   "blank": "abandoned",
+   "unit": "NO.307 Unit 5"
+  },
+  {
+   "en": "dye",
+   "pos": "v.",
+   "zh": "染色",
+   "ex": "Mary dyed her hair red last week.",
+   "blank": "dyed",
+   "unit": "NO.307 Unit 5"
+  },
+  {
+   "en": "fluent",
+   "pos": "adj.",
+   "zh": "流利的",
+   "ex": "She is fluent in three languages.",
+   "blank": "fluent",
+   "unit": "NO.307 Unit 5"
+  },
+  {
+   "en": "immediately",
+   "pos": "adv.",
+   "zh": "立刻；馬上",
+   "ex": "Please call me immediately if anything changes.",
+   "blank": "immediately",
+   "unit": "NO.307 Unit 5"
+  },
+  {
+   "en": "recycle",
+   "pos": "v.",
+   "zh": "回收利用",
+   "ex": "David recycles bottles and old newspapers every weekend.",
+   "blank": "recycles",
+   "unit": "NO.307 Unit 5"
+  },
+  {
+   "en": "record",
+   "pos": "v., n.",
+   "zh": "記錄；唱片",
+   "ex": "The scientist recorded the temperature of the water every hour during the long experiment.",
+   "blank": "recorded",
+   "unit": "NO.307 Unit 5"
+  },
+  {
+   "en": "generous",
+   "pos": "adj.",
+   "zh": "慷慨的；大方的",
+   "ex": "It was generous of him to share his lunch.",
+   "blank": "generous",
+   "unit": "NO.307 Unit 5"
+  },
+  {
+   "en": "opportunity",
+   "pos": "n.",
+   "zh": "機會",
+   "ex": "This job is a great opportunity for young people.",
+   "blank": "opportunity",
+   "unit": "NO.307 Unit 5"
+  }
+ ],
+ "page2.png": [
+  {
+   "en": "ancient",
+   "pos": "adj.",
+   "zh": "古代的",
+   "ex": "They visited an ancient temple in the mountains.",
+   "blank": "ancient",
+   "unit": "Unit 6"
+  },
+  {
+   "en": "borrow",
+   "pos": "v.",
+   "zh": "借入",
+   "ex": "May I borrow your umbrella for a while?",
+   "blank": "borrow",
+   "unit": "Unit 6"
+  },
+  {
+   "en": "climate",
+   "pos": "n.",
+   "zh": "氣候",
+   "ex": "The climate here is warm and wet in summer.",
+   "blank": "climate",
+   "unit": "Unit 6"
+  },
+  {
+   "en": "damage",
+   "pos": "n., v.",
+   "zh": "損害；毀壞",
+   "ex": "The storm damaged many houses near the coast.",
+   "blank": "damaged",
+   "unit": "Unit 6"
+  },
+  {
+   "en": "effort",
+   "pos": "n.",
+   "zh": "努力",
+   "ex": "With a little more effort, you will pass the test.",
+   "blank": "effort",
+   "unit": "Unit 6"
+  },
+  {
+   "en": "familiar",
+   "pos": "adj.",
+   "zh": "熟悉的",
+   "ex": "His voice sounded familiar to me.",
+   "blank": "familiar",
+   "unit": "Unit 6"
+  },
+  {
+   "en": "give away",
+   "pos": "片語",
+   "zh": "贈送、分送",
+   "ex": "The store is giving away free samples today.",
+   "blank": "giving away",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "pick up",
+   "pos": "片語",
+   "zh": "撿起；接（某人）",
+   "ex": "She picked up the coins from the floor.",
+   "blank": "picked up",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "look forward to",
+   "pos": "片語",
+   "zh": "期待",
+   "ex": "We look forward to seeing you again soon.",
+   "blank": "look forward to",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "run out of",
+   "pos": "片語",
+   "zh": "用完",
+   "ex": "The car ran out of gas on the highway.",
+   "blank": "",
+   "unit": "Key Phrases"
+  },
+  {
+   "en": "take care of",
+   "pos": "片語",
+   "zh": "照顧",
+   "ex": "Nurses take care of patients in the hospital.",
+   "blank": "take care of",
+   "unit": "Key Phrases"
+  }
+ ],
+ "page3.jpg": [
+  {
+   "en": "recieve",
+   "pos": "v.",
+   "zh": "收到；接受",
+   "ex": "Did you recieve my letter yesterday?",
+   "blank": "recieve",
+   "unit": "Unit 7"
+  },
+  {
+   "en": "harvest",
+   "pos": "n.",
+   "zh": "收穫；收成",
+   "ex": "Farmers celebrate after a good harvest.",
+   "blank": "harvest",
+   "unit": "Unit 7"
+  },
+  {
+   "en": "journey",
+   "pos": "n.",
+   "zh": "旅程",
+   "ex": "The journey across the desert took five days.",
+   "blank": "journey",
+   "unit": "Unit 7"
+  },
+  {
+   "en": "knowledge",
+   "pos": "n.",
+   "zh": "知識",
+   "ex": "Reading is a good way to gain knowledge.",
+   "blank": "knowledge",
+   "unit": "Unit 7"
+  },
+  {
+   "en": "polite",
+   "pos": "adj.",
+   "zh": "有禮貌的",
+   "ex": "It is polite to say thank you.",
+   "blank": "polite",
+   "unit": "Unit 7"
+  },
+  {
+   "en": "quarrel",
+   "pos": "v.",
+   "zh": "爭吵",
+   "ex": "The brothers quarreled over a toy.",
+   "blank": "quarreled",
+   "unit": "Unit 7"
+  },
+  {
+   "en": "struggle",
+   "pos": "v.",
+   "zh": "奮鬥；掙扎",
+   "ex": "He struggled to carry the heavy box upstairs.",
+   "blank": "struggled",
+   "unit": "Unit 7"
+  }
+ ]
+}

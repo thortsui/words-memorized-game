@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>掃描上傳（測試用外殼）</title>
+<link rel="icon" href="data:,">
+</head>
+<body>
+<!-- 只掛載「掃描上傳」頁的測試外殼：npm run dev 之後開 /tests/scan-harness.html。
+     和 index.html 同樣的骨架，但不載入練習與戰鬥模組，自動化測試不會被其他頁面的狀態影響。 -->
+<header><div class="hd"><div class="logo">單字剪卡</div><nav><a class="on">掃描上傳</a></nav></div></header>
+<main id="app"></main>
+<div id="modal" class="modal hide"><div><p id="m-msg" style="margin-top:0"></p><div class="row" style="justify-content:flex-end"><button id="m-no">取消</button><button id="m-yes" class="pri">確定</button></div></div></div>
+<div id="toast" class="toast hide"></div>
+<script type="module">
+import '/src/style.css';
+import { renderUpload } from '/src/pages/upload.js';
+import { S, allDicts } from '/src/core/store.js';
+window.__dicts = () => Object.values(allDicts()).map(d => ({ id: d.id, name: d.name, words: d.words.map(w => ({ en: w.en, pos: w.pos, zh: w.zh, ex: w.ex, blank: w.blank, unit: w.unit })) }));
+renderUpload();
+</script>
+</body>
+</html>
