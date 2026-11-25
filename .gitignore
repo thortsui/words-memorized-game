@@ -21,3 +21,5 @@ tests/playtest/*
 tests/playtest/site/*
 !tests/playtest/site/img/
 art/screenshots/fix1/
+art/blender/export_raw/
+tests/smoke-*.png
