@@ -5,8 +5,10 @@ import { bgmDuck } from './audio.js';
 
 // sp：聲音設定（練習設定頁會改這些值）
 export const sp={rate:+(lsGet("vc-rate","0.9")),eng:lsGet("vc-eng3","auto"),voiceName:lsGet("vc-voice",""),voice:null,onVoices:null};
-let gFail=false,gHost=0,gBad=0,gFailAt=0,dBad=0,dFail=false,dFailAt=0,spkId=0;
-export const resetGoogleFail=()=>{gFail=false};
+// gFail／dFail：引擎被判定失敗，RETRY 毫秒內直接跳過；時間到了只「試探」一次，再失敗就立刻再跳過
+let gFail=false,gHost=0,gBad=0,gFailAt=0,dBad=0,dFail=false,dFailAt=0,spkId=0,gProbe=false;
+const RETRY=120000;
+export const resetGoogleFail=()=>{gFail=false;gBad=0;gProbe=false;dFail=false;dBad=0};
 const hasSys=()=>"speechSynthesis" in window&&typeof SpeechSynthesisUtterance!=="undefined";
 
 function pickVoice(){try{const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]US/i.test(v.lang));const rank=[/Google US English/i,/(Ava|Samantha|Zoe|Allison|Evan|Nathan).*(Premium|Enhanced)/i,/Natural/i,/Siri/i,/Samantha/i,/Ava/i,/Aria|Jenny/i];sp.voice=null;for(const r of rank){sp.voice=vs.find(v=>r.test(v.name));if(sp.voice)break}sp.voice=sp.voice||vs[0]||null}catch(e){}}
@@ -37,10 +39,11 @@ const ttsUrl=(t,lang,hi)=>TTS_HOSTS[hi]+"&tl="+(lang==="zh"?"zh-TW":"en-US")+"&q
 function googleSpeak(text,done,fail,lang,my){const q=chunks(text);let k=0,hi=gHost,tries=0,stall=null,iv=null,lastT=-1,lastC=0;const alive=()=>my===spkId;
   try{if(hasSys()&&(speechSynthesis.speaking||speechSynthesis.pending))speechSynthesis.cancel()}catch(e){}
   const cleanup=()=>{clearTimeout(stall);clearInterval(iv);if(alive()){au.onended=au.onerror=au.onplaying=null}};
-  const giveUp=()=>{cleanup();gBad++;if(gBad>=2){gFail=true;gFailAt=Date.now()}fail(q.slice(k).join(" "))};
-  const bad=()=>{if(!alive())return;cleanup();try{au.pause()}catch(e){}if(tries<1){tries++;hi=1-hi;return start()}giveUp()};
+  // 兩個主機都試過還是不行（試探時只試一個）就判定失敗，之後的句子不再等
+  const giveUp=()=>{cleanup();gBad++;gFail=true;gFailAt=Date.now();gProbe=false;fail(q.slice(k).join(" "))};
+  const bad=()=>{if(!alive())return;cleanup();try{au.pause()}catch(e){}if(tries<1&&!gProbe){tries++;hi=1-hi;return start()}giveUp()};
   const start=()=>{if(!alive())return;au.src=ttsUrl(q[k],lang,hi);au.playbackRate=sp.rate<.8?.75:1;
-    au.onplaying=()=>{if(!alive())return;clearTimeout(stall);gBad=0;gHost=hi;lastT=-1;lastC=Date.now();clearInterval(iv);
+    au.onplaying=()=>{if(!alive())return;clearTimeout(stall);gBad=0;gProbe=false;gHost=hi;lastT=-1;lastC=Date.now();clearInterval(iv);
       iv=setInterval(()=>{if(!alive()){clearInterval(iv);return}if(au.ended)return;if(au.currentTime!==lastT){lastT=au.currentTime;lastC=Date.now()}else if(Date.now()-lastC>4000)bad()},400)};
     au.onended=()=>{if(!alive())return;cleanup();k++;tries=0;if(k>=q.length)done();else start()};
     au.onerror=bad;clearTimeout(stall);stall=setTimeout(bad,2500);
@@ -56,18 +59,30 @@ export function speak(text,btn,opt){opt=opt||{};if(readFin&&!opt.chain)readFin()
   caption(opt.label||(lang==="zh"?"中文":"英文"),shown);bgmDuck(true);
   document.querySelectorAll(".spk.on").forEach(b=>b.classList.remove("on"));if(btn)btn.classList.add("on");let fired=false;const off=()=>{if(fired)return;fired=true;btn&&btn.classList.remove("on");if(id===spkId){caption();bgmDuck(false)}if(opt.done&&id===spkId)setTimeout(opt.done,250)};
   try{au.pause()}catch(e){}
-  // 某引擎連續失敗 2 次，跳過它 2 分鐘
-  if(gFail&&Date.now()-gFailAt>120000){gFail=false;gBad=0}
-  if(dFail&&Date.now()-dFailAt>120000){dFail=false;dBad=0}
-  const gOK=!gFail&&navigator.onLine!==false,eng=sp.eng,order=eng==="google"?(gOK?["g","d"]:["d"]):eng==="device"?["d"]:!gOK?["d"]:dFail?["g","d"]:["d","g"];let i=0;
-  const run=t=>{if(id!==spkId)return;if(i>=order.length){once("mute","沒有聲音？請確認音量，或到練習頁換一種聲音");off();return}const e=order[i++];(e==="g"?googleSpeak:deviceSpeak)(t,off,rest=>run(rest||t),lang,id)};run(text)}
+  // 被判定失敗的引擎跳過 2 分鐘；時間到了再試探一次（試探時失敗一次就再跳過，不必重新等兩輪）
+  if(gFail&&Date.now()-gFailAt>RETRY){gFail=false;gBad=0;gProbe=true}
+  if(dFail&&Date.now()-dFailAt>RETRY){dFail=false;dBad=1}
+  const gOK=!gFail&&navigator.onLine!==false,dOK=!dFail&&hasSys(),eng=sp.eng;
+  const order=(eng==="google"?["g","d"]:eng==="device"?["d"]:["d","g"]).filter(e=>e==="g"?gOK:dOK);let i=0;
+  // 能用的引擎都被判定失敗：直接跳過朗讀、立刻解鎖，不讓每一句都空等
+  if(!order.length){once("mute","現在沒辦法朗讀（裝置語音與 Google 語音都沒有反應），先跳過朗讀，稍後會自動再試");fired=true;btn&&btn.classList.remove("on");caption();bgmDuck(false);opt.done&&opt.done();return}
+  const run=t=>{if(id!==spkId)return;
+    while(i<order.length&&(order[i]==="g"?gFail:dFail))i++; // 這一句進行中才被判定失敗的引擎也跳過
+    if(i>=order.length){
+      // 這一句所有引擎都沒聲音：裝置語音只要失敗過就一併判定失敗，下一句起直接跳過（不必再多等一句）
+      if(order.includes("d")&&dBad>=1&&(gFail||navigator.onLine===false)){dFail=true;dFailAt=Date.now()}
+      once("mute","沒有聲音？請確認音量，或到練習頁換一種聲音");off();return}
+    const e=order[i++];(e==="g"?googleSpeak:deviceSpeak)(t,off,rest=>run(rest||t),lang,id)};run(text)}
 
 // 作答後依序念英文、中文、例句；最長 25 秒
 export function readAll(w,btn){return new Promise(res=>{let done=false;const fin=()=>{if(done)return;done=true;if(readFin===fin)readFin=null;res()};if(readFin)readFin();readFin=fin;setTimeout(fin,25000);
   speak(w.en,btn,{chain:1,label:"英文",done:()=>speak(w.zh,btn,{lang:"zh",chain:1,label:"中文",done:()=>w.ex?speak(w.ex,btn,{chain:1,label:"例句",done:fin}):fin()})})})}
 // 朗讀期間鎖住按鈕
-export function gate(btn,p,label){if(!btn)return;const t=btn.innerHTML;btn.disabled=true;btn.classList.add("reading");btn.innerHTML=label||"朗讀中…（英文→中文→例句）";p.then(()=>{if(!btn.isConnected)return;btn.disabled=false;btn.classList.remove("reading");btn.innerHTML=t})}
-export function stopSpeech(){spkId++;if(readFin)readFin();try{au.pause();speechSynthesis.cancel()}catch(e){}caption();bgmDuck(false)}
+export function gate(btn,p,label){if(!btn)return;const t=btn.innerHTML;btn.disabled=true;btn.classList.add("reading");btn.innerHTML=label||"朗讀中…（英文→中文→例句）";p.then(()=>{if(!btn.isConnected)return;btn.disabled=false;btn.classList.remove("reading");btn.innerHTML=t;
+  // 鎖住時瀏覽器會把焦點丟回 body；解鎖後還給按鈕，鍵盤才接得上
+  const a=document.activeElement;if(!a||a===document.body)try{btn.focus({preventScroll:true})}catch(e){}})}
+// 停止朗讀：字幕立刻收起來（不等平常句子之間的 0.7 秒緩衝）
+export function stopSpeech(){spkId++;if(readFin)readFin();try{au.pause()}catch(e){}try{speechSynthesis.cancel()}catch(e){}caption();const c=$("#cap");if(c){clearTimeout(c._t);c.classList.remove("on")}document.querySelectorAll(".spk.on").forEach(b=>b.classList.remove("on"));bgmDuck(false)}
 
 const SPK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
 export const spkBtn=(t,label)=>`<button class="spk" data-say="${esc(t)}" aria-label="${label||"朗讀"}">${SPK}</button>`;

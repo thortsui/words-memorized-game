@@ -1,6 +1,6 @@
 // 錯題紀錄頁
 import { $, app, esc, ask, SC, fmt } from '../core/util.js';
-import { S, save, allDicts, setup, findW, ctx } from '../core/store.js';
+import { S, save, allDicts, findW, ctx } from '../core/store.js';
 import { modeName } from '../core/grading.js';
 import { spkBtn } from '../core/speech.js';
 
@@ -18,11 +18,12 @@ export function renderHist(){const D=allDicts();let rows=[];
     <span class="small" style="margin-left:6px;color:${todo?"var(--bad)":"var(--ok)"}">${todo?"待複習":"已練會"}</span><div>${esc(w.zh)}</div>
     <div class="small">錯 ${L.n} 次・上次 ${fmt(L.last)}</div>${L.ans.length?`<div class="small">你答過：${L.ans.map(a=>`「${esc(a.a)}」<span style="opacity:.7">${esc(modeName(a.m))}・${fmt(a.t)}</span>`).join("；")}</div>`:""}</div>
     <div class="row" style="gap:4px;align-items:flex-start">${spkBtn(w.en)}</div></div>`).join("")||'<p class="small">還沒有答錯紀錄，去練習吧！</p>'}</div></div>
-  <h2>練習歷程</h2><div class="cut">${SC}<div class="tab"><span>LOG</span></div><div class="body list">${hs.map(s=>{const ws=s.wrong.map(([d,id])=>findW(d,id)).filter(Boolean);return`<details class="it" style="display:block"><summary style="cursor:pointer;min-height:40px"><b>${fmt(s.t)}</b>・${esc(modeName(s.mode))}${s.game==="soul"?"・魂系":s.game?"・打怪":""}・${esc((D[s.dict]||{name:"全部字典"}).name)}・<b style="color:${s.right===s.n?"var(--ok)":"var(--or)"}">${s.right}/${s.n}</b></summary>
+  <h2>練習歷程</h2><div class="cut">${SC}<div class="tab"><span>LOG</span></div><div class="body list">${hs.map(s=>{const ws=s.wrong.map(([d,id])=>findW(d,id)).filter(Boolean);return`<details class="it" style="display:block"><summary style="cursor:pointer;min-height:44px;padding:8px 0"><b>${fmt(s.t)}</b>・${esc(modeName(s.mode))}${s.game==="soul"?"・魂系":s.game?"・打怪":""}・${esc(s.dict==="__all"?"全部字典":D[s.dict]?D[s.dict].name:"已刪除的字典")}・<b style="color:${s.right===s.n?"var(--ok)":"var(--or)"}">${s.right}/${s.n}</b></summary>
     ${ws.length?`<div class="small" style="padding:6px 0 0">答錯：${ws.map(w=>`<span class="w">${esc(w.en)}</span> ${esc(w.zh)}`).join("　")}</div>`:'<div class="small">全對！</div>'}</details>`}).join("")||'<p class="small">還沒有練習紀錄。</p>'}</div></div>
   ${rows.length||hs.length?'<p style="margin-top:16px"><button class="sm ghost" id="hclr" style="color:var(--bad)">清除所有紀錄</button></p>':""}`;
   $("#hd").onchange=e=>{hf.dict=e.target.value;renderHist()};
   app.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{hf.sort=b.dataset.s;renderHist()});
   // 一鍵練待複習：直接開始只含這些字的練習
-  $("#hp").onclick=()=>{setup.dict=hf.dict;setup.wrong=true;setup.scope="all";ctx.autoStart=true;location.hash="practice"};
+  // 只套用這一次，不改使用者原本的練習設定（題型沿用目前設定）
+  $("#hp").onclick=()=>{ctx.autoStart={dict:hf.dict,wrong:true,scope:"all",n:0};location.hash="practice"};
   const c=$("#hclr");if(c)c.onclick=async()=>{if(!await ask("清除所有錯題紀錄與練習歷程？待複習清單也會一起清空。"))return;S.wlog={};S.hist=[];S.miss={};save();renderHist()}}
