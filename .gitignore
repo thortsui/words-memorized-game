@@ -3,3 +3,13 @@ dist
 .DS_Store
 *.log
 .playwright-mcp
+
+# 建模中間產物（可由 art/blender 的腳本重建）
+art/blender/__pycache__/
+art/blender/textures/*
+!art/blender/textures/_credits*.md
+art/blender/source/*.blend1
+art/blender/source/hero_knight.blend
+art/blender/source/boss_*.blend
+art/blender/source/arena_*.blend
+art/blender/preview/_tiles/
