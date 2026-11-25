@@ -1,0 +1,225 @@
+{
+ "base": "http://127.0.0.1:4181/",
+ "viewport": "390x700",
+ "images": {
+  "page1.png": {
+   "extractMs": 9918,
+   "freeze": {
+    "maxMs": 184,
+    "stalls": 1
+   },
+   "progress": [
+    "第 #/# 頁：主引擎 PP-OCR：準備中…｜複核 tesseract：準備中…",
+    "第 #/# 頁：主引擎 PP-OCR：下載辨識模型… # / # MB（只有第一次，之後離線可用）｜複核 tesseract：準備中…",
+    "第 #/# 頁：主引擎 PP-OCR：下載辨識模型… # / # MB（只有第一次，之後離線可用）｜複核 tesseract：啟動辨識核心",
+    "第 #/# 頁：主引擎 PP-OCR：下載辨識模型… # / # MB（只有第一次，之後離線可用）｜複核 tesseract：下載語言資料（只有第一次） #%",
+    "第 #/# 頁：主引擎 PP-OCR：下載辨識模型… # / # MB（只有第一次，之後離線可用）｜複核 tesseract：影像前處理",
+    "第 #/# 頁：主引擎 PP-OCR：下載辨識模型… # / # MB（只有第一次，之後離線可用）｜複核 tesseract：辨識文字",
+    "第 #/# 頁：主引擎 PP-OCR：下載辨識模型… # / # MB（只有第一次，之後離線可用）｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：載入模型…｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：辨識文字",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：完成",
+    "第 #/# 頁：主引擎 PP-OCR：辨識文字 #/#｜複核 tesseract：完成"
+   ],
+   "badProgress": [],
+   "pageHead": "第 1 頁：讀到 8 筆",
+   "leftovers": [],
+   "skipped": "自動略過的頁首、頁尾、頁碼（1 段，點開檢查）42",
+   "sum": "還有 8 筆條目要確認 跳到下一個",
+   "score": {
+    "N": 8,
+    "cards": 8,
+    "autoCorrect": 0,
+    "caught": 8,
+    "caughtWrong": 0,
+    "missed": 0,
+    "missedListed": 0,
+    "leak": 0,
+    "extraFlagged": 0
+   },
+   "problems": [],
+   "caughtDetail": [
+    "caught-but-correct｜abandon｜｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣",
+    "caught-but-correct｜dye｜｜兩個引擎讀到的單元標籤不一樣（其他欄位都一樣）：請在這一頁最上面選正確的單元",
+    "caught-but-correct｜fluent｜｜兩個引擎讀到的單元標籤不一樣（其他欄位都一樣）：請在這一頁最上面選正確的單元",
+    "caught-but-correct｜immediately｜｜兩個引擎讀到的單元標籤不一樣（其他欄位都一樣）：請在這一頁最上面選正確的單元",
+    "caught-but-correct｜recycle｜｜兩個引擎讀到的單元標籤不一樣（其他欄位都一樣）：請在這一頁最上面選正確的單元；這一筆範圍裡兩個引擎讀到的原始文字不一樣；這一筆後面緊接著沒被收進條目的文字，可能其實是這一筆的一部分",
+    "caught-but-correct｜record｜｜兩個引擎讀到的單元標籤不一樣（其他欄位都一樣）：請在這一頁最上面選正確的單元",
+    "caught-but-correct｜generous｜｜兩個引擎讀到的單元標籤不一樣（其他欄位都一樣）：請在這一頁最上面選正確的單元；這一筆範圍裡兩個引擎讀到的原始文字不一樣；這一筆後面緊接著沒被收進條目的文字，可能其實是這一筆的一部分",
+    "caught-but-correct｜opportunity｜｜兩個引擎讀到的單元標籤不一樣（其他欄位都一樣）：請在這一頁最上面選正確的單元"
+   ],
+   "rawDiffs": [
+    "abandon： abandon v. 放棄；拋棄 The sa⟦i⟧lors abandoned the damaged ship.  ‖  abandon v. 放棄；拋棄 The sal⟦l⟧ors abandoned the damaged ship.",
+    "recycle： recycle v. 回收利用 David recycles bottles and old newspapers every weekend.  ‖  recycle v. 回收利用 David recycles bottles and old newspapers every weekend.⟦ REE EBARERIHR MERA -⟧",
+    "generous： generous adj. 慷慨的；大方的 It was generous of him to share his lunch.  ‖  generous adj. 慷慨的；大方的 It was generous of him to share his lunch.⟦ RABID ZFE⟧"
+   ],
+   "gate": {
+    "blocked": true,
+    "msg": "還不能存入：8 筆條目沒有確認。"
+   }
+  },
+  "hard2.png": {
+   "extractMs": 5763,
+   "freeze": {
+    "maxMs": 153,
+    "stalls": 1
+   },
+   "progress": [
+    "第 #/# 頁：主引擎 PP-OCR：準備中…｜複核 tesseract：準備中…",
+    "第 #/# 頁：主引擎 PP-OCR：載入模型…｜複核 tesseract：載入語言資料",
+    "第 #/# 頁：主引擎 PP-OCR：載入模型…｜複核 tesseract：影像前處理",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：影像前處理",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：辨識文字 #/#｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：辨識文字 #/#｜複核 tesseract：完成"
+   ],
+   "badProgress": [],
+   "pageHead": "第 1 頁：讀到 10 筆",
+   "leftovers": [],
+   "skipped": "",
+   "sum": "還有 3 筆條目要確認 跳到下一個",
+   "score": {
+    "N": 10,
+    "cards": 10,
+    "autoCorrect": 7,
+    "caught": 3,
+    "caughtWrong": 0,
+    "missed": 0,
+    "missedListed": 0,
+    "leak": 0,
+    "extraFlagged": 0
+   },
+   "problems": [],
+   "caughtDetail": [
+    "caught-but-correct｜behavior｜｜兩個引擎讀的不一樣",
+    "caught-but-correct｜in charge of｜｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣",
+    "caught-but-correct｜come up with｜｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣"
+   ],
+   "rawDiffs": [
+    "in charge of： in charge of負責；掌管  ‖  in charge of⟦ 和⟧負責；掌管",
+    "come up with： come up with 想出⟦；⟧提出  ‖  come up with 想出提出⟦ i 想出；提⟧"
+   ],
+   "gate": {
+    "blocked": true,
+    "msg": "還不能存入：3 筆條目沒有確認。"
+   }
+  },
+  "hard3.jpg": {
+   "extractMs": 4019,
+   "freeze": {
+    "maxMs": 0,
+    "stalls": 0
+   },
+   "progress": [
+    "第 #/# 頁：主引擎 PP-OCR：載入模型…｜複核 tesseract：啟動辨識核心",
+    "第 #/# 頁：主引擎 PP-OCR：載入模型…｜複核 tesseract：影像前處理",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：影像前處理",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：辨識文字 #/#｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：辨識文字 #/#｜複核 tesseract：完成"
+   ],
+   "badProgress": [],
+   "pageHead": "第 1 頁：讀到 10 筆",
+   "leftovers": [],
+   "skipped": "自動略過的頁首、頁尾、頁碼（2 段，點開檢查）Senior High English Vocabulary Book Three　｜　23",
+   "sum": "還有 10 筆條目要確認 跳到下一個",
+   "score": {
+    "N": 9,
+    "cards": 10,
+    "autoCorrect": 0,
+    "caught": 9,
+    "caughtWrong": 7,
+    "missed": 0,
+    "missedListed": 0,
+    "leak": 0,
+    "extraFlagged": 0
+   },
+   "problems": [],
+   "caughtDetail": [
+    "caught-but-correct｜abandon｜｜只有主引擎（PP-OCR）讀到這一筆，另一個引擎沒讀到或讀成別的",
+    "caught-wrong｜dye｜en: 讀成「de dyd vdn」正確「dye」、pos: 讀成「片語」正確「v./n.」、zh: 讀成「將染色；染（頭髮、布料等）；染料、染劑 Mary dyed her hair red for a fresh look.」正確「將……染色；染（頭髮、布料等）；染料、染劑」、ex: 讀成「」正確「Mary dyed her hair red for a fresh look.」、blank: 讀成「」正確「dyed」｜只有主引擎（PP-OCR）讀到這一筆，另一個引擎沒讀到或讀成別的；中文解釋裡夾著英文字，可能把別筆或另一欄的內容併進來了；英文「de、dyd、vdn」不在英文詞表裡，可能拼錯；中文和 Google 翻譯完全對不上",
+    "caught-wrong｜appreciate｜pos: 讀成「」正確「v.」、ex: 讀成「」正確「Emma appreciated her neighbor taking care of her dog.」、blank: 讀成「」正確「appreciated」｜只有主引擎（PP-OCR）讀到這一筆，另一個引擎沒讀到或讀成別的；單字沒有讀到詞性（如果是片語，英文可能少了空格）",
+    "caught-but-correct｜appreciation｜｜只有主引擎（PP-OCR）讀到這一筆，另一個引擎沒讀到或讀成別的",
+    "caught-wrong｜be famous for ~｜zh: 讀成「以.......聞名」正確「以……聞名」、ex: 讀成「Tainan is famous for its delicious steet food.」正確「Tainan is famous for its delicious street food.」｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣；中文裡的刪節號點數不尋常，請對照原圖；這一筆後面緊接著沒被收進條目的文字，可能其實是這一筆的一部分；例句裡的「steet」不在英文詞表裡，可能拼錯",
+    "caught-wrong｜responsible｜en: 讀成「reponsible rspansbl」正確「responsible」、ex: 讀成「」正確「Parents are responsible for their children's safety and well-being at home.」、blank: 讀成「」正確「responsible」｜只有主引擎（PP-OCR）讀到這一筆，另一個引擎沒讀到或讀成別的；英文「reponsible、rspansbl」不在英文詞表裡，可能拼錯",
+    "caught-but-correct｜e-mail｜｜欄位內容兩邊一樣，但這一筆範圍裡兩個引擎讀到的原始文字不完全一樣（多半是例句翻譯、音標或附註）",
+    "caught-wrong｜take sb/sth for granted｜en: 讀成「take sb/sth forgranted」正確「take sb/sth for granted」、zh: 讀成「把…視為理所當然」正確「把……視為理所當然」｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣；英文「forgranted」不在英文詞表裡，可能拼錯",
+    "caught-wrong｜lie｜ex: 讀成「The town lis t he foot of the mountain.」正確「The town lies at the foot of the mountain.」、blank: 讀成「lis」正確「lies」｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣；例句裡的「lis」不在英文詞表裡，可能拼錯",
+    "caught-wrong｜experiment｜ex: 讀成「」正確「The students did an interesting experiment on plants in the science laboratory yesterday.」、blank: 讀成「」正確「experiment」｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣"
+   ],
+   "rawDiffs": [
+    "be famous for ~： 4. be famous for ~ 以⟦……⟧.⟦聞⟧名 Ta⟦in⟧an ⟦i⟧s famous for its delicious steet food.  ‖  4. be famous for ~ 以⟦ ⟧.⟦..... 導⟧名 Ta⟦m⟧an ⟦1⟧s famous for its delicious st⟦r⟧eet food.",
+    "e-mail： 6. e-mail [⟦i,m⟧e⟦l]⟧ n. 電子郵件 Please send me an e-mail when you arrive.  ‖  6. e-mail [⟦n⟧e n. 電子郵件 Please send me an e-mail when you arrive.",
+    "take sb/sth forgranted： 7.take sb/sth forgranted 把⟦…⟧視為理所當然 We should not take clean water for granted.  ‖  7.⟦ ⟧take sb/sth for⟦ ⟧granted 把⟦ ...... ⟧視為理所當然 We should not take clean water for granted.",
+    "lie： 8. lie [⟦l⟧a⟦r]⟧ ⟦V⟧. 躺；位於；說謊 The town lis t he foot of the mountain.  ‖  8. lie [a⟦i⟧ ⟦v⟧. 躺；位於；說謊 The town li⟦e⟧s ⟦a⟧t ⟦t⟧he foot of the mountain.",
+    "experiment： 9. experiment [k⟦ ⟧speram⟦a⟧nt] n. 實驗  ‖  9. experiment [⟦1⟧k⟦'⟧speram⟦o⟧nt] ⟦N⟧n. 實驗⟦ The students did an Interesting experiment on plants in the science laboratory yesterday.⟧"
+   ],
+   "gate": {
+    "blocked": true,
+    "msg": "還不能存入：10 筆條目沒有確認。"
+   }
+  },
+  "hard5.png": {
+   "extractMs": 5815,
+   "freeze": {
+    "maxMs": 0,
+    "stalls": 0
+   },
+   "progress": [
+    "第 #/# 頁：主引擎 PP-OCR：準備中…｜複核 tesseract：準備中…",
+    "第 #/# 頁：主引擎 PP-OCR：載入模型…｜複核 tesseract：載入語言資料",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：影像前處理",
+    "第 #/# 頁：主引擎 PP-OCR：找出文字位置…｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：辨識文字 #/#｜複核 tesseract：辨識文字 #%",
+    "第 #/# 頁：主引擎 PP-OCR：辨識文字 #/#｜複核 tesseract：完成"
+   ],
+   "badProgress": [],
+   "pageHead": "第 1 頁：讀到 10 筆",
+   "leftovers": [],
+   "skipped": "自動略過的頁首、頁尾、頁碼（2 段，點開檢查）23　｜　Senior High English Vocabulary Book Three",
+   "sum": "還有 8 筆條目要確認 跳到下一個",
+   "score": {
+    "N": 9,
+    "cards": 10,
+    "autoCorrect": 2,
+    "caught": 7,
+    "caughtWrong": 2,
+    "missed": 0,
+    "missedListed": 0,
+    "leak": 0,
+    "extraFlagged": 1
+   },
+   "problems": [],
+   "caughtDetail": [
+    "caught-but-correct｜paint｜｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣",
+    "caught-but-correct｜social｜｜欄位內容兩邊一樣，但這一筆範圍裡兩個引擎讀到的原始文字不完全一樣（多半是例句翻譯、音標或附註）",
+    "caught-wrong｜be famous for ~｜zh: 讀成「以.....聞名」正確「以……聞名」｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣；中文裡的刪節號點數不尋常，請對照原圖",
+    "caught-wrong｜It is said that ...｜en: 讀成「It is said that. ...」正確「It is said that ...」、zh: 讀成「據說....」正確「據說……」｜兩個引擎讀的不一樣；這一筆範圍裡兩個引擎讀到的原始文字不一樣；中文裡的刪節號點數不尋常，請對照原圖",
+    "caught-but-correct｜responsible｜｜這一筆後面緊接著沒被收進條目的文字，可能其實是這一筆的一部分",
+    "caught-but-correct｜lead｜｜只有主引擎（PP-OCR）讀到這一筆，另一個引擎沒讀到或讀成別的",
+    "caught-but-correct｜experiment｜｜這一筆後面緊接著沒被收進條目的文字，可能其實是這一筆的一部分",
+    "extra-flagged｜Amy fF Facebook｜多出來的條目：Amy fF Facebook｜片語｜和 Instagram 3 = 08 1 -｜｜只有複核引擎（tesseract）讀到這一筆，另一個引擎沒讀到或讀成別的；中文解釋裡夾著英文字，可能把別筆或另一欄的內容併進來了；英文「fF」不在英文詞表裡，可能拼錯"
+   ],
+   "rawDiffs": [
+    "paint： paint v. 油漆；繪畫 The pa⟦i⟧nter pa⟦i⟧nted the wall blue.  ‖  paint v. 油漆；繪畫 The pa⟦l⟧nter pa⟦l⟧nted the wall blue.",
+    "social： social adj. 社交的；社會的 Amy shares photos on social media every day.  ‖  social adj. 社交的；社會的 Amy shares photos on social media every day.⟦ Amy fF Facebook 和 Instagram 3 = 08 1 -⟧",
+    "be famous for ~： be famous for ~ 以.....聞名 Tainan is famous for its delicious street food.  ‖  be famous for ~ 以⟦ ⟧.....⟦. ⟧聞名 Tainan is famous for its delicious street food.",
+    "It is said that. ...： It⟦ ⟧is said that.⟦ ⟧..⟦.⟧據說.... It is said that the old house is haunted.  ‖  Itis said that...⟦ ⟧據說⟦ ⟧....⟦..⟧ It is said that the old house is haunted."
+   ],
+   "gate": {
+    "blocked": true,
+    "msg": "還不能存入：8 筆條目沒有確認。"
+   }
+  }
+ },
+ "errors": [],
+ "total": {
+  "N": 36,
+  "autoCorrect": 9,
+  "caught": 27,
+  "missed": 0,
+  "missedListed": 0,
+  "leak": 0,
+  "maxFreeze": 184
+ }
+}
