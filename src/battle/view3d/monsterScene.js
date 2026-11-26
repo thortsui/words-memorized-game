@@ -131,6 +131,8 @@ export function createMonsterScene(eng,fx,api){
   const moves=createMoves({eng,fx,hero,foe:()=>foe,soul:false,approach,retreat,impact,cam,dim,pal});
   let aura=null; // 連招蓄力的魔法陣
   const clearAura=()=>{if(aura){aura.remove();aura=null}};
+  let cure=null; // 回血招式的綠色魔法陣
+  const clearCure=()=>{if(cure){cure.remove();cure=null}};
 
   /* ---------- 事件 ---------- */
   const H={
@@ -165,7 +167,11 @@ export function createMonsterScene(eng,fx,api){
     // 連招中斷：魔法陣碎掉、主角嚇一跳
     async chainBreak(){clearAura();fx.emit({p:hero.center(v3(),.2),n:22,color:[0x9aa0b5,0xd7dbea],speed:[1,3.5],flat:.4,size:[.1,.24],life:[.4,.8],gravity:5});
       fx.text(hero.center(v3(),1.2),"中斷…","bad",{dur:.8});hero.play("Hit");await eng.wait(.35)},
-    async skill(p){if(p.big&&!p.chainStage)fx.banner(p.name,"cute",1);await moves.start(p)},
+    // 回血招式起手：鏡頭用 cast、主角吟唱，腳下浮出綠色魔法陣、光點往上飄（命中與回復在 heal 事件）
+    async skill(p){if(p.heal){clearCure();cam("cast",.4);hero.play("Cast",{hold:true});cure=fx.circle(HERO,{color:0x7dffa0,r:hero.h*.95,spin:.9});
+        fx.emit({p:HERO,n:16,color:[0x7dffa0,0xffe58a,0xffffff],speed:[.2,.7],up:1.8,size:[.08,.16],life:[.5,.9],radius:hero.h*.6,radiusY:.05,kind:1});
+        await eng.wait(.42);return}
+      if(p.big&&!p.chainStage)fx.banner(p.name,"cute",1);await moves.start(p)},
     async hit(p){await moves.hit(p)},
     // 怪物出手：史萊姆跳起來壓過去、蝙蝠俯衝；撞到主角面前才 resolve，接著由 playerHit 表現命中
     async foeAttack(p){const f=foe;if(!f)return;cam("hero",.35);const r=f.root.position,d=v3().subVectors(FOE,HERO).setY(0),dist=d.length();d.normalize();
@@ -186,21 +192,30 @@ export function createMonsterScene(eng,fx,api){
         await eng.tween(clip?.45:.36,k=>{r.lerpVectors(from,FOE,k);if(!clip)r.y=Math.sin(k*Math.PI)*.6},ease.io);r.y=0;if(!clip)dust(FOE,5)}else await eng.wait(.3);
       cam("base",.4)},
     // 怪物倒下：扁掉、變成星星消失
-    async faint(p){const f=foe;if(!f)return;cam("foe",.35);moves.abort();clearAura();
+    async faint(p){const f=foe;if(!f)return;cam("foe",.35);moves.abort();clearAura();clearCure();
       await f.play("Faint",{hold:true});const c=f.center(v3(),.3);
       stars(c,22,5.5);fx.flash(c,{color:0xffffff,size:f.h*2.4});fx.ring(FOE,{color:0xffffff,r1:f.h*2,opacity:.7});
       fx.emitN({p:c,n:16,color:[0xffffff,0xfff3c0],speed:[.4,1.4],up:1.5,size:[.3,.6],life:[.5,1],alpha:.75,grow:.8});
       await eng.tween(.3,k=>{f.root.scale.setScalar(Math.max(.001,1-k));f.setOpacity(1-k*.5)},ease.in);
       f.remove();if(foe===f)foe=null;hero.play("Victory");await eng.wait(.4);cam("base",.35)},
-    // 回復：綠色光點上升
-    async heal(p){const c=HERO.clone();fx.emit({p:c,n:22,color:[0x7dffa0,0xffffff,0xb8ffcf],speed:[.2,.7],up:2,size:[.1,.22],life:[.6,1.1],radius:.55,radiusY:.05,kind:1});
+    // 回復：回血招式＝綠／金色光柱從天而降、愛心往上飄、頭上冒綠色 +N；打倒怪物的回復＝綠色光點上升
+    async heal(p){if(p.source==="skill"){const c=hero.center(),h=hero.h;
+        fx.pillar(HERO,{color:0x3fd870,r:.5,h:6,dur:.9});fx.flash(c,{color:0x7dffa0,size:h*1.2,dur:.3,opacity:.45});
+        p.onImpact&&p.onImpact();hero.flash(0x7dffa0,.85);
+        fx.emitN({p:hero.center(v3(),.25),n:12,color:[0xff8fc7,0xff6fa8,0xff9ad1,0x7dffa0],speed:[.15,.5],up:1.6,size:[.18,.3],life:[.9,1.5],radius:h*.55,radiusY:.1,drag:.8,gravity:-.6,kind:3,alpha:.95});
+        fx.emit({p:HERO,n:20,color:[0x7dffa0,0xffe58a,0xffffff],speed:[.2,.8],up:2.2,size:[.08,.18],life:[.6,1.1],radius:h*.6,radiusY:.05,kind:1});
+        fx.ring(HERO,{color:0x9dffb8,r1:1.5,dur:.55,opacity:.8});
+        fx.text(hero.center(v3(),1.25),"+"+p.amount,"cure",{bounce:true,dur:1.15,rise:34});
+        const s=hero.pose.scale;s.set(1.14,.86,1.14);eng.to(s,{x:1,y:1,z:1},.4,ease.elastic);
+        await eng.wait(.3);hero.play("Victory");await eng.wait(.55);clearCure();await cam("base",.4);return}
+      const c=HERO.clone();p.onImpact&&p.onImpact();fx.emit({p:c,n:22,color:[0x7dffa0,0xffffff,0xb8ffcf],speed:[.2,.7],up:2,size:[.1,.22],life:[.6,1.1],radius:.55,radiusY:.05,kind:1});
       fx.ring(HERO,{color:0x7dffa0,r1:1.4,dur:.5});fx.text(hero.center(v3(),1.2),"+"+p.amount+" HP","good",{dur:.9});hero.flash(0x7dffa0,.6);await eng.wait(.45)},
     // 勝利：主角歡呼、彩帶、鏡頭拉近
     async win(){cam("hero",.6);hero.root.rotation.y=Math.atan2(camera.position.x-HERO.x,camera.position.z-HERO.z);
       const conf=()=>fx.emitN({p:v3(HERO.x+rand(-1.5,1.5),3.2,HERO.z+rand(-.5,1)),n:26,color:[0xff5a79,0xffd23f,0x5ad1ff,0x7dffa0,0xc59bff],speed:[.3,1.6],size:[.1,.2],life:[1.2,2.2],gravity:1.6,drag:.8,kind:2});
       conf();fx.banner("勝利！","cute",1.4);await hero.play("Victory");conf();hero.play("Victory");await eng.wait(.5)},
     // 落敗：主角倒下、畫面變灰
-    async lose(){cam("hero",.6);moves.abort();clearAura();eng.canvas.classList.add("v3-gray");if(foe)foe.play("Victory");await hero.play("Faint",{hold:true});await eng.wait(.5)},
+    async lose(){cam("hero",.6);moves.abort();clearAura();clearCure();eng.canvas.classList.add("v3-gray");if(foe)foe.play("Victory");await hero.play("Faint",{hold:true});await eng.wait(.5)},
   };
 
   onResize();

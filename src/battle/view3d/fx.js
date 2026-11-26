@@ -9,12 +9,13 @@ const pick=c=>Array.isArray(c)?c[(Math.random()*c.length)|0]:c;
 /* ---------- 粒子池 ---------- */
 const VS=`attribute float size;attribute vec4 pcolor;attribute float kind;varying vec4 vC;varying float vK;uniform float uScale;
 void main(){vC=pcolor;vK=kind;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=size*uScale/max(.1,-mv.z);gl_Position=projectionMatrix*mv;}`;
-// kind 0：柔邊圓點　1：四角星芒　2：實心圓（彩帶、花瓣）
+// kind 0：柔邊圓點　1：四角星芒　2：實心圓（彩帶、花瓣）　3：愛心（回血招式）
 const FS=`varying vec4 vC;varying float vK;
 void main(){vec2 p=gl_PointCoord-.5;float d=length(p);float a;
  if(vK<.5){a=smoothstep(.5,.08,d);}
  else if(vK<1.5){float s=abs(p.x)*abs(p.y)*90.;a=max(0.,1.-s)*smoothstep(.5,.2,d);a=max(a,smoothstep(.16,.0,d));}
- else{a=step(d,.42);}
+ else if(vK<2.5){a=step(d,.42);}
+ else{vec2 q=vec2(p.x*2.7,.08-p.y*2.7);float u=q.x*q.x+q.y*q.y-1.;float f=u*u*u-q.x*q.x*q.y*q.y*q.y;a=1.-smoothstep(-.03,.03,f);}
  if(a<.01)discard;gl_FragColor=vec4(vC.rgb,vC.a*a);}`;
 
 function makePool(eng,max,additive){

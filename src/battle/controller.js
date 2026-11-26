@@ -5,7 +5,7 @@ import { setup, mark, pushHist, allWords, ctx, save } from '../core/store.js';
 import { clozeAns, opts, normEn, checkEn, checkZhSmart, zhPrompt, clozePos } from '../core/grading.js';
 import { speak, readAll, gate, spkBtn, stopSpeech, releaseSpeech } from '../core/speech.js';
 import { sfx, bgmStart, bgmStop, bgmToggle, bgmOn } from '../core/audio.js';
-import { MON, SKILLS, MAXEN, STORY, SOUL_STORY, SOUL_BOSSES, SOUL } from './data.js';
+import { MON, SKILLS, MAXEN, PLAYER_HP, STORY, SOUL_STORY, SOUL_BOSSES, SOUL } from './data.js';
 import { createMonsterBattle, comboMult } from './monster.js';
 import { createSoulBattle } from './soul.js';
 import { mount } from './view3d.js';
@@ -126,7 +126,7 @@ const MSG={
   graze:()=>["答得太慢，被擦傷！","bad"],
   foeHit:e=>[(e.timeout?"來不及了！":"答錯了，沒有躲開！")+(e.chain?"下一段來了！":""),"bad"],
   faint:e=>[`${(e.monster||e.boss).name} 倒下了！`,"good"],
-  heal:e=>[`你恢復了 ${e.amount} HP！`,"good"],
+  heal:e=>[`你恢復了 ${e.amount} HP！`+(e.source==="skill"?(e.left>0?`（這隻怪物還能再用 ${e.left} 次）`:"（這隻怪物已經用完了）"):""),"good"],
   flaskStart:()=>["拿出藥壺……答對這題才喝得下去！（攻擊時間照樣在走）","good"],
   drink:e=>[`喝下藥壺，回復 ${e.amount} HP！（剩 ${e.flasks} 壺）`,"good"],
   spill:e=>[`${e.timeout?"來不及喝，":"手一抖，"}藥灑了……（剩 ${e.flasks} 壺）`,"bad"],
@@ -150,6 +150,7 @@ async function runEvents(t,events){for(const e of events){if(!alive(t))return;
     if(e.type==="hit"){e.onImpact=()=>{sfx(e.big||e.dmg>=40?"crit":"hit");hud(s,"foe")}} // 命中瞬間才扣怪物血
     else if(e.type==="playerHit"){e.onImpact=()=>{sfx("hurt");hud(s,"me")}}
     else if(e.type==="drink"){e.onImpact=()=>{sfx("win");hud(s,"me")}} // 喝下去那一刻才補血
+    else if(e.type==="heal"&&!t.soul){e.onImpact=()=>hud(s,"me")} // 打怪模式：治癒光落到身上那一刻才補血（音效照舊在事件開頭）
     else hud(s);
     if(t.soul&&(e.type==="guard"||e.type==="dodge"||e.type==="graze")){const prev=t.lastSta==null?s.stamina:t.lastSta;if(prev>s.stamina)staDrain(prev-s.stamina)}
     if(t.soul&&s)t.lastSta=s.stamina;
@@ -221,9 +222,14 @@ async function mAnswer(t,w,ok,idx,given,sec,loose,opt){setAns(true);mark(w,ok,gi
     nb.onclick=()=>{if(t.phase!=="wrong")return;nb.disabled=true;nb.remove();t.E.ack();t.phase="ready";mQuestion(t)};gate(nb,t.readP,"朗讀中…");nb.focus({preventScroll:true});return}
   if(c)say(`連招蓄力 ${c.stage}/${c.s.chain.length}！（${sec.toFixed(1)} 秒）再答對 ${c.s.chain.length-c.stage} 題就能發動「${c.s.name}」`,"good");
   mReady(t)}
+// 回血招式：一般招式下面的整列按鈕，鍵盤 H（數字鍵 1–9、0 維持原本的招式與不出招）
+const HEAL_I=SKILLS.findIndex(s=>s.heal);
+function healBtn(t){if(HEAL_I<0)return"";const s=SKILLS[HEAL_I],S=t.E.state,c=t.E.healCheck(HEAL_I);
+  const note=c.reason==="full"?"HP 已滿":c.reason==="used"?"這隻怪物已用完":`⚡${s.cost}・回復 ${Math.min(s.heal,PLAYER_HP-S.hp)}・剩 ${c.left} 次`;
+  return`<button class="healb" data-s="${HEAL_I}" ${c.ok?"":"disabled"}><b><span class="k">H</span><i class="hh">♥</i>${s.name}</b><span class="c">${note}</span></button>`}
 function mSkills(t){if(!alive(t))return;t.phase="skill";const S=t.E.state,mult=comboMult(S.combo);closeMenu();
   const ov=document.createElement("div");ov.className="skov";ov.id="skov";
-  ov.innerHTML=`<div class="row" style="margin-bottom:6px;flex-wrap:nowrap"><b>選擇招式</b><span class="small" style="margin-left:auto;color:#5ad1ff;white-space:nowrap"><span style="color:#9dffb8">HP ${S.hp}</span>・能量 ${S.en}/${MAXEN}${mult>1?`・×${mult.toFixed(1)}`:""}</span><button class="skip sm" data-s="-1" style="padding:2px 12px">不出招</button></div><div class="skills">${SKILLS.map((s,i)=>s.chain?"":`<button data-s="${i}" ${S.en<s.cost?"disabled":""}><b><span class="k">${i+1}</span>${s.name}</b><span class="c">${s.cost?"⚡"+s.cost:"免費"}・約 ${s.hits.reduce((a,b)=>a+Math.round(b*mult),0)}</span></button>`).join("")}<div class="chl"><b>連招（不耗能量、還會累積能量）</b> 連續答對指定題數後一次打出整套，限時較短</div>${SKILLS.map((s,i)=>s.chain?`<button class="chainb" data-s="${i}"><b><span class="k">${i+1}</span>${s.name}</b><span class="c">連對 ${s.chain.length} 題・約 ${(m=>s.stages.flat().reduce((a,b)=>a+Math.round(b*m),0))(comboMult(S.combo+s.chain.length))}</span></button>`:"").join("")}</div>`;
+  ov.innerHTML=`<div class="row" style="margin-bottom:6px;flex-wrap:nowrap"><b>選擇招式</b><span class="small" style="margin-left:auto;color:#5ad1ff;white-space:nowrap"><span style="color:#9dffb8">HP ${S.hp}</span>・能量 ${S.en}/${MAXEN}${mult>1?`・×${mult.toFixed(1)}`:""}</span><button class="skip sm" data-s="-1" style="padding:2px 12px">不出招</button></div><div class="skills">${SKILLS.map((s,i)=>s.chain||s.heal?"":`<button data-s="${i}" ${S.en<s.cost?"disabled":""}><b><span class="k">${i+1}</span>${s.name}</b><span class="c">${s.cost?"⚡"+s.cost:"免費"}・約 ${s.hits.reduce((a,b)=>a+Math.round(b*mult),0)}</span></button>`).join("")}${healBtn(t)}<div class="chl"><b>連招（不耗能量、還會累積能量）</b> 連續答對指定題數後一次打出整套，限時較短</div>${SKILLS.map((s,i)=>s.chain?`<button class="chainb" data-s="${i}"><b><span class="k">${i+1}</span>${s.name}</b><span class="c">連對 ${s.chain.length} 題・約 ${(m=>s.stages.flat().reduce((a,b)=>a+Math.round(b*m),0))(comboMult(S.combo+s.chain.length))}</span></button>`:"").join("")}</div>`;
   $("#ovl").appendChild(ov);menuOpen();
   ov.onclick=async e=>{const b=e.target.closest("[data-s]");if(!b||b.disabled||t.phase!=="skill")return;const i=+b.dataset.s;closeMenu();t.phase="busy";
     if(i<0)say(`保留能量 ${S.en}/${MAXEN}。`);
@@ -352,6 +358,7 @@ document.addEventListener("keydown",e=>{const t=T;if(!t||!ctx.B||ctx.view!=="pra
   if(t.phase==="ready"&&(e.key==="Enter"||e.key===" ")){e.preventDefault();const g=$("#gonext");if(g&&!g.disabled)g.click()}
   else if(t.phase==="q"&&/^[1-4]$/.test(e.key)){const b=app.querySelector(`#bopts [data-o="${+e.key-1}"]`);if(b)b.click()}
   else if(t.phase==="lock"&&/^[1-4]$/.test(e.key)){t.onEarly&&t.onEarly()}
+  else if(t.phase==="skill"&&/^[hH]$/.test(e.key)){const b=document.querySelector(`#skov .healb`);if(b&&!b.disabled)b.click()}
   else if(t.phase==="skill"&&/^[0-9]$/.test(e.key)){const b=document.querySelector(`#skov [data-s="${e.key==="0"?-1:+e.key-1}"]`);if(b)b.click()}
   else if(t.phase==="cmd"&&/^[0-4]$/.test(e.key)){const b=document.querySelector(`#skov [data-c="${e.key}"]`);if(b&&!b.disabled)b.click()}
   else if(t.phase==="cmd"&&e.key==="Enter"){const b=$("#cgo");if(b&&!b.disabled)b.click()}

@@ -43,7 +43,7 @@ export function mountText(container,api){
     graze:async()=>{line("太慢了，被擦傷。","bad");await W(250)},
     foeHit:async p=>{line(p.timeout?"來不及了！":"沒有躲開！","bad");await W(300)},
     faint:async p=>{line(`${(p.monster||p.boss).name} 倒下了！`,"big good");await W(700)},
-    heal:async p=>{line(`回復 ${p.amount} HP`,"good");await W(300)},
+    heal:async p=>{p.onImpact&&p.onImpact();line(`回復 ${p.amount} HP`,"good");await W(300)},
     win:async()=>{line("勝利！","big good");await W(500)},
     lose:async()=>{line("你倒下了…","big bad");await W(500)},
   };

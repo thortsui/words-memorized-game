@@ -112,6 +112,31 @@ t("打怪：打倒 5 隻破關、HP 歸零失敗",()=>{const E=createMonsterBatt
   const L=createMonsterBattle({pool,mode:"en2zh",rng:()=>1});L.start();let ev=[];for(let i=0;i<20&&L.state.phase!=="end";i++){L.nextQuestion();ev=L.answer(false,1);L.ack()}
   assert.equal(L.result().win,false);assert.equal(ev.at(-1).type,"lose");assert.equal(ev.at(-2).lethal,true)});
 
+t("打怪：回血招式（治癒之光）—能量不足／HP 滿不能用、不超過上限、每隻怪物 2 次、事件順序",()=>{const HI=SKILLS.findIndex(s=>s.heal),H=SKILLS[HI];
+  assert.ok(HI>8,"回血放在連招後面，1–9 號維持原本的招式");assert.equal(H.cost,14);assert.equal(H.heal,35);assert.equal(H.perFoe,2);assert.ok(!H.hits&&!H.chain);
+  const E=createMonsterBattle({pool,mode:"en2zh",rng:()=>1});E.start();
+  // 被打到 82、能量 7（不夠 14）：能量不足不能用（回傳空陣列、什麼都沒變）
+  E.nextQuestion();E.answer(false,1);assert.equal(E.state.hp,82);E.ack();
+  E.nextQuestion();E.answer(true,3.2);assert.equal(E.state.en,7);assert.equal(E.healCheck(HI).reason,"en");assert.deepEqual(E.useSkill(HI),[]);assert.equal(E.state.hp,82);assert.equal(E.state.en,7);assert.equal(E.state.phase,"skill");E.useSkill(-1);
+  // 能量夠：skill（起手、不造成傷害）→ heal；回復量被上限截到 18
+  E.nextQuestion();E.answer(true,0);assert.equal(E.state.en,17);assert.ok(E.healCheck(HI).ok);let ev=E.useSkill(HI);
+  assert.deepEqual(types(ev),["skill","heal"]);assert.equal(ev[0].skillId,"heal");assert.equal(ev[0].heal,true);assert.equal(ev[0].hitCount,0);assert.equal(ev[0].totalDmg,0);
+  assert.equal(ev[0].s.en,3);assert.equal(ev[0].s.hp,82); // 起手當下已扣能量、還沒補血
+  assert.equal(ev[1].amount,18);assert.equal(ev[1].hp,100);assert.equal(ev[1].source,"skill");assert.equal(ev[1].left,1);assert.equal(ev[1].s.hp,100);
+  assert.equal(E.state.hp,100);assert.equal(E.state.en,3);assert.equal(E.state.mhp,MON[0].hp);assert.equal(E.state.phase,"ready");assert.equal(E.state.heals,1);
+  // HP 滿：能量夠也不能用
+  E.nextQuestion();E.answer(true,0);E.useSkill(-1);E.nextQuestion();E.answer(true,0);assert.equal(E.state.en,23);assert.equal(E.healCheck(HI).reason,"full");assert.deepEqual(E.useSkill(HI),[]);assert.equal(E.state.en,23);E.useSkill(-1);
+  // 第 2 次：回復 35（沒超過上限）
+  for(let i=0;i<3;i++){E.nextQuestion();E.answer(false,1);E.ack()}assert.equal(E.state.hp,46);
+  E.nextQuestion();E.answer(true,0);assert.equal(E.state.en,33);ev=E.useSkill(HI);assert.equal(ev[1].amount,35);assert.equal(E.state.hp,81);assert.equal(E.state.en,19);assert.equal(ev[1].left,0);
+  // 第 3 次：這隻怪物已用完（就算能量夠、HP 沒滿）
+  E.nextQuestion();E.answer(false,1);E.ack();E.nextQuestion();E.answer(true,0);assert.ok(E.state.en>=14&&E.state.hp<100);assert.equal(E.healCheck(HI).reason,"used");assert.deepEqual(E.useSkill(HI),[]);
+  // 換下一隻怪物：次數重算；打倒怪物的回血事件標 source:"kill"
+  let kill=null;for(let g=0;g<60&&E.state.mi===0;g++){if(E.state.phase!=="skill"){E.nextQuestion();E.answer(true,0)}const i=[5,4,3,2,1,0].find(i=>E.state.en>=SKILLS[i].cost);const r=E.useSkill(i);kill=r.find(e=>e.type==="heal")||kill}
+  assert.equal(E.state.mi,1);assert.equal(E.state.heals,0);assert.equal(E.healCheck(HI).left,2);if(kill)assert.equal(kill.source,"kill");
+  // 不在選招階段不能用
+  assert.deepEqual(E.useSkill(HI),[])});
+
 /* ---------- 魂系模式 ---------- */
 t("魂系：閃避判定依答題速度分級",()=>{assert.equal(gradeDodge(true,900,4000,1500),"parry");assert.equal(gradeDodge(true,2000,4000,1500),"dodge");assert.equal(gradeDodge(true,3500,4000,1500),"graze");assert.equal(gradeDodge(true,4001,4000,1500),"hit");assert.equal(gradeDodge(false,500,4000,1500),"hit")});
 t("魂系：動態難度隨答題速度變化",()=>{assert.equal(difficulty([]).d,0);const fast=difficulty(Array(8).fill({ok:true,ms:1200})),slow=difficulty(Array(8).fill({ok:true,ms:5500})),bad=difficulty(Array(8).fill({ok:false,ms:1000}));

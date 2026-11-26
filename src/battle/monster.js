@@ -9,8 +9,8 @@ export const comboMult=combo=>1+Math.min(.5,.1*Math.max(0,combo-1));
 export const energyGain=sec=>Math.max(1,Math.min(10,Math.round(10-sec)));
 
 export function createMonsterBattle({pool,mode,rng=Math.random,onEvent}){
-  const B={kind:"monster",mode,pool,queue:shuffle(pool),hp:PLAYER_HP,en:0,mi:0,mhp:MON[0].hp,combo:0,best:0,fast:99,right:0,n:0,wrong:[],kills:0,chain:null,phase:"intro",w:null,over:null};
-  const snap=()=>({hp:B.hp,hpMax:PLAYER_HP,en:B.en,enMax:MAXEN,mi:B.mi,mhp:B.mhp,mhpMax:MON[B.mi].hp,combo:B.combo,right:B.right,n:B.n,kills:B.kills,
+  const B={kind:"monster",mode,pool,queue:shuffle(pool),hp:PLAYER_HP,en:0,mi:0,mhp:MON[0].hp,combo:0,best:0,fast:99,right:0,n:0,wrong:[],kills:0,heals:0,chain:null,phase:"intro",w:null,over:null};
+  const snap=()=>({hp:B.hp,hpMax:PLAYER_HP,en:B.en,enMax:MAXEN,mi:B.mi,mhp:B.mhp,mhpMax:MON[B.mi].hp,combo:B.combo,right:B.right,n:B.n,kills:B.kills,heals:B.heals,
     chain:B.chain?{id:B.chain.s.id,name:B.chain.s.name,stage:B.chain.stage,total:B.chain.s.chain.length}:null});
   const mk=(out)=>(type,p)=>{const e={type,...p,s:snap()};out.push(e);onEvent&&onEvent(e);return e};
 
@@ -21,11 +21,15 @@ export function createMonsterBattle({pool,mode,rng=Math.random,onEvent}){
     return B.mhp<=0}
   function faint(ev){const m=MON[B.mi];B.kills++;ev("faint",{monster:m,index:B.mi,lastMonster:B.mi+1>=MON.length});
     if(B.mi+1>=MON.length){B.phase="end";B.over="win";ev("win",{});return}
-    const heal=Math.min(HEAL_ON_KILL,PLAYER_HP-B.hp);B.hp+=heal;if(heal)ev("heal",{amount:heal,hp:B.hp});
-    B.mi++;B.mhp=MON[B.mi].hp;B.phase="ready";ev("enter",{monster:MON[B.mi],index:B.mi})}
+    const heal=Math.min(HEAL_ON_KILL,PLAYER_HP-B.hp);B.hp+=heal;if(heal)ev("heal",{amount:heal,hp:B.hp,source:"kill"});
+    B.mi++;B.mhp=MON[B.mi].hp;B.heals=0;B.phase="ready";ev("enter",{monster:MON[B.mi],index:B.mi})}
+
+  // 回血招式能不能用：{ok, reason:"full"（HP 已滿）|"used"（這隻怪物已用完次數）|"en"（能量不足）, left 剩幾次}
+  function healCheck(s){const left=Math.max(0,s.perFoe-B.heals);
+    return{ok:B.hp<PLAYER_HP&&left>0&&B.en>=s.cost,reason:B.hp>=PLAYER_HP?"full":left<=0?"used":B.en<s.cost?"en":null,left}}
 
   return {
-    state:B, snapshot:snap, monsters:MON, skills:SKILLS,
+    state:B,healCheck:i=>healCheck(SKILLS[i]), snapshot:snap, monsters:MON, skills:SKILLS,
     get monster(){return MON[B.mi]},
     start(){const out=[],ev=mk(out);B.phase="ready";ev("enter",{monster:MON[B.mi],index:B.mi});return out},
     // 出下一題。連招蓄力中每題有較短的限時，超時算答錯；一般題只計能量不會超時。
@@ -53,6 +57,11 @@ export function createMonsterBattle({pool,mode,rng=Math.random,onEvent}){
     useSkill(i){const out=[],ev=mk(out);if(B.phase!=="skill")return out;
       if(i<0){B.phase="ready";ev("hold",{en:B.en});return out}
       const s=SKILLS[i];if(!s||B.en<s.cost)return out;
+      if(s.heal){if(!healCheck(s).ok)return out;
+        // 回血：先發 skill（起手、扣能量），再發 heal（回復量不超過上限），之後照常出下一題
+        B.phase="busy";B.en-=s.cost;B.heals++;ev("skill",{skillId:s.id,move:s.move,name:s.name,hitCount:0,totalDmg:0,mult:1,target:null,heal:true,cost:s.cost});
+        const amount=Math.min(s.heal,PLAYER_HP-B.hp);B.hp+=amount;ev("heal",{amount,hp:B.hp,source:"skill",skillId:s.id,left:s.perFoe-B.heals});
+        B.phase="ready";return out}
       if(s.chain){B.chain={s,stage:0};B.phase="ready";ev("chainStart",{skill:s,skillId:s.id,total:s.chain.length});return out}
       B.phase="busy";B.en-=s.cost;const dead=hitSkill(ev,s.id,s.move,s.name,s.hits,comboMult(B.combo),{big:s.cost>=18,cost:s.cost});
       if(dead)faint(ev);else B.phase="ready";return out},

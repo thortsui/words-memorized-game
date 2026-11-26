@@ -20,7 +20,9 @@ export const SKILLS=[
  {id:"holy",name:"聖光審判劍",cost:28,move:"holy",hits:[135],d:"終極奧義"},
  {id:"c3",name:"流星三連斬",cost:0,chain:["slash","gale","meteorEnd"],stages:[[20],[10,10,14],[56]],times:[5,4,3]},
  {id:"c5",name:"魔劍五連舞",cost:0,chain:["slash","gale","fire","ice","meteorEnd"],stages:[[20],[10,10,14],[34],[10,10,10,10,16],[66]],times:[5,5,4,4,3]},
- {id:"c7",name:"七曜天地斬",cost:0,chain:["slash","gale","fire","ice","thunder","meteorEnd","holy"],stages:[[10],[6,6,8],[18],[5,5,5,5,8],[26],[50],[150]],times:[5,5,4,4,4,3,3]}];
+ {id:"c7",name:"七曜天地斬",cost:0,chain:["slash","gale","fire","ice","thunder","meteorEnd","holy"],stages:[[10],[6,6,8],[18],[5,5,5,5,8],[26],[50],[150]],times:[5,5,4,4,4,3,3]},
+ // 回血招式：放在最後（索引 9），連招維持 7–9 號；鍵盤用 H。heal＝回復量、perFoe＝每隻怪物最多用幾次（換下一隻怪物重算）
+ {id:"heal",name:"治癒之光",cost:14,move:"heal",heal:35,perFoe:2,d:"魔法・回復 HP"}];
 // 七曜天地斬：發動時連擊必定 ≥7（傷害 ×1.5）。前六式合計 152×1.5＝230，打不死滿血的魔王（240），
 // 重心放在最後的聖光劍（150×1.5），所以七式都播得到。
 export const MOVE_NAMES={slash:"普通斬擊",gale:"疾風連斬",fire:"火球術",thunder:"雷霆之矛",ice:"冰晶風暴",meteorEnd:"流星斬",holy:"聖光審判劍"};

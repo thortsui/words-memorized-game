@@ -160,6 +160,9 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .skov .skip{background:transparent;color:#fff;border:2px solid #5a5f9e}
 .skov .chl{grid-column:1/-1;font-size:12px;color:#c9cdf2;margin-top:2px}.skov .chl b{color:#ffd23f;font-size:13px}
 .skov .chainb{border-color:#ffd23f!important}.skov .chainb b{color:#ffd23f}
+/* 回血招式：一般招式下面的整列綠色按鈕（名稱在左、能量／回復量在右，一行就好，不多佔高度） */
+.skov .skills .healb{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;border-color:#7ee89a!important}
+.skov .healb b{color:#9dffb8}.skov .healb .hh{font-style:normal;color:#ff8fc7;margin-right:3px}.skov .skills .healb .c{color:#9dffb8;white-space:nowrap}
 .cmdov .skills{grid-template-columns:repeat(2,minmax(0,1fr))}
 .shud{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-weight:800;font-size:13px}
 .stime{flex:1;height:12px;border:2.5px solid #111;background:#fff;overflow:hidden;border-radius:3px}.stime i{display:block;height:100%;background:linear-gradient(90deg,#ff3d3d,#ffc41f 35%,#2fd36b);transform-origin:left}
@@ -241,6 +244,7 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .v3-t.dmg{font-size:26px;color:#ff7a1a}.v3-t.dmg.big{font-size:36px;color:#ff4d2e}.v3-t.dmg.hurt{color:#ff5a6e}
 .v3-t.ono{font-size:22px;color:#fff3a0;font-family:"Noto Sans TC",sans-serif;font-weight:900}.v3-t.ono.big{font-size:30px;color:#ffe14d}
 .v3-t.good{color:#9dffb8;font-size:18px}.v3-t.bad{color:#ff9d9d;font-size:20px}.v3-t.gold{color:#ffd23f;font-size:20px}
+.v3-t.cure{font-size:28px;color:#6dff95}/* 回血招式的 +N（打怪模式） */
 /* 魂系的字：細、冷、不描粗邊 */
 .v3-t.soul{font:600 15px/1 "Noto Sans TC",sans-serif;letter-spacing:.14em;color:#e8e4dc;text-shadow:0 0 6px #000,0 1px 2px #000}
 .v3-t.soul.dmg{font:700 22px/1 Lexend,sans-serif;letter-spacing:0;color:#f3efe6}.v3-t.soul.dmg.big{font-size:30px;color:#ffd9a0}.v3-t.soul.dmg.hurt{color:#ff5a4a}
@@ -260,7 +264,7 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .v3-vig.dark{background:radial-gradient(ellipse at center,rgb(0 0 0/.2) 30%,rgb(0 0 0/.9) 100%);transition:opacity 1.5s}
 .v3-vig.danger{background:radial-gradient(ellipse at center,rgb(150 0 0/.22) 0%,rgb(120 0 0/.35) 45%,rgb(210 12 0/.9) 100%)} /* 魂系必殺：全畫面泛紅 */
 .v3-banner.soul.danger span{color:#ff5a40;font-weight:900;letter-spacing:.5em}
-@media(max-width:480px){.v3-t{font-size:17px}.v3-t.dmg{font-size:22px}.v3-t.dmg.big{font-size:30px}.v3-t.ono{font-size:18px}.v3-t.ono.big{font-size:24px}}
+@media(max-width:480px){.v3-t{font-size:17px}.v3-t.cure{font-size:24px}.v3-t.dmg{font-size:22px}.v3-t.dmg.big{font-size:30px}.v3-t.ono{font-size:18px}.v3-t.ono.big{font-size:24px}}
 
 /* ---------- 戰鬥介面修正（第一輪試玩回報） ---------- */
 /* 朗讀字幕條：接近全寬、最多兩行，沒內容時完全隱藏（不露出邊框） */
