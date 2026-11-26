@@ -69,13 +69,16 @@ export function compareRaw(a,b,{rawA,rawB,W,H}){if(!rawA||!rawB||!W||!H||!a.bbox
 /* ----- 覆蓋率：頁面上還有哪些文字沒被收進任何條目 -----
    ca／cb：parseLayout 回傳的 .cover。回傳 {left:[沒用到的文字框], skipped:[自動略過的：頁首頁尾、頁碼]}。
    主引擎沒用到的全部列出；複核引擎沒用到、而且主引擎在那個位置完全沒讀到東西的也列出（主引擎漏看的字）。 */
-export function leftovers(ca,cb){const A=ca?ca.boxes:[],B=cb?cb.boxes:[],ov=(p,q)=>{const w=Math.min(p.x1,q.x1)-Math.max(p.x0,q.x0),h=Math.min(p.y1,q.y1)-Math.max(p.y0,q.y0);return w>0&&h>0?w*h:0},area=p=>Math.max(1,(p.x1-p.x0)*(p.y1-p.y0));
+export function leftovers(ca,cb){const noise=[],A=ca?ca.boxes:[],B=cb?cb.boxes:[],ov=(p,q)=>{const w=Math.min(p.x1,q.x1)-Math.max(p.x0,q.x0),h=Math.min(p.y1,q.y1)-Math.max(p.y0,q.y0);return w>0&&h>0?w*h:0},area=p=>Math.max(1,(p.x1-p.x0)*(p.y1-p.y0));
   const pick=(b,from)=>({text:b.text,x0:b.x0,y0:b.y0,x1:b.x1,y1:b.y1,from}),left=A.filter(b=>b.use===null).map(b=>pick(b,"a"));
   for(const b of B){if(b.use!==null)continue;const hit=left.find(a=>a.from==="a"&&ov(a,b)>=.3*Math.min(area(a),area(b)));
     if(hit){hit.textB=hit.textB?hit.textB+" "+b.text:b.text;continue}
-    if(!A.some(a=>ov(a,b)>=.3*area(b)))left.push(pick(b,"b"))}
+    if(!A.some(a=>ov(a,b)>=.3*area(b))){if(ca&&bNoise(b)){noise.push(pick(b,"b"));continue}left.push(pick(b,"b"))}}
   left.sort((p,q)=>p.y0-q.y0||p.x0-q.x0);
-  return{left,skipped:(ca?A:B).filter(b=>b.use==="hf").map(b=>pick(b,ca?"a":"b"))}}
+  return{left,skipped:[...(ca?A:B).filter(b=>b.use==="hf").map(b=>pick(b,ca?"a":"b")),...noise]}}
+// 只有複核引擎讀到、主引擎在那裡什麼字都沒看到的零碎（手機照片的裝訂環、紙緣、陰影常被讀成「1」「\」「圖」）：
+// 信心低、或連三個英文字母／兩個中文字都湊不到的，放進「略過」清單（還是看得到），不逼使用者一段一段處理
+const bNoise=b=>{const t=String(b.text||""),la=(t.match(/[A-Za-z]/g)||[]).length,cj=(t.match(/[㐀-鿿]/g)||[]).length;return(b.conf!=null&&b.conf<.6)||(la<3&&cj<2)};
 
 // 回傳 [{status, a, b, fields, bad, raw, entry}]，順序照 A，只有 B 有的插在它前一筆配對的後面。
 // entry：建議存入的內容（agree／diff／onlyA 先放 A 的，onlyB 放 B 的），diff 一定要人工選邊或修改。

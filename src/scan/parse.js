@@ -87,7 +87,10 @@ export const FLAG={
   sense:"一個字有好幾個編號的意思（1. 2. …），中文和例句是合併起來的，請確認",
   region:"這一筆的範圍裡有不屬於它的文字",
   mixed:"例句那一列的英文還沒到句尾就接了中文，可能混進了別筆或另一欄的內容",
-  dots:"中文裡的刪節號點數不尋常，請對照原圖"};
+  dots:"中文裡的刪節號點數不尋常，請對照原圖",
+  dhead:"左欄這個字不確定是不是印刷的單字（可能是手寫或辨識錯），請對照原圖",
+  dsense:"這個字在書上有兩個以上的意思（左欄沒有另列），詞性與中文是合併起來的，請確認",
+  nozh:"這一筆沒讀到中文解釋"};
 
 // 逐列分類。rows：[{text, x0?,y0?,x1?,y1?, ids?, gap?}]（座標單位隨意）。opt.units：[{y,unit}] 已知的側邊標籤。
 // 回傳 {entries, rows}：每一列多了 use（head／zh／ex／tr 例句翻譯／note 同反義字列／unit／hf 頁首頁尾／noise／null 沒用到）與 ei（屬於第幾筆）。
@@ -184,12 +187,102 @@ export function groupRows(boxes){const bs=boxes.slice().sort((a,b)=>(a.y0+a.y1)-
   return rows.map(r=>{const it=r.items.sort((a,b)=>a.x0-b.x0);let gap=0;for(let i=1;i<it.length;i++)gap=Math.max(gap,it[i].x0-it[i-1].x1);
     return{text:it.map(b=>b.text).join(" "),x0:r.x0,y0:r.y0,x1:r.x1,y1:r.y1,ids:it.map(b=>b.i).filter(i=>i!=null),gap,h:med(it.map(b=>b.y1-b.y0))}})}
 
+/* ----- 字典式版面：左欄是（編號）單字＋音標，右欄是「▶ 詞性 中文 英文解釋」，下面是「• 例句」 -----
+   課本的單字頁常見這種排法（衍生字在左欄各自一列；同一個字的第二個意思在右欄另起一個 ▶，左欄沒有字）。
+   作法：找出「詞性＋中文」開頭的文字框 → 它們的左緣連成分隔線（手機照片的分隔線是斜的，用直線 x＝a＋b·y 擬合）
+   → 分成左右兩欄 → 左欄挑出印刷的單字（手寫筆記只收和這一號單字同字根的）→ 依高度把單字和右欄的區塊依序配對。 */
+const DPOS="adj|adv|prep|conj|pron|phr|vt|vi|yt|yi|n|v";
+const DHEAD=new RegExp("^(?:[^A-Za-z0-9㐀-鿿\\[(]{0,3}|[PDpb]\\s)?\\s*((?:"+DPOS+")\\s?[.,](?:\\s?(?:sing|pl)\\s?[.,]?)?(?:\\s?[\\[f(][A-Za-z, ]{1,6}[\\]J)]?)?)\\s*([㐀-鿿（(][㐀-鿿（）()；;，、…\\s]*)?(.*)$");
+const IPA=/[\[\]əɪʊæɑɔŋʃʒθðˈˌ`ıɛʌ]/;
+// 「▶ n. [U] 回收 a process of …」→ {pos:"n.", zh:"回收", rest:"a process of …"}
+export function dictHead(t){const m=tidy(t).match(DHEAD);if(!m)return null;const zh=(m[2]||"").replace(/\s+/g,"").replace(/;/g,"；").replace(/\(/g,"（").replace(/\)/g,"）").replace(/[；（]$/,"");
+  const pos=fixPos(m[1].replace(/^y/,"v").replace(/\s?(sing|pl)\s?[.,]?/,"").replace(/\s?[\[f(][A-Za-z, ]*[\]J)]?$/,""));return{pos,zh,rest:(m[3]||"").trim()}}
+// 左欄的一段文字 → 候選單字 {w, num}（num：前面有編號）；音標、看不出是字的回傳 null
+export function dictWord(t){const x=tidy(t).replace(/\[[^\]]*\]?/g," ").trim();if(!x||CJK.test(x)||/^[^\d]*[əɪʊæɑɔŋʃʒθðˈˌ`ıɛʌ]/.test(x))return null;
+  const m=x.match(/^[^A-Za-z0-9]{0,2}(\d{1,2})?\s*[.,]?\s*([A-Za-z][A-Za-z'\-]+)/);if(!m||m[2].length<2)return null;return{w:m[2],num:!!m[1]}}
+const stemShare=(a,b)=>{a=a.toLowerCase();b=b.toLowerCase();let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;return i>=3&&i>=Math.min(4,Math.min(a.length,b.length)-1)};
+function lineFit(pts){let use=pts;const calc=u=>{const n=u.length,my=u.reduce((t,p)=>t+p.y,0)/n,mx=u.reduce((t,p)=>t+p.x,0)/n;let sxy=0,syy=0;for(const p of u){sxy+=(p.y-my)*(p.x-mx);syy+=(p.y-my)**2}const b=syy>0?sxy/syy:0;return{a:mx-b*my,b,n}};
+  let f=calc(use);for(let r=0;r<3;r++){const res=use.map(p=>Math.abs(p.x-(f.a+f.b*p.y))),lim=Math.max(15,2.5*med(res)),nx=use.filter((p,i)=>res[i]<=lim);if(nx.length===use.length||nx.length<2)break;use=nx;f=calc(use)}return f}
+// 一列裡左右間隙超過 k 倍字高就切段
+const segs=(row,k)=>{const out=[];let cur=null;for(const b of row.items){if(cur&&b.x0-cur.x1<=k*row.h){cur.items.push(b);cur.x1=Math.max(cur.x1,b.x1)}else{cur={items:[b],x0:b.x0,x1:b.x1};out.push(cur)}}
+  return out.map(g=>({...g,text:g.items.map(b=>b.text).join(" "),ids:g.items.map(b=>b.i)}))};
+function rowsOf(boxes){const bs=boxes.slice().sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)),rows=[];
+  for(const b of bs){const h=b.y1-b.y0;let hit=null;for(let i=rows.length-1;i>=0&&i>=rows.length-4;i--){const r=rows[i],ov=Math.min(r.y1,b.y1)-Math.max(r.y0,b.y0);if(ov>=.5*Math.min(h,r.y1-r.y0)){hit=r;break}}
+    if(hit){hit.items.push(b);hit.y0=Math.min(hit.y0,b.y0);hit.y1=Math.max(hit.y1,b.y1)}else rows.push({items:[b],y0:b.y0,y1:b.y1})}
+  rows.sort((a,b)=>a.y0-b.y0);for(const r of rows){r.items.sort((a,b)=>a.x0-b.x0);r.h=med(r.items.map(b=>b.y1-b.y0));r.y=(r.y0+r.y1)/2}return rows}
+// bs：文字框（帶 i）；cov：覆蓋率陣列（會直接寫入 use／ei）。不是這種版面回傳 null
+export function parseDict(bs,{W,H},cov){
+  const hs=med(bs.map(b=>b.y1-b.y0))||20,isPos=b=>{const d=dictHead(b.text);return d&&(d.zh||!d.rest)};
+  const cand=bs.filter(isPos);if(cand.length<3)return null;
+  const fit=lineFit(cand.map(b=>({x:b.x0,y:(b.y0+b.y1)/2})));if(Math.abs(fit.b)>.6)return null;
+  const div=y=>fit.a+fit.b*y-.6*hs,L=[],R=[];for(const b of bs)((b.x0+b.x1)/2<div((b.y0+b.y1)/2)?L:R).push(b);
+  const set=(ids,use,ei=-1)=>{for(const i of ids){cov[i].use=use;cov[i].ei=ei}};
+  // 右欄：區塊（詞性＋中文開頭）與例句
+  const blocks=[];let cb=null;
+  for(const r of rowsOf(R)){const sg=segs(r,2.5);
+    // 最右邊另一張講義、頁緣的字（和內文隔很遠，只有中文或很短）不算
+    for(let k=1;k<sg.length;k++){const t=tidy(sg[k].text);if(CJK.test(t)&&!/[A-Za-z]{3}/.test(t)||t.replace(/[^A-Za-z]/g,"").length<=5){for(let j=k;j<sg.length;j++)set(sg[j].ids,"hf");sg.length=k;break}}
+    const ids=sg.flatMap(x=>x.ids),t=tidy(sg.map(x=>x.text).join(" ")),dh=dictHead(t),x1=sg[sg.length-1].x1;
+    if(dh&&(dh.zh||!dh.rest)){cb={pos:dh.pos,zh:dh.zh,ex:"",exDone:false,y:r.y,y0:r.y0,y1:r.y1,x0:sg[0].x0,x1,h:r.h,rows:[{ids,use:"zh"}]};blocks.push(cb);continue}
+    if(!cb){set(ids,"hf");continue}                                  // 第一個區塊之前：頁首、標題、手寫
+    const take=use=>{cb.rows.push({ids,use});cb.y1=Math.max(cb.y1,r.y1);cb.x1=Math.max(cb.x1,x1)};
+    if(!cb.zh&&CJK.test(t)&&!/[A-Za-z]{3}/.test(t)){cb.zh=t.replace(/\s+/g,"");take("zh");continue}   // 詞性和中文分成兩列讀到
+    const e=t.replace(/^[•·*●◆■\-–]\s*/,"").replace(/^[eo]\s+(?=[A-Z])/,"").trim(),bul=e!==t;
+    if(!cb.ex){if(bul||/^["'(]?[A-Z]/.test(e)){cb.ex=e;cb.exDone=TERM.test(e);take("ex")}else take("note");continue}   // 例句之前小寫開頭的是英文解釋的下一列
+    if(!cb.exDone&&!bul){cb.ex=/[A-Za-z]-$/.test(cb.ex)&&/^[a-z]/.test(e)?cb.ex.slice(0,-1)+e:cb.ex+" "+e;cb.exDone=TERM.test(cb.ex);take("ex");continue}
+    cb.exDone=true;take("tr")}                                         // 第二個例句以後：算這一筆的，但不收
+  if(!blocks.length)return null;
+  // 左欄：每一列切段，找候選單字
+  const words=[],loose=[];let numW=null;
+  const edge=b=>b.x1<.045*W&&tidy(b.text).length<=6;for(const b of L)if(edge(b))set([b.i],"hf");
+  for(const r of rowsOf(L.filter(b=>!edge(b)))){const sg=segs(r,2.5);let got=false;
+    for(const g of sg){const t=tidy(g.text);
+      if(!got){const dw=dictWord(t);if(dw){const ok=dw.num||!numW||stemShare(dw.w,numW)||words.length&&stemShare(dw.w,words[words.length-1].w);
+          if(ok){words.push({...dw,y:r.y,y0:r.y0,y1:r.y1,x0:g.x0,x1:g.x1,ids:g.ids,ph:[]});if(dw.num)numW=dw.w;got=true;continue}
+          loose.push({w:dw.w,y:r.y,ids:g.ids});continue}}
+      if(words.length)for(const b of g.items){const bt=tidy(b.text);if(IPA.test(bt)&&!CJK.test(bt)&&!dictWord(bt))words[words.length-1].ph.push(b.i)}}}   // 音標：算上一個字的
+  // 依高度把單字和區塊依序配對（動態規劃）：每個單字配一個區塊（相差超過三個字高不行）；沒配到的區塊是上一個字的另一個意思
+  const n=words.length,m=blocks.length,INF=1e9,D=Array.from({length:n+1},()=>new Float64Array(m+1).fill(INF)),P=Array.from({length:n+1},()=>new Int8Array(m+1));D[0][0]=0;
+  for(let i=0;i<=n;i++)for(let j=0;j<=m;j++){const v=D[i][j];if(v>=INF)continue;
+    // 印刷的單字有編號、或下一列有音標；兩樣都沒有的（多半是手寫）配對時多算一點代價
+    if(i<n&&j<m){const d=Math.abs(words[i].y-blocks[j].y)/Math.max(hs,blocks[j].h)+(words[i].num||words[i].ph.length?0:.8);if(d<=3.8&&v+d<D[i+1][j+1]){D[i+1][j+1]=v+d;P[i+1][j+1]=1}}
+    if(i<n){const c=words[i].num||words[i].ph.length?5:2.5;if(v+c<D[i+1][j]){D[i+1][j]=v+c;P[i+1][j]=2}}   // 這個單字沒有區塊（多半是手寫；有編號的不太可能）
+    if(j<m&&v+1<D[i][j+1]){D[i][j+1]=v+1;P[i][j+1]=3}}              // 這個區塊沒有單字
+  const owner=Array(m).fill(-1);for(let i=n,j=m;i>0||j>0;){const p=P[i][j];if(p===1){owner[j-1]=i-1;i--;j--}else if(p===2)i--;else j--}
+  const ents=[],usedW=new Set();
+  const mk=(en,b,w)=>{const e={en,pos:b.pos,zh:b.zh,ex:b.ex,flags:new Set(),b,y0:Math.min(b.y0,w?w.y0:b.y0),y1:Math.max(b.y1,w?w.y1:b.y1),x0:w?w.x0:b.x0,x1:b.x1,src:{head:w?w.ids.slice():[],zh:[],ex:[],other:[]}};
+    for(const r of b.rows)(r.use==="zh"?e.src.zh:r.use==="ex"?e.src.ex:e.src.other).push(...r.ids);
+    if(!b.zh)e.flags.add("nozh");if(b.ex&&!TERM.test(b.ex))e.flags.add("trail");return e};
+  const merge=(e,b)=>{if(b.zh&&!e.zh.split("；").includes(b.zh))e.zh=e.zh?e.zh+"；"+b.zh:b.zh;if(b.pos&&!e.pos.split(/[,/] ?/).includes(b.pos))e.pos=e.pos+", "+b.pos;if(!e.ex&&b.ex)e.ex=b.ex;
+    e.y1=Math.max(e.y1,b.y1);e.x1=Math.max(e.x1,b.x1);e.flags.add("dsense");for(const r of b.rows)(r.use==="zh"?e.src.zh:r.use==="ex"?e.src.ex:e.src.other).push(...r.ids)};
+  blocks.forEach((b,j)=>{const wi=owner[j];
+    if(wi<0){const hh=Math.max(hs,b.h),up=words.map((w,i)=>({w,i})).filter(x=>!usedW.has(x.i)&&!owner.includes(x.i)&&x.w.y<=b.y+1.2*hh&&x.w.y>=b.y-4*hh).pop();
+      if(up){usedW.add(up.i);const e=mk(up.w.w,b,up.w);e.flags.add("dhead");set(up.w.ids,"head",ents.length);set(up.w.ph,"note",ents.length);b.rows.forEach(r=>set(r.ids,r.use,ents.length));ents.push(e);return}
+      const prev=ents[ents.length-1];if(prev&&b.y-prev.b.y<=8*hh){merge(prev,b);b.rows.forEach(r=>set(r.ids,r.use,ents.length-1));return}
+      const lo=loose.find(x=>Math.abs(x.y-b.y)<=1.2*hh);
+      if(lo){const e=mk(lo.w,b,null);e.flags.add("dhead");e.src.head=lo.ids.slice();set(lo.ids,"head",ents.length);b.rows.forEach(r=>set(r.ids,r.use,ents.length));ents.push(e);return}
+      b.rows.forEach(r=>set(r.ids,null));return}
+    const w=words[wi];usedW.add(wi);const e=mk(w.w,b,w);set(w.ids,"head",ents.length);set(w.ph,"note",ents.length);b.rows.forEach(r=>set(r.ids,r.use,ents.length));ents.push(e)});
+  words.forEach((w,i)=>{if(!usedW.has(i)){const u=w.y1<blocks[0].y0-.5*hs?"hf":null;set(w.ids,u);set(w.ph,u)}});   // 沒配到區塊的單字：標題算頁首，其他留給使用者處理
+  // 頁首的「Lesson 5」當單元
+  const ls=bs.map(b=>tidy(b.text).match(/\bLesson\s*(\d{1,2})\b/i)).find(Boolean),unit=ls?"Lesson "+ls[1]:"";
+  // 沒中文的不算條目：用到的框放回「沒用到」，後面條目的編號往前補
+  const keep=ents.map(e=>!!e.zh),map=[];let k=0;keep.forEach((x,i)=>map[i]=x?k++:-1);
+  for(const c of cov)if(c.ei>=0){c.ei=map[c.ei];if(c.ei<0)c.use=null}
+  return ents.filter((e,i)=>keep[i]).map(e=>({en:e.en,pos:e.pos,zh:zhDots(e.zh),ex:e.ex,blank:deriveBlank(e.en,e.pos,e.ex),unit,
+    bbox:{y0:e.y0/H*100,y1:e.y1/H*100,x0:e.x0/W*100,x1:e.x1/W*100},flags:[...e.flags].map(f=>FLAG[f]),src:e.src}))}
+
 // boxes：[{text,x0,y0,x1,y1}]（像素）。回傳條目陣列：bbox 是整頁百分比（y0,y1,x0,x1：這一筆自己的範圍，核對時裁圖用），
 // src 記每個欄位來自哪些文字框，flags 是結構上的疑點。陣列另外帶 .cover：
 //   {W,H,boxes:[{i,text,x0,y0,x1,y1,use,ei}]}，use＝head／zh／ex／tr／note／unit／hf／noise／null（沒被任何條目用到）
-export function parseLayout(boxes,{W,H}){const bs=boxes.map((b,i)=>({text:String(b.text||""),x0:b.x0,y0:b.y0,x1:b.x1,y1:b.y1,i})),cov=bs.map(b=>({...b,use:null,ei:-1})),units=[],flow=[];
+export function parseLayout(boxes,{W,H}){const bs=boxes.map((b,i)=>({text:String(b.text||""),x0:b.x0,y0:b.y0,x1:b.x1,y1:b.y1,i,...(b.conf!=null?{conf:b.conf}:{})})),cov=bs.map(b=>({...b,use:null,ei:-1})),units=[],flow=[];
   for(const b of bs){const t=tidy(b.text),um=t.match(UNIT);if(!t){cov[b.i].use="noise";continue}
     if(um&&!CJK.test(t)&&words(t.slice(um[0].length)).length<=4){units.push(b);cov[b.i].use="unit"}else flow.push(b)}
+  { const c2=cov.map(b=>({...b})),d=parseDict(flow,{W,H},c2);
+    if(d&&d.length>=2){
+      // 範圍檢查（同下面一般版面）
+      d.forEach((e,ei)=>{const b=e.bbox,px={x0:b.x0*W/100,x1:b.x1*W/100,y0:b.y0*H/100,y1:b.y1*H/100};if(c2.some(c=>c.ei!==ei&&c.use!==null&&c.use!=="unit"&&c.use!=="noise"&&c.use!=="hf"&&(c.x0+c.x1)/2>px.x0&&(c.x0+c.x1)/2<px.x1&&(c.y0+c.y1)/2>px.y0&&(c.y0+c.y1)/2<px.y1))e.flags=[...e.flags,FLAG.region]});
+      d.cover={W,H,boxes:c2};d.layout="dict";return d}}
   const cols=splitColumns(flow,W),out=[];
   const cx=cols.map(c=>({x0:Math.min(...c.map(b=>b.x0)),x1:Math.max(...c.map(b=>b.x1))}));
   cols.forEach((col,ci)=>{

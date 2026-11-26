@@ -9,6 +9,7 @@ import { consensus, leftovers, FIELD_NAME } from '../scan/consensus.js';
 import { parseHead, tidy } from '../scan/parse.js';
 import { ruleWarnings } from '../scan/rules.js';
 import { loadLexicon } from '../scan/wordlist.js';
+import { straighten } from '../scan/deskew.js';
 
 // engA／engB：主引擎與複核引擎（"none"＝不複核）；adv：有沒有打開「進階」裡的 Claude
 let pages=[],cur=0,review=[],showOut=true,engA=lsGet("vc-ext","ppocr"),engB=lsGet("vc-ext2","ocr"),adv=lsGet("vc-adv","0")==="1";
@@ -32,7 +33,10 @@ async function scan(p){let t0=performance.now();const brk=async()=>{if(performan
     for(let y=0;y<H;y++){if(!(y&63))await brk();const gy=Math.min(gh-1.001,Math.max(0,y/f-.5)),y0=gy|0,ty=gy-y0;for(let x=0;x<W;x++){const gx=Math.min(gw-1.001,Math.max(0,x/f-.5)),x0=gx|0,tx=gx-x0;
       const bg=Math.max(40,(g[y0*gw+x0]*(1-tx)+g[y0*gw+x0+1]*tx)*(1-ty)+(g[(y0+1)*gw+x0]*(1-tx)+g[(y0+1)*gw+x0+1]*tx)*ty),j=(y*W+x)*4;
       for(let c=0;c<3;c++){let v=o[j+c]/bg*255;v=(v-35)*255/(232-35);o[j+c]=v<0?0:v>255?255:v}}}}
-  ctx.putImageData(im,0,0);p.out=out;p._jpg=null;p.status="scanned"}
+  ctx.putImageData(im,0,0);
+  // 手機照片的文字列常常是斜的、往下越歪越多：沿著文字列的方向把每一列拉平（歪得很少就不動）
+  try{const st=await straighten(out);p.out=st.canvas;p.warp=st.info}catch(e){p.out=out}
+  p._jpg=null;p.status="scanned"}
 
 async function addFiles(files){for(const f of files){if(!f.type.startsWith("image/"))continue;try{
   const bmp=await createImageBitmap(f,{imageOrientation:"from-image"}).catch(()=>createImageBitmap(f));const k=Math.min(1,2400/Math.max(bmp.width,bmp.height));

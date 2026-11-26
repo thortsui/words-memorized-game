@@ -3,6 +3,7 @@
 // 模型與執行檔從 CDN 用到才下載，存進 Cache Storage，之後離線可用。來源與授權見 docs/第三方資源.md。
 import { allCached } from '../cache.js';
 import { parseLayout } from '../parse.js';
+import { mostlyTraditional, toTrad } from '../s2t.js';
 import { FILES, parseDict, ocrBoxes as coreBoxes } from './ppocr-core.js';
 export { FILES, parseDict };
 
@@ -25,5 +26,6 @@ export const ppocrEngine={
   size:"約 44 MB",note:"第一次使用會下載辨識模型約 44 MB（之後存在瀏覽器裡，離線也能用）。圖片不會上傳。",
   ready:()=>true,
   cached:()=>allCached(Object.values(FILES)),
-  async extract(canvas,{onProgress}={}){const lines=await ocrBoxes(canvas,onProgress),e=parseLayout(lines,{W:canvas.width,H:canvas.height});e.lines=lines;return e}
+  async extract(canvas,{onProgress}={}){let lines=await ocrBoxes(canvas,onProgress);if(mostlyTraditional(lines.map(b=>b.text)))lines=lines.map(b=>({...b,text:toTrad(b.text)}));
+    const e=parseLayout(lines,{W:canvas.width,H:canvas.height});e.lines=lines;return e}
 };

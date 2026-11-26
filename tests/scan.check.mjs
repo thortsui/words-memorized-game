@@ -4,7 +4,8 @@
 // 檢查解析器自己出的錯會不會被標成需確認、漏掉的文字會不會出現在覆蓋率清單裡。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { parseRows, parseLayout, parseHead, deriveBlank, classifyRows, FLAG } from '../src/scan/parse.js';
+import { parseRows, parseLayout, parseHead, deriveBlank, classifyRows, FLAG, dictHead, dictWord } from '../src/scan/parse.js';
+import { toTrad, mostlyTraditional } from '../src/scan/s2t.js';
 import { consensus, leftovers, compareRaw, regionText } from '../src/scan/consensus.js';
 import { ruleWarnings, isInflection } from '../src/scan/rules.js';
 import { makeLexicon } from '../src/scan/wordlist.js';
@@ -110,4 +111,48 @@ t("原始文字比對：解析後一樣、但那一塊原圖上兩邊讀到的�
 t("規則檢查：例句沒有句尾標點、中文夾英文、簡體字、結構疑點都要人工確認",()=>{const w={en:"achieve",pos:"v.",zh:"達成；實現",ex:"She finally achieved her goal.",blank:"achieved"},has=(x,s)=>ruleWarnings(x,lex).some(m=>m.includes(s));
   assert.deepEqual(ruleWarnings(w,lex),[]);assert.ok(has({...w,ex:"After years of hard work, she finally achieved her goal of"},"結尾"));assert.ok(has({...w,zh:"達成；實現 deal with 處理；應付"},"夾著英文"));
   assert.ok(!has({...w,zh:"能幹的（be capable of V-ing 有能力做某事）"},"夾著英文"));assert.ok(has({...w,zh:"达成；实现"},"簡體"));assert.ok(has({...w,flags:[FLAG.trail]},"沒被收進條目"));assert.ok(!has({en:"be famous for ~",pos:"片語",zh:"以……聞名",ex:"Tainan is famous for its food.",blank:""},"奇怪"))});
+/* ---------- S9：課本的字典式版面（手機照片：分隔線是斜的、有手寫筆記、旁邊露出隔壁頁和講義） ---------- */
+// 左欄：編號單字＋音標、衍生字＋音標、手寫筆記；右欄：「▶ 詞性 中文 英文解釋」→「• 例句」；同一個字的第二個意思右欄另起一個 ▶、左欄沒有字。
+// 分隔線往右下斜（x＝440＋0.1·y），模擬照片沒拍正。
+{const dx=y=>Math.round(.1*y),L=(text,x0,y,x1)=>B(text,x0+dx(y)*.4,y,x1+dx(y)*.4,y+40),R=(text,x0,y,x1)=>B(text,x0+dx(y),y,x1+dx(y),y+40);
+const page=[B("Lesson 3 Things at Home",800,30,1150,62),
+  L("1. glow",120,150,250),L("[glo]",140,198,230),L("shine",130,250,230),                              // shine 是手寫的同義字（不同字根）
+  R("▶ vi. 發光 to give out a soft light",440,150,980),R("• The lamp glows softly in the dark room.",460,198,1010),
+  L("glowing",120,330,270),L("[ˈgloɪŋ]",140,378,270),
+  R("▶ adj. 發光的",440,330,640),R("• We saw a glowing light over the",460,378,960),R("hill at midnight.",490,426,700),
+  L("2. kind",110,560,240),L("[kaɪnd]",140,608,260),
+  R("▶ adj. 仁慈的 friendly and helpful",440,560,960),R("• She is always kind to animals.",460,608,900),
+  R("▶ n. [C] 種類",440,700,640),R("• What kind of music do you like?",460,748,940),R("• This is a new kind of apple.",460,796,900),
+  B("作業；任務",1300,560,1460,600),B("ike",0,330,40,370),                                                   // 右邊另一張講義、左邊隔壁頁的字
+  L("3. careful",110,900,290),L("[ˈkɛrfəl]",140,948,290),L("careless 粗心",120,1000,330),             // 手寫：同字根但同一段有中文
+  R("▶ adj. 小心的",440,900,640),R("• Be careful when you cross the street.",460,948,1000)];
+t("字典式版面：左欄單字配右欄區塊（斜的分隔線）、第二個意思併進同一筆、音標／講義／隔壁頁不算漏字、手寫筆記留給使用者",()=>{
+  const r=parseLayout(page,{W,H});assert.equal(r.layout,"dict");
+  assert.deepEqual(r.map(e=>[e.en,e.pos,e.zh]),[["glow","vi.","發光"],["glowing","adj.","發光的"],["kind","adj., n.","仁慈的；種類"],["careful","adj.","小心的"]]);
+  assert.equal(r[0].ex,"The lamp glows softly in the dark room.");assert.equal(r[0].blank,"glows");
+  assert.equal(r[1].ex,"We saw a glowing light over the hill at midnight.","例句換行接回來");
+  assert.equal(r[2].ex,"She is always kind to animals.","第二個意思的例句不收");assert.ok(r[2].flags.includes(FLAG.dsense),"併起來的要人工確認");
+  assert.ok(r.every(e=>e.unit==="Lesson 3"),"頁首 Lesson 當單元");
+  const use=txt=>r.cover.boxes.find(b=>b.text===txt).use;
+  assert.equal(use("[glo]"),"note");assert.equal(use("作業；任務"),"hf");assert.equal(use("ike"),"hf");assert.equal(use("• This is a new kind of apple."),"tr");
+  assert.equal(use("▶ vi. 發光 to give out a soft light"),"zh");
+  assert.equal(use("shine"),null,"手寫的字不配給任何一筆，但要列出來給使用者處理");assert.equal(use("careless 粗心"),null);
+  // 一般的條列式版面不會被當成字典式
+  assert.notEqual(parseLayout(leftCol,{W,H}).layout,"dict")});
+t("字典式版面：手寫的同字根筆記搶不走印刷單字的區塊；沒讀到單字的區塊不硬配手寫的字",()=>{
+  // 手寫的 glowy 寫在 ▶ 那一列旁邊（比印刷的 1. glow 更貼近），印刷的單字有編號、下一列有音標，要贏
+  const p2=[L("glowy",130,140,230),L("1. glow",120,190,250),L("[glo]",140,238,230),R("▶ vi. 發光",440,150,640),R("• The lamp glows softly.",460,198,900),
+    L("2. kind",110,400,240),L("[kaɪnd]",140,448,260),R("▶ adj. 仁慈的",440,400,640),R("• She is kind.",460,448,700),
+    R("▶ n. [C] 種類",440,600,640),R("• What kind of music do you like?",460,648,940),L("In",130,600,170)];  // In 是手寫，剛好在第二個意思旁邊
+  const r=parseLayout(p2,{W,H});assert.deepEqual(r.map(e=>[e.en,e.zh]),[["glow","發光"],["kind","仁慈的；種類"]])});
+}
+t("簡體字：PP-OCR 在繁體書上讀成的簡體字換回繁體；簡體書不換",()=>{
+  assert.equal(toTrad("羡慕；擠满的；消费者；毒药；环境"),"羨慕；擠滿的；消費者；毒藥；環境");
+  assert.equal(toTrad("头发"),"头发","一對多的字（发→發／髮）不換");
+  assert.ok(mostlyTraditional(["消费者","毒药","物質"]),"繁體書上偶爾幾個簡體字");assert.ok(!mostlyTraditional(["这是我们的学习时间","国家","说话"]),"簡體書")});
+t("字典式版面的詞性列：[U] 被讀成 [UJ／fUJ、vt. 讀成 yt.、中文半形括號",()=>{
+  assert.deepEqual(dictHead("▶ n. [UJ 傷害 damage or injury"),{pos:"n.",zh:"傷害",rest:"damage or injury"});
+  assert.deepEqual(dictHead("yt.羡慕 to desire"),{pos:"vt.",zh:"羡慕",rest:"to desire"});
+  assert.equal(dictHead("adj. 塑膠(製）的 made of plastic").zh,"塑膠（製）的");assert.equal(dictHead("n. sing. 自然環境 the natural world").pos,"n.");
+  assert.equal(dictHead("The house is big."),null);assert.equal(dictWord("13. recycling").w,"recycling");assert.equal(dictWord("[kraʊd]"),null);assert.equal(dictWord("drift apart 漂走"),null)});
 console.log(`掃描漏網情境：全部通過 ${n} 項`);
