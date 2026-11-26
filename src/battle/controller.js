@@ -254,21 +254,26 @@ function sQ(t){if(!alive(t)||!$("#bq"))return;++t.seq;t.view.setTimeScale(1);clo
   if(!q)return run(t,t.E.startEnemyTurn()).then(()=>alive(t)&&sEnemy(t));
   const w=q.w,m=q.mode;t.phase="q";t.qkind="atk";
   $("#bq").innerHTML=soulHud()+qCard(t,w,m);$("#satb").innerHTML=atbHtml(t.E.snapshot());
-  const tm=timer(t,q.windowMs,q.leftMs,[$("#stb"),$("#tb")],async()=>{if(t.phase!=="q")return;t.phase="busy";markOpts(t,-9);await run(t,t.E.attackTimeout());if(alive(t))sEnemy(t)},
+  const tm=timer(t,q.windowMs,q.leftMs,[$("#stb"),$("#tb")],async()=>{if(t.phase!=="q")return;t.phase="busy";markOpts(t,-9);answerLine(w,false,exSpk(w));const seq=t.seq;if(!await settle(t,seq,t.E.attackTimeout()))return;sGo(t)},
     left=>{const el=$("#sphase");if(el)el.textContent=`攻擊時間 ${(left/1000).toFixed(1)} 秒`});
   hook(t,w,m,async(ok,idx,given,loose)=>{const ms=tm.stop();mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerAttack(ok,ms),s=t.E.snapshot();$("#satb").innerHTML=atbHtml(s);
     say(ok?`答對！${loose?"（"+loose+"）":""}ATB ${s.atb}/3。剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`:`答錯了，多扣 ${SOUL.missPenaltyMs/1000} 秒！剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`,ok?"good":"bad");
     setAns(true);const seq=t.seq;
-    await run(t,evs);if(!alive(t)||t.seq!==seq)return;if(t.E.state.phase!=="cmd")return sGo(t); // 被突襲、打倒 Boss（練等）、陣亡
-    // 沒有任何招可出：不開指令列。答錯的話多停一下讓玩家看正確答案
-    if(!t.E.commands().some(c=>c.ready)){await holdFor(t,ok?350:1100);if(!alive(t)||t.seq!==seq)return}
+    if(!await settle(t,seq,evs))return;if(t.E.state.phase!=="cmd")return sGo(t); // 被突襲、打倒 Boss（練等）、陣亡
     sCmd(t)},()=>tm.stop());
   if(setup.auto&&(m==="en2zh"||m==="en2zhT"))speak(w.en,$("#bq .spk"))}
 // 指令列（時間減速）：放在題目卡下面的一排按鈕，不蓋住戰場
 // 等一小段時間（暫停中不算）
 async function holdFor(t,ms){let left=ms;while(left>0&&alive(t)){await wait(50);if(!t.paused)left-=50}}
 async function soulNext(t,seq){await run(t,t.E.command(0));if(!alive(t)||t.seq!==seq)return;sGo(t)}
+// 作答後一律停下來，按「下一題」才繼續（中間可以看答案、記單字；停著的時候攻擊時間不倒數）。
+// 會清掉題目卡的事件（換回合、Boss 倒下、突擊、練等…）先等玩家按，再播；其他先播完再等。回傳 false＝流程已經換掉
+const CLEARS=new Set(["windowEnd","enemyTurn","faint","bossEnter","win","lose","assault","perkOffer"]);
+function waitNext(t,seq,label="下一題 ▶"){return new Promise(res=>{if(!alive(t)||t.seq!==seq||!$("#bq"))return res(false);const old=$("#bnx");if(old)old.remove();
+  const nb=nextBtn(label);t.phase="wrong";nb.onclick=()=>{if(t.phase!=="wrong"||t.seq!==seq)return;t.phase="busy";nb.disabled=true;nb.remove();res(true)};nb.focus({preventScroll:true})})}
+async function settle(t,seq,evs){if(evs.some(e=>CLEARS.has(e.type))){if(!await waitNext(t,seq))return false;await run(t,evs)}
+  else{await run(t,evs);if(!alive(t)||t.seq!==seq)return false;if(!await waitNext(t,seq))return false}return alive(t)&&t.seq===seq}
 // 依規則引擎目前的階段走到下一個畫面
 function sGo(t){if(!alive(t))return;const ph=t.E.state.phase;if(ph==="end")return finish(t);if(ph==="perk")return sPerk(t);if(ph==="assault")return sAssault(t);if(ph==="pturn")return sQ(t);if(ph==="enemy")return sEnemy(t);if(ph==="cmd")return sCmd(t)}
 // 練等：打倒 Boss 後 3 選 1（只在這一局有效），選完才進下一隻
@@ -283,8 +288,7 @@ function sAssault(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu(
   say(`突擊 ${q.index+1}/${q.total}：答對就砍一刀！`,"good");
   let done=false,tm=null;
   const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
-    await run(t,t.E.answerAssault(ok,opt&&opt.timeout?q.limitMs+1:ms,opt||{}));if(!alive(t)||t.seq!==seq)return;
-    await holdFor(t,t.E.state.phase==="assault"?250:ok?300:900);if(!alive(t)||t.seq!==seq)return;sGo(t)};
+    if(!await settle(t,seq,t.E.answerAssault(ok,opt&&opt.timeout?q.limitMs+1:ms,opt||{})))return;sGo(t)};
   tm=timer(t,q.limitMs,q.limitMs,[$("#stb"),$("#tb")],()=>{if(t.phase==="q"){t.phase="busy";say("來不及了！","bad");fin(false,-9,"（超時）",{timeout:true})}},
     left=>{const el=$("#sphase");if(el)el.textContent=`突擊 ${q.index+1}/${q.total}・${(left/1000).toFixed(1)} 秒`});
   hook(t,w,m,(ok,idx,given)=>fin(ok,idx,given))}
@@ -309,9 +313,8 @@ function sFlask(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();
   const w=q.w,m=q.mode;t.phase="q";t.qkind="flask";
   $("#bq").innerHTML=soulHud()+qCard(t,w,m,{cls:"flaskq",plain:true});$("#satb").innerHTML=atbHtml(t.E.snapshot());
   let done=false;
-  const after=async evs=>{await run(t,evs);if(!alive(t)||t.seq!==seq)return;if(t.E.state.phase!=="cmd")return sGo(t);
-    if(!evs.some(e=>e.type==="ambush"))await holdFor(t,400);if(!alive(t)||t.seq!==seq)return;sCmd(t)};
-  const tm=timer(t,q.windowMs,q.leftMs,[$("#stb"),$("#tb")],async()=>{if(t.phase!=="q"||done)return;done=true;t.phase="busy";markOpts(t,-9);await after(t.E.answerFlask(false,q.leftMs,{timeout:true}))},
+  const after=async evs=>{if(!await settle(t,seq,evs))return;if(t.E.state.phase!=="cmd")return sGo(t);sCmd(t)};
+  const tm=timer(t,q.windowMs,q.leftMs,[$("#stb"),$("#tb")],async()=>{if(t.phase!=="q"||done)return;done=true;t.phase="busy";markOpts(t,-9);answerLine(w,false,exSpk(w));await after(t.E.answerFlask(false,q.leftMs,{timeout:true}))},
     left=>{const el=$("#sphase");if(el)el.textContent=`喝藥中…攻擊時間 ${(left/1000).toFixed(1)} 秒`});
   hook(t,w,m,async(ok,idx,given)=>{if(done)return;done=true;const ms=tm.stop();mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));setAns(true);
     await after(t.E.answerFlask(ok,ms))})}
@@ -336,20 +339,9 @@ async function sEnemy(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeM
   let done=false,early=0,tm=null;
   const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";t.onEarly=null;setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerDodge(ok,opt&&opt.timeout?d.limitMs+1:ms,{...(opt||{}),early});
-    await run(t,evs);if(!alive(t)||t.seq!==seq)return;const ph=t.E.state.phase;
-    if(ph==="end"){await wait(400);return alive(t)&&finish(t)}
-    if(!$("#bqc"))return sGo(t); // 題目卡已經被清掉（反擊打倒了 Boss、觸發突擊）：直接往下走
-    const hurt=evs.some(e=>e.type==="playerHit");
-    // 連擊還沒打完：不停下來，看一眼答案就迎接下一段（中招也一樣）
-    if(d.chain&&ph==="enemy"){await holdFor(t,hurt||!ok?650:300);if(!alive(t)||t.seq!==seq)return;return sEnemy(t)}
-    // 突襲：沒有「繼續」緩衝，看一眼答案就回到攻擊回合（或時間用完直接進敵人回合）
-    if(d.kind==="ambush"){await holdFor(t,hurt||!ok?800:450);if(!alive(t)||t.seq!==seq)return;return sGo(t)}
-    // 彈反或翻滾成功（沒受傷）：約 0.6 秒後自動迎接下一擊／換玩家回合；受傷、硬擋、答錯才停下來等「繼續」
-    if(ok&&!hurt){await holdFor(t,600);if(!alive(t)||t.seq!==seq)return;return sGo(t)}
-    const nb=nextBtn("繼續 ▶");t.phase="wrong";
-    {const el=$("#msg"),more=t.E.state.enemy&&t.E.state.enemy.i<t.E.state.enemy.total;if(el)el.textContent=el.textContent.replace(/（按「繼續」.*$/,"")+(more?"（按「繼續」迎接下一擊）":"（按「繼續」換你進攻）")}
-    // 只能按一次：按下立刻失效並移除（連點兩下會讓下一回合開始兩次）
-    nb.onclick=()=>{if(t.phase!=="wrong"||t.seq!==seq)return;t.phase="busy";nb.disabled=true;nb.remove();sGo(t)}};
+    if(!await settle(t,seq,evs))return;
+    if(t.E.state.phase==="end"){await wait(300);return alive(t)&&finish(t)}
+    sGo(t)};
   const go=()=>{if(!alive(t)||t.seq!==seq||done)return;t.phase="q";t.qAt=performance.now()-guardMs(t);const o=$("#bopts");if(o)o.classList.remove("locked","guard");const lb=$("#lockb");if(lb)lb.remove();
     tm=timer(t,d.limitMs,d.limitMs,[$("#stb"),$("#tb")],()=>{if(t.phase==="q"){t.phase="busy";say("來不及了！","bad");fin(false,-9,"（超時）",{timeout:true})}},
       left=>{const el=$("#sphase");if(el)el.textContent=`${d.seg>0?`連擊 ${d.seg+1}/${d.segs}・`:""}閃避！${(left/1000).toFixed(1)} 秒`})};

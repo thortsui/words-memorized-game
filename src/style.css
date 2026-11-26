@@ -496,3 +496,6 @@ body:has(#pauseov) #bq,body.inbattle:has(#modal:not(.hide)) #bq{filter:blur(12px
 .cmds.perks{grid-template-columns:1fr;gap:6px}.cmds.perks button{min-height:56px;border-color:#c9a24a}.cmds.perks button b{font-size:15px;color:#f0d890}.cmds.perks button .c{font-size:12px;color:var(--ink);white-space:normal}
 @media(orientation:landscape) and (max-height:520px){.cmds.perks{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .bwrap.soul .chainq.k-assault{box-shadow:0 0 0 2px #d9b24a,0 0 26px rgb(217 178 74/.6)}
+
+/* 噬語魔王命中時噴出的字母 */
+.v3-t.voidl{font:700 22px Lexend,serif;color:#ff6a50;text-shadow:0 0 8px #8a1aff,0 0 2px #000;letter-spacing:0}
