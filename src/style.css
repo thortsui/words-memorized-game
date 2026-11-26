@@ -514,3 +514,9 @@ body:has(#pauseov) #bq,body.inbattle:has(#modal:not(.hide)) #bq{filter:blur(12px
 .fcard .fc-zh{font-size:clamp(22px,6vw,30px);font-weight:700;color:var(--or)}
 .fcard .fc-ex{display:flex;justify-content:center;align-items:flex-start;gap:8px;margin-top:8px;padding-top:12px;border-top:1px dashed var(--line);text-align:left;font-size:17px;line-height:1.5}
 .fcard .fc-hint{margin-top:auto;opacity:.6}
+
+/* 歷史錯誤單字 */
+.mrow{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.mrank{flex:0 0 auto;min-width:28px;height:28px;border-radius:8px;background:var(--orbg);color:var(--or);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px;margin-top:2px}
+.mbar{height:6px;border-radius:3px;background:var(--line);margin:6px 0 4px;max-width:260px;overflow:hidden}
+.mbar i{display:block;height:100%;background:var(--bad);border-radius:3px}

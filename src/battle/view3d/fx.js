@@ -55,6 +55,39 @@ function makePool(eng,max,additive){
   return{emit,update,pts,mat:m,get alive(){return alive}};
 }
 
+/* ---------- 火花條（金屬撞擊）：沿速度方向拉長、面向鏡頭的細長四邊形，頭亮尾暗；顏色乘上 HDR 倍率讓光暈吃得到 ---------- */
+function makeStreaks(eng,max){
+  const pos=new Float32Array(max*12),col=new Float32Array(max*12),idx=new Uint16Array(max*6);
+  for(let i=0;i<max;i++){const v=i*4;idx.set([v,v+1,v+2,v+1,v+3,v+2],i*6)}
+  const P=new Float32Array(max*3),Vl=new Float32Array(max*3),life=new Float32Array(max),ml=new Float32Array(max),C=new Float32Array(max*3),W=new Float32Array(max),L=new Float32Array(max),Gr=new Float32Array(max),Dr=new Float32Array(max);
+  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(pos,3).setUsage(THREE.DynamicDrawUsage));g.setAttribute("color",new THREE.BufferAttribute(col,3).setUsage(THREE.DynamicDrawUsage));g.setIndex(new THREE.BufferAttribute(idx,1));
+  const m=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false,toneMapped:false});
+  const mesh=new THREE.Mesh(g,m);mesh.frustumCulled=false;mesh.renderOrder=12;eng.scene.add(mesh);
+  let cur=0,alive=0;const c=new THREE.Color(),cam=new THREE.Vector3(),h=new THREE.Vector3(),t=new THREE.Vector3(),d=new THREE.Vector3(),sd=new THREE.Vector3();
+  // o：{p, n, color, speed:[a,b], dir, spread, up, life:[a,b], gravity, drag, width, len（拖尾秒數）, hdr（亮度倍率）}
+  function emit(o){let n=o.n||10;if(eng.rm)n=Math.ceil(n*.4);else if(eng.quality==="low")n=Math.ceil(n*.4);
+    const p=V(o.p),sp=o.speed||[4,12],lf=o.life||[.18,.45],dir=o.dir?V(o.dir):null,spread=o.spread==null?1:o.spread,hdr=o.hdr||3;
+    for(let i=0;i<n;i++){const k=cur;cur=(cur+1)%max;let dx=rand(-1,1),dy=rand(-.6,1),dz=rand(-1,1);const l=Math.hypot(dx,dy,dz)||1;dx/=l;dy/=l;dz/=l;
+      if(dir){dx=dir.x+dx*spread;dy=dir.y+dy*spread;dz=dir.z+dz*spread;const l2=Math.hypot(dx,dy,dz)||1;dx/=l2;dy/=l2;dz/=l2}
+      const s=rand(sp[0],sp[1]);Vl[k*3]=dx*s;Vl[k*3+1]=dy*s+(o.up||0);Vl[k*3+2]=dz*s;P[k*3]=p.x;P[k*3+1]=p.y;P[k*3+2]=p.z;
+      c.set(pick(o.color||[0xfff2c0,0xffc060,0xffffff]));const b=hdr*rand(.7,1.2);C[k*3]=c.r*b;C[k*3+1]=c.g*b;C[k*3+2]=c.b*b;
+      W[k]=(o.width||.022)*rand(.7,1.3);L[k]=(o.len||.045)*rand(.7,1.4);Gr[k]=o.gravity==null?11:o.gravity;Dr[k]=o.drag==null?1.6:o.drag;ml[k]=life[k]=rand(lf[0],lf[1])}
+    alive=Math.max(alive,1)}
+  function update(dt){if(!alive)return;if(dt<=0)return;alive=0;eng.camera.getWorldPosition(cam);
+    for(let k=0;k<max;k++){const o=k*12;if(life[k]<=0){if(col[o]||col[o+3]){col.fill(0,o,o+12);pos.fill(0,o,o+12)}continue}
+      life[k]-=dt;if(life[k]<=0){col.fill(0,o,o+12);pos.fill(0,o,o+12);continue}alive++;
+      const dk=Math.max(0,1-Dr[k]*dt);Vl[k*3]*=dk;Vl[k*3+1]=Vl[k*3+1]*dk-Gr[k]*dt;Vl[k*3+2]*=dk;
+      P[k*3]+=Vl[k*3]*dt;P[k*3+1]+=Vl[k*3+1]*dt;P[k*3+2]+=Vl[k*3+2]*dt;
+      h.set(P[k*3],P[k*3+1],P[k*3+2]);d.set(Vl[k*3],Vl[k*3+1],Vl[k*3+2]);t.copy(h).addScaledVector(d,-L[k]);
+      // 寬度方向＝速度 × 視線，四邊形永遠正對鏡頭
+      sd.subVectors(cam,h).cross(d);const sl=sd.length();if(sl<1e-6)sd.set(W[k],0,0);else sd.multiplyScalar(W[k]/sl);
+      const r=life[k]/ml[k],f=Math.min(1,r*1.6),hr=C[k*3]*f,hg=C[k*3+1]*f,hb=C[k*3+2]*f;
+      pos[o]=h.x-sd.x;pos[o+1]=h.y-sd.y;pos[o+2]=h.z-sd.z;pos[o+3]=h.x+sd.x;pos[o+4]=h.y+sd.y;pos[o+5]=h.z+sd.z;
+      pos[o+6]=t.x-sd.x*.3;pos[o+7]=t.y-sd.y*.3;pos[o+8]=t.z-sd.z*.3;pos[o+9]=t.x+sd.x*.3;pos[o+10]=t.y+sd.y*.3;pos[o+11]=t.z+sd.z*.3;
+      col[o]=col[o+3]=hr;col[o+1]=col[o+4]=hg;col[o+2]=col[o+5]=hb;col[o+6]=col[o+9]=hr*.12;col[o+7]=col[o+10]=hg*.08;col[o+8]=col[o+11]=hb*.04}
+    g.attributes.position.needsUpdate=true;g.attributes.color.needsUpdate=true}
+  return{emit,update,mesh}}
+
 /* ---------- 共用貼圖 ---------- */
 function glowTexture(){const c=document.createElement("canvas");c.width=c.height=64;const x=c.getContext("2d");const g=x.createRadialGradient(32,32,0,32,32,32);
   g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(.25,"rgba(255,255,255,.75)");g.addColorStop(.6,"rgba(255,255,255,.18)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,64,64);
@@ -75,10 +108,10 @@ function beamTexture(){const c=document.createElement("canvas");c.width=4;c.heig
 
 export function createFx(eng,{soul=false}={}){
   const {scene,camera}=eng;
-  const add=makePool(eng,soul?700:500,true),norm=makePool(eng,400,false);
+  const add=makePool(eng,soul?700:500,true),norm=makePool(eng,400,false),stk=makeStreaks(eng,soul?260:180);
   const setScale=()=>{const s=eng.height*eng.dpr*.5/Math.tan(camera.fov*Math.PI/360);add.mat.uniforms.uScale.value=s;norm.mat.uniforms.uScale.value=s};
   eng.onResize.push(setScale);
-  eng.onUpdate(dt=>{add.update(dt);norm.update(dt)},50);
+  eng.onUpdate(dt=>{add.update(dt);norm.update(dt);stk.update(dt)},50);
   const glowTex=eng.track(glowTexture()),blobTex=eng.track(blobTexture()),circTex=eng.track(circleTexture()),beamTex=eng.track(beamTexture());
   const G={
     arc:new THREE.RingGeometry(.72,1,28,1,0,Math.PI*.95),
@@ -163,6 +196,6 @@ export function createFx(eng,{soul=false}={}){
   // 假陰影圓片
   function blob(r=.6,opacity=1){const m=new THREE.Mesh(G.plane,new THREE.MeshBasicMaterial({map:blobTex,transparent:true,depthWrite:false,opacity,color:0x000000}));m.rotation.x=-Math.PI/2;m.position.y=.02;m.scale.setScalar(r*2);m.renderOrder=1;return m}
 
-  return{emit:o=>add.emit(o),emitN:o=>norm.emit(o),text,banner,setVig,pulseVig,slash,ring,burstRing,flash,orb,pillar,bolt,circle,ghost,blob,temp,basic,G,glowTex,beamTex,setScale,
+  return{emit:o=>add.emit(o),emitN:o=>norm.emit(o),streaks:o=>stk.emit(o),text,banner,setVig,pulseVig,slash,ring,burstRing,flash,orb,pillar,bolt,circle,ghost,blob,temp,basic,G,glowTex,beamTex,setScale,
     get particleCount(){return add.alive+norm.alive}};
 }

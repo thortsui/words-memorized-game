@@ -1,7 +1,7 @@
 // 練習設定頁與一般練習（五種題型）
 import { $, app, esc, SC, lsSet, toast, KEY_HINT } from '../core/util.js';
 import { S, allDicts, setup, saveSetup, pool, mark, unlog, pushHist, allWords, ctx } from '../core/store.js';
-import { MODES, shuffle, clozeAns, clozePos, zhPrompt, opts, normEn, checkEn, checkZhSmart } from '../core/grading.js';
+import { MODES, shuffle, clozeAns, clozePos, zhPrompt, opts, normEn, checkEn, checkZhSmart, pickMode, modeName } from '../core/grading.js';
 import { recordTyping } from '../core/typing.js';
 import { sp, speak, readAll, gate, spkBtn, enVoices, stopSpeech, resetGoogleFail } from '../core/speech.js';
 import { bgmStop } from '../core/audio.js';
@@ -17,7 +17,7 @@ export function renderSetup(){const D=allDicts();if(!D[setup.dict]&&setup.dict!=
   <div class="cut">${SC}<div class="tab"><span>SETUP</span></div><div class="body">
   <label><span class="small">字典</span><select id="dsel"><option value="__all">全部字典</option>${Object.values(D).map(d=>`<option value="${esc(d.id)}" ${d.id===setup.dict?"selected":""}>${esc(d.name)}（${d.words.length}）</option>`).join("")}</select></label>
   <h2 style="font-size:16px;margin:18px 0 8px">玩法</h2><div class="chips">${chip("game",false,"一般練習")}${chip("game","card","單字閃卡")}${chip("game",true,"打怪模式")}${chip("game","soul","魂系模式")}</div>${setup.game==="card"?'<p class="small" style="margin:6px 0 0">上面英文、下面中文，底下是例句（沒有例句就不顯示）。點一下卡片換下一張；鍵盤空白鍵／→ 下一張、← 上一張。不計分、不記錯題。</p>':""}${setup.game==="soul"?'<p class="small" style="margin:6px 0 0">黑暗奇幻的 Boss 戰，所有動作都由答題驅動。你的回合有 5～7 秒攻擊時間（中翻英・填空依你的打字速度換算），答對就自動連斬：越快答完段數越多（3～5 連斬），第 2 刀起每一刀要再答一題複習題（先考答錯過的字）。Boss 會 3～5 連擊，每一擊都是限時閃避題（2～5 秒）：<b>很快答對＝彈反並反擊</b>，一般速度＝翻滾閃避，太慢只能擦傷，答錯或超時就會中招；連續快速閃避會觸發突擊。答錯會當場被打倒。打倒 Boss 可以從 3 個技能挑 1 個（這一局有效）。每題答完都要按「下一題」，中間可以先記答案。</p>':setup.game===true?'<p class="small" style="margin:6px 0 0">劍與魔法的世界：按「下一題」才開始計時；答對獲得 1～10 點能量（越快越多，最多存 40），再選劍技或魔法出手（普通斬擊免費，其他從 10 點起跳），或保留能量放大招。連招（3／5／7 題）不耗能量，連續答對指定題數（時間更短）才會一次發動，傷害最高；答錯會被怪物攻擊、連招中斷。打倒 5 隻怪物就破關！</p>':""}
-  ${card?"":`<h2 style="font-size:16px;margin:18px 0 8px">題型</h2><div class="chips">${MODES.map(m=>chip("mode",m[0],m[1])).join("")}</div>`}
+  ${card?"":`<h2 style="font-size:16px;margin:18px 0 8px">題型 <span class="small" style="font-weight:400">可以複選：選兩種以上就是綜合題型，每一題隨機出其中一種</span></h2><div class="chips">${MODES.map(m=>`<button class="chip ${setup.modes.includes(m[0])?"on":""}" data-mode="${m[0]}" aria-pressed="${setup.modes.includes(m[0])}">${m[1]}</button>`).join("")}<button class="chip ${setup.modes.length===MODES.length?"on":""}" id="mall">全部綜合</button></div>${setup.mode==="mix"?`<p class="small" style="margin:6px 0 0">綜合題型：${setup.modes.map(modeName).join("、")}。從範圍裡隨機抽題，每題的題型也隨機（克漏字只出給有例句的字）。</p>`:""}`}
   <h2 style="font-size:16px;margin:18px 0 8px">範圍</h2><div class="chips">${chip("scope","all","單字＋片語")}${chip("scope","w","只有單字")}${chip("scope","p","只有片語")}${chip("wrong",true,"只練錯題")}${chip("wrong",false,"全部題目")}</div>
   <h2 style="font-size:16px;margin:18px 0 8px">題數</h2><div class="chips">${chip("n",10,"10 題")}${chip("n",20,"20 題")}${chip("n",0,"全部")}</div>
   <h2 style="font-size:16px;margin:18px 0 8px">例句模式 <span class="small" style="font-weight:400">開啟後題目下方顯示英文例句（不附中文）</span></h2><div class="chips">${chip("exmode",false,"關閉")}${chip("exmode",true,"開啟")}</div>
@@ -29,6 +29,10 @@ export function renderSetup(){const D=allDicts();if(!D[setup.dict]&&setup.dict!=
   ${n?"":`<p class="small">${setup.wrong?"這個範圍目前沒有錯題，太好了！":setup.mode==="cloze"?"這個範圍沒有可用的例句克漏字。":"這個範圍沒有條目。"}</p>`}</div></div>`;
   $("#dsel").onchange=e=>{setup.dict=e.target.value;saveSetup();renderSetup()};
   app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{setup[b.dataset.k]=JSON.parse(b.dataset.v);saveSetup();renderSetup()});
+  // 題型複選：至少留一種；兩種以上＝綜合（mode "mix"）
+  const setModes=ms=>{if(!ms.length)return;setup.modes=MODES.map(m=>m[0]).filter(m=>ms.includes(m));setup.mode=setup.modes.length>1?"mix":setup.modes[0];saveSetup();renderSetup()};
+  app.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{const m=b.dataset.mode,has=setup.modes.includes(m);if(has&&setup.modes.length===1){toast("至少要選一種題型");return}setModes(has?setup.modes.filter(x=>x!==m):[...setup.modes,m])});
+  const ma=$("#mall");if(ma)ma.onclick=()=>setModes(MODES.map(m=>m[0]));
   app.querySelectorAll("[data-eng]").forEach(b=>b.onclick=()=>{sp.eng=b.dataset.eng;resetGoogleFail();lsSet("vc-eng3",sp.eng);renderSetup()});
   $("#vsel").onchange=e=>{sp.voiceName=e.target.value;lsSet("vc-voice",sp.voiceName)};
   $("#slow").onclick=()=>{sp.rate=sp.rate<.8?.9:.65;lsSet("vc-rate",sp.rate);renderSetup()};
@@ -36,13 +40,13 @@ export function renderSetup(){const D=allDicts();if(!D[setup.dict]&&setup.dict!=
 
 /* ----- 單字閃卡：上面英文、下面中文、底下例句；點一下換下一張 ----- */
 let cardKey=null;
-export function startCards(ws){if(!ws.length)return;const items=shuffle(ws).slice(0,setup.n||ws.length),st=ctx.Q={cards:true};let i=0;
+export function startCards(ws,n){if(!ws.length)return;const nn=n==null?setup.n:n,items=shuffle(ws).slice(0,nn||ws.length),st=ctx.Q={cards:true};let i=0;
   const alive=()=>ctx.Q===st&&ctx.view==="practice",off=()=>{if(cardKey){document.removeEventListener("keydown",cardKey);cardKey=null}};
   const go=d=>{if(!alive())return;i=Math.max(0,Math.min(items.length,i+d));stopSpeech();draw()};
   function draw(){window.scrollTo(0,0);
     if(i>=items.length){app.innerHTML=`<div class="cut">${SC}<div class="tab"><span>DONE</span></div><div class="body" style="text-align:center"><p class="big" style="margin:8px 0">看完了 ${items.length} 張</p>
       <div class="row" style="justify-content:center;gap:10px;margin-top:14px"><button class="pri" id="again">再看一次（重新洗牌）</button><button id="back">回設定</button></div></div></div>`;
-      $("#again").onclick=()=>startCards(ws);$("#back").onclick=()=>{off();toSetup()};return}
+      $("#again").onclick=()=>startCards(ws,nn);$("#back").onclick=()=>{off();toSetup()};return}
     const w=items[i];
     app.innerHTML=`<div class="row"><button class="sm ghost" id="quit" style="padding-left:0">← 結束閃卡</button><span class="small" style="margin-left:auto">${i+1} / ${items.length}</span></div>
     <div class="fcard" id="fc" role="button" tabindex="0" aria-label="下一張">
@@ -66,10 +70,12 @@ export function toSetup(){ctx.Q=null;ctx.B=null;document.body.classList.remove("
 
 let Q=null;
 // over：只套用這一輪的設定（錯題頁的「練習待複習」），不寫回 setup
-export function startQuiz(ws,over){if(!ws.length)return;const c=over?{...setup,...over}:setup,n=c.n||ws.length;const all=pool(over);const items=shuffle(ws).slice(0,n);
+export function startQuiz(ws,over){if(!ws.length)return;const c=over?{...setup,...over}:setup,n=c.n||ws.length;const all=pool(over);
+  // 從整個範圍隨機抽 n 題（不是每種題型各 n 題）；綜合題型時每題各自抽一種題型，答錯重出時沿用同一種
+  const items=shuffle(ws).slice(0,n).map(w=>({...w,_m:pickMode(c.mode,c.modes,w)}));
   Q=ctx.Q={items,n0:items.length,i:0,right:0,wrong:[],reps:0,fixed:0,mode:c.mode,dict:c.dict,over:over||null,all:all.length>=4?all:ws,bank:allWords()};ctx.B=null;stopSpeech();renderQ()}
 
-function renderQ(){const w=Q.items[Q.i],m=Q.mode,tot=Q.n0;Q.done=false;Q.checking=false;
+function renderQ(){const w=Q.items[Q.i],m=w._m||Q.mode,tot=Q.n0;Q.done=false;Q.checking=false;
   // 進度只算原本的題數；答錯重出的題目另外標「重考」，分母不會邊做邊變
   const prog=Q.i<tot?`${Q.i+1} / ${tot}`:`重考 ${Q.i-tot+1} / ${Q.items.length-tot}（原 ${tot} 題已答完）`;
   let prompt="",body="";
@@ -79,7 +85,7 @@ function renderQ(){const w=Q.items[Q.i],m=Q.mode,tot=Q.n0;Q.done=false;Q.checkin
   if(m==="en2zh"||m==="zh2en"||m==="cloze"){const key=m==="en2zh"?"zh":m==="zh2en"?"en":"cloze";Q.ans=key==="cloze"?clozeAns(w):w[key];Q.opts=opts(w,key,Q.bank);
     body=`<div class="opts" id="opts">${Q.opts.map((o,i)=>`<button data-o="${i}" class="${key==="zh"?"":"en"}"><span class="k">${i+1}</span>${esc(o)}</button>`).join("")}</div>`}
   else body=`<form id="tf" class="row" style="margin-top:18px"><input id="ti" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${m==="en2zhT"?"輸入中文意思":"輸入英文"}" style="flex:1 1 220px;width:auto" class="${m==="zh2enT"?"en":""}"><button class="pri" id="tsub">送出</button><button type="button" id="idk" class="ghost">不會</button></form>`;
-  app.innerHTML=`<div class="row"><button class="sm ghost" id="quit" style="padding-left:0">← 結束練習</button><span class="small" id="prog" style="margin-left:auto">${MODES.find(x=>x[0]===m)[1]}・${prog}・答對 ${Q.right}</span></div>
+  app.innerHTML=`<div class="row"><button class="sm ghost" id="quit" style="padding-left:0">← 結束練習</button><span class="small" id="prog" style="margin-left:auto">${Q.mode==="mix"?"綜合・":""}${modeName(m)}・${prog}・答對 ${Q.right}</span></div>
   <div class="bar"><i style="width:${Math.min(Q.i,tot)/tot*100}%"></i></div>
   <div class="cut qcard">${SC}<div class="tab"><span>${esc(w.unit||"WORD")}</span></div><div class="body">${w._rep?'<div class="small" style="color:var(--bad);font-weight:700;margin-bottom:6px">剛剛答錯，再考一次</div>':""}${prompt}${body}<div id="fb"></div></div></div>`;
   $("#quit").onclick=toSetup;
@@ -92,10 +98,10 @@ function renderQ(){const w=Q.items[Q.i],m=Q.mode,tot=Q.n0;Q.done=false;Q.checkin
       checkZhSmart(v,w).catch(()=>({ok:false})).then(r=>{if(ctx.Q!==q||Q.i!==wi)return;Q.checking=false;answer(r.ok,-1,v,r.loose)});return}
     answer(checkEn(v,w),-1,v)};$("#idk").onclick=()=>{if(!Q.done&&!Q.checking)answer(false,-1,"")}}}
 
-function answer(ok,idx,typed,loose){if(Q.done)return;Q.done=true;const w=Q.items[Q.i],m=Q.mode;
+function answer(ok,idx,typed,loose){if(Q.done)return;Q.done=true;const w=Q.items[Q.i],m=w._m||Q.mode;
   // 成績只算第一次作答；答錯的加到本輪最後再考，每字最多重出 3 次
   Q.pushed=false;if(w._rep){if(ok)Q.fixed++}else if(ok)Q.right++;else Q.wrong.push(w);
-  if(!ok&&(w._rep||0)<3){Q.items.push({...w,_rep:(w._rep||0)+1});Q.reps++;Q.pushed=true}mark(w,ok,typed,Q.mode);
+  if(!ok&&(w._rep||0)<3){Q.items.push({...w,_rep:(w._rep||0)+1});Q.reps++;Q.pushed=true}mark(w,ok,typed,m);
   const ob=app.querySelectorAll("#opts button");ob.forEach((b,i)=>{b.disabled=true;if(Q.opts[i]===Q.ans)b.classList.add("right");else if(i===idx)b.classList.add("wrong")});
   const ti=$("#ti");if(ti)ti.readOnly=true;
   // 作答後：送出鈕恢復文字並停用（不會一直停在「判斷中…」），「不會」也停用
@@ -106,7 +112,7 @@ function answer(ok,idx,typed,loose){if(Q.done)return;Q.done=true;const w=Q.items
    ${w.ex?`<div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:6px"><div class="ex en">${esc(w.ex)}</div>${spkBtn(w.ex,"朗讀例句")}</div>`:""}
    ${!ok&&typed&&idx<0?`<p class="small" style="margin:8px 0 0">你的答案：${esc(typed)}</p>`:""}</div>
    <div class="row" style="margin-top:12px"><button class="pri" id="nx" style="flex:1 1 200px">${Q.i+1<Q.items.length?(Q.i+1<Q.n0?"下一題":"下一題・重考"):"看結果"}${KEY_HINT}</button>${!ok&&typedMode&&typed?'<button id="ovr" class="ghost">我其實答對了</button>':""}</div>`;
-  $("#nx").onclick=next;$("#nx").focus();const ov=$("#ovr");if(ov)ov.onclick=()=>{if(Q.pushed){Q.items.pop();Q.reps--}if(w._rep)Q.fixed++;else{Q.right++;Q.wrong.pop()}unlog(w);mark(w,true,"",Q.mode);next()};
+  $("#nx").onclick=next;$("#nx").focus();const ov=$("#ovr");if(ov)ov.onclick=()=>{if(Q.pushed){Q.items.pop();Q.reps--}if(w._rep)Q.fixed++;else{Q.right++;Q.wrong.pop()}unlog(w);mark(w,true,"",m);next()};
   Q.readP=readAll(w,app.querySelector("#fb .spk"));gate($("#nx"),Q.readP,"朗讀中…（英文→中文→例句）")}
 // 換題前先停掉上一題還沒唸完的朗讀（25 秒強制解鎖後也一樣）
 function next(){stopSpeech();Q.i++;if(Q.i<Q.items.length)renderQ();else renderEnd()}

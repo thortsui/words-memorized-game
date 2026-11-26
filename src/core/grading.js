@@ -2,7 +2,13 @@
 export const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 export const isPhrase=w=>/片語|phr/i.test(w.pos)||/\s/.test(w.en.trim());
 export const MODES=[["en2zh","英翻中・選擇"],["zh2en","中翻英・選擇"],["en2zhT","英翻中・填空"],["zh2enT","中翻英・填空"],["cloze","克漏字"]];
-export const modeName=m=>(MODES.find(x=>x[0]===m)||[0,""])[1];
+export const modeName=m=>m==="mix"?"綜合題型":(MODES.find(x=>x[0]===m)||[0,""])[1];
+// 綜合題型：練習設定可以複選題型（modes），選兩種以上時 mode＝"mix"，每一題從選到的題型裡隨機抽一種；
+// 克漏字只出給有例句、挖得出答案的字，挖不出來就從其他選到的題型抽
+export const MODE_IDS=["en2zh","zh2en","en2zhT","zh2enT","cloze"];
+export const canMode=(w,m)=>m!=="cloze"||!!(w&&w.ex&&clozeAns(w));
+export function pickMode(mode,modes,w,rng=Math.random){if(mode!=="mix")return mode;const ok=(modes&&modes.length?modes:MODE_IDS).filter(m=>canMode(w,m));
+  if(!ok.length)return(modes||[]).find(m=>m!=="cloze")||"en2zh";return ok[Math.floor(rng()*ok.length)%ok.length]}
 // 填空題型對應的選擇題型（魂系閃避題一律選擇題）
 export const mcOf=m=>m==="en2zhT"?"en2zh":m==="zh2enT"?"zh2en":m;
 

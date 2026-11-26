@@ -1,6 +1,7 @@
 // 純邏輯檢查：node tests/check.mjs
 import assert from 'node:assert/strict';
 import { BUILTIN } from '../src/data/no307.js';
+import { pickMode } from '../src/core/grading.js';
 import { isPhrase, normEn, enVariants, checkEn, checkZh, nearZh, zhSegs, clozeAns, clozePos, zhPrompt, inflections, checkZhSmart, opts, mcOf, sayable, formOf, matchCase, inflectAs } from '../src/core/grading.js';
 import { normalizeState, normalizeSetup } from '../src/core/normalize.js';
 import { parseOcr, parseLines, parseLayout, parseHead, deriveBlank } from '../src/scan/parse.js';
@@ -85,9 +86,19 @@ t("啟動時的正規化：壞資料不丟例外，能救的留下、救不了�
   const r=normalizeState({dicts:{x:{id:"x",name:"壞字典"},y:{id:"zzz",name:"好",words:[{id:"1",en:"a",zh:"甲"},{id:"2",en:""},null,{id:"3",en:"c",zh:null,ex:7}]},z:{words:[{en:"q"}]}},miss:{y:{1:3,2:"x",3:-1},q:null},wlog:{y:{1:{n:2},2:null,3:{n:0}}},hist:[null,{t:"5",wrong:"x"}],hidden:{no307:1}});
   assert.deepEqual(Object.keys(r.dicts),["y","z"]);assert.equal(r.dicts.y.id,"y");assert.deepEqual(r.dicts.y.words.map(w=>w.en),["a","c"]);assert.equal(r.dicts.y.words[1].zh,"");assert.equal(r.dicts.y.words[1].ex,"7");assert.equal(r.dicts.z.name,"未命名字典");assert.ok(r.dicts.z.words[0].id);
   assert.deepEqual(r.miss,{y:{1:3}});assert.deepEqual(r.wlog,{y:{1:{n:2,last:0,ans:[]}}});assert.deepEqual(r.hist,[{t:5,mode:"",dict:"",n:0,right:0,wrong:[],game:false}]);assert.deepEqual(r.hidden,{no307:true})});
-t("練習設定正規化：不認得的值退回預設",()=>{assert.deepEqual(normalizeSetup(null),{dict:"no307",mode:"en2zh",scope:"all",n:10,wrong:false,auto:true,exmode:false,game:false});
-  assert.deepEqual(normalizeSetup({dict:5,mode:"xx",scope:"q",n:7,wrong:1,auto:"no",game:"soul",junk:1}),{dict:"no307",mode:"en2zh",scope:"all",n:10,wrong:true,auto:true,exmode:false,game:"soul"});
-  assert.deepEqual(normalizeSetup({dict:"__all",mode:"cloze",scope:"p",n:0,wrong:false,auto:false,exmode:true,game:true}),{dict:"__all",mode:"cloze",scope:"p",n:0,wrong:false,auto:false,exmode:true,game:true})});
+t("練習設定正規化：不認得的值退回預設",()=>{assert.deepEqual(normalizeSetup(null),{dict:"no307",mode:"en2zh",modes:["en2zh"],scope:"all",n:10,wrong:false,auto:true,exmode:false,game:false});
+  assert.deepEqual(normalizeSetup({dict:5,mode:"xx",scope:"q",n:7,wrong:1,auto:"no",game:"soul",junk:1}),{dict:"no307",mode:"en2zh",modes:["en2zh"],scope:"all",n:10,wrong:true,auto:true,exmode:false,game:"soul"});
+  assert.deepEqual(normalizeSetup({dict:"__all",mode:"cloze",scope:"p",n:0,wrong:false,auto:false,exmode:true,game:true}),{dict:"__all",mode:"cloze",modes:["cloze"],scope:"p",n:0,wrong:false,auto:false,exmode:true,game:true});
+  // 複選題型：兩種以上＝mix；不認得的題型丟掉；全部不認得就退回單一 mode
+  const m=normalizeSetup({mode:"zh2en",modes:["cloze","en2zh","bogus"]});assert.equal(m.mode,"mix");assert.deepEqual(m.modes,["en2zh","cloze"]);
+  assert.deepEqual(normalizeSetup({mode:"zh2enT",modes:["zz"]}).modes,["zh2enT"]);assert.equal(normalizeSetup({modes:["cloze"]}).mode,"cloze")});
+t("綜合題型：每題從選到的題型隨機抽，克漏字只給有例句的字，打怪／魂系出題也跟著抽",()=>{
+  const ex=W.find(w=>w.ex&&clozeAns(w)),noex={...W[0],ex:""};const seen=new Set();
+  for(let i=0;i<200;i++)seen.add(pickMode("mix",["en2zh","zh2enT","cloze"],ex));assert.deepEqual([...seen].sort(),["cloze","en2zh","zh2enT"]);
+  for(let i=0;i<100;i++)assert.notEqual(pickMode("mix",["en2zh","cloze"],noex),"cloze");
+  assert.equal(pickMode("zh2en",["en2zh","cloze"],ex),"zh2en");
+  const B=createMonsterBattle({pool:W.slice(0,20).map(w=>({...w,dict:"no307"})),mode:"mix",modes:["en2zh","zh2en"]});B.start();const ms=new Set();for(let i=0;i<40;i++){const q=B.nextQuestion();ms.add(q.mode);B.state.phase="ready"}
+  assert.ok(ms.has("en2zh")&&ms.has("zh2en")&&ms.size===2)});
 
 /* ---------- 打怪模式 ---------- */
 const pool=W.slice(0,20).map(w=>({...w,dict:"no307"}));

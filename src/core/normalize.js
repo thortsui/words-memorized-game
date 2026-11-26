@@ -38,10 +38,12 @@ export function normalizeState(j,opt){const strict=!!(opt&&opt.strict),out=blank
   out.t=+j.t||0;return out}
 
 // 練習設定：值不在允許範圍就退回預設（壞掉的設定不能讓練習頁出錯）
-export const SETUP_DEFAULT={dict:"no307",mode:"en2zh",scope:"all",n:10,wrong:false,auto:true,exmode:false,game:false};
+export const SETUP_DEFAULT={dict:"no307",mode:"en2zh",modes:["en2zh"],scope:"all",n:10,wrong:false,auto:true,exmode:false,game:false};
 export function normalizeSetup(j){const s={...SETUP_DEFAULT};if(!isObj(j))return s;
   if(typeof j.dict==="string"&&j.dict)s.dict=j.dict;
-  if(["en2zh","zh2en","en2zhT","zh2enT","cloze"].includes(j.mode))s.mode=j.mode;
+  const M=["en2zh","zh2en","en2zhT","zh2enT","cloze"];if(M.includes(j.mode))s.mode=j.mode;
+  // 複選題型：兩種以上＝綜合（mode "mix"）；舊設定沒有 modes 就用單一的 mode
+  const ms=Array.isArray(j.modes)?M.filter(m=>j.modes.includes(m)):[];s.modes=ms.length?ms:[s.mode];s.mode=s.modes.length>1?"mix":s.modes[0];
   if(["all","w","p"].includes(j.scope))s.scope=j.scope;
   if([0,10,20].includes(j.n))s.n=j.n;
   s.wrong=!!j.wrong;if(typeof j.auto==="boolean")s.auto=j.auto;s.exmode=!!j.exmode;s.game=j.game==="soul"||j.game==="card"?j.game:!!j.game;return s}

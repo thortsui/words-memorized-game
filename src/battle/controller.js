@@ -3,7 +3,7 @@
 import { $, app, esc, ask, SC, wait, lsGet, lsSet, KEY_HINT } from '../core/util.js';
 import { setup, mark, pushHist, allWords, ctx, save } from '../core/store.js';
 import { clozeAns, opts, normEn, checkEn, checkZhSmart, zhPrompt, clozePos } from '../core/grading.js';
-import { speak, readAll, gate, spkBtn, stopSpeech, releaseSpeech } from '../core/speech.js';
+import { speak, readAll, gate, spkBtn, stopSpeech, releaseSpeech, speechBusy, waitSpeech } from '../core/speech.js';
 import { sfx, bgmStart, bgmStop, bgmToggle, bgmOn } from '../core/audio.js';
 import { MON, SKILLS, MAXEN, PLAYER_HP, STORY, SOUL_STORY, SOUL_BOSSES, SOUL } from './data.js';
 import { createMonsterBattle, comboMult } from './monster.js';
@@ -27,7 +27,7 @@ export function startBattle(ws,soul){if(!ws.length)return;ctx.Q=null;stopSpeech(
   const t=T=ctx.B={soul:!!soul,mode:setup.mode,pool:ws,bank:allWords(),phase:"busy",readP:Promise.resolve(),raf:0,tmo:0,seq:0};
   // window.__soulTest：自動化測試用（例如 {ambushRng} 強制觸發突襲），一般使用不會有
   const typeLimit=(w,k=1)=>typeLimitMs(enVariants(w.en)[0]||w.en)-Math.round(TYPE_THINK_MS*(1-k));
-  t.E=(soul?createSoulBattle:createMonsterBattle)({pool:ws,mode:setup.mode,typeLimit,...(soul&&window.__soulTest?window.__soulTest:{})});if(soul&&window.__soulTest&&window.__soulTest.expose)window.__soulE=t.E;
+  t.E=(soul?createSoulBattle:createMonsterBattle)({pool:ws,mode:setup.mode,modes:setup.modes,typeLimit,...(soul&&window.__soulTest?window.__soulTest:{})});if(soul&&window.__soulTest&&window.__soulTest.expose)window.__soulE=t.E;
   document.body.classList.add("inbattle");document.body.classList.toggle("soulmode",!!soul);window.scrollTo(0,0);vvOn();guardOn();
   app.innerHTML=`<div class="bwrap ${soul?"soul":""}"><div class="row btop"><button class="sm ghost" id="run" style="padding-left:0">← 逃跑</button><button class="sm ghost" id="bgmb">${bgmOn()?"♪ 音樂開":"♪ 音樂關"}</button><span class="small" style="margin-left:auto" id="bstat"></span></div>
   <div class="arenawrap"><div class="arena" id="arena"></div>
@@ -177,7 +177,7 @@ async function runEvents(t,events){for(const e of events){if(!alive(t))return;
     await t.view.play(e.type,e);t.skippable=false;if(!alive(t))return;hud(s);if(t.soul){const sa=$("#satb");if(sa)sa.innerHTML=atbHtml(s)}}}
 
 /* ---------- 題目卡（兩種模式共用） ---------- */
-function qCard(t,w,m,o={}){let prompt="",body="";
+function qCard(t,w,m,o={}){let prompt="",body="";t.qm=m; // 綜合題型：記下這一題實際的題型（錯題紀錄用）
   if(m==="en2zh"||m==="en2zhT")prompt=`<div class="row" style="gap:8px;flex-wrap:nowrap"><div class="bprompt en">${esc(w.en)}</div>${o.plain?"":spkBtn(w.en)}<span class="small">${esc(w.pos)}</span></div>${o.plain?"":exLine(w,false)}`;
   else if(m==="zh2en"||m==="zh2enT")prompt=`<div class="bprompt zh">${esc(zhPrompt(w))}</div>${m==="zh2enT"?`<div class="small">提示：${esc(w.en.trim()[0]||"")}… 共 ${normEn(w.en).replace(/ /g,"").length} 個字母</div>`:""}${o.plain?"":exLine(w,true)}`;
   else{const a=clozeAns(w),i=clozePos(w.ex,a);prompt=`<div class="cloze" style="font-size:17px;line-height:1.45">${esc(w.ex.slice(0,i))}<span class="blank">　?　</span>${esc(w.ex.slice(i+a.length))}</div><div class="small">提示：${esc(zhPrompt(w))}</div>`}
@@ -226,7 +226,7 @@ function mQuestion(t){if(!alive(t)||t.phase!=="ready")return;const q=t.E.nextQue
   const tm=timer(t,q.limitMs,q.limitMs,[$("#tb")],q.timed?()=>{if(t.phase==="q"){t.phase="busy";say("時間到！","bad");fin(false,-1,"（超時）",null,{timeout:true})}}:null);
   hook(t,w,m,fin,()=>tm.stop());
   if(setup.auto&&(m==="en2zh"||m==="en2zhT"))speak(w.en,$("#bq .spk"))}
-async function mAnswer(t,w,ok,idx,given,sec,loose,opt){setAns(true);mark(w,ok,given,t.mode);if(t.opts)markOpts(t,idx);else markOpts(t,-9);answerLine(w,ok);t.readP=readAll(w,$("#bans .spk"));
+async function mAnswer(t,w,ok,idx,given,sec,loose,opt){setAns(true);mark(w,ok,given,t.qm||t.mode);if(t.opts)markOpts(t,idx);else markOpts(t,-9);answerLine(w,ok);t.readP=readAll(w,$("#bans .spk"));
   const evs=t.E.answer(ok,sec,opt||{});const g=evs.find(e=>e.type==="gain");
   if(ok&&g&&!t.E.state.chain&&t.E.state.phase==="skill")say(`答對了！${loose?"（"+loose+"）":""}${sec.toFixed(1)} 秒，+${g.raw} 能量`+(t.E.state.en===MAXEN?"（已滿）":"")+"。看一下單字，再選招式。","good");
   await run(t,evs);if(!alive(t))return;const ph=t.E.state.phase,c=t.E.state.chain;
@@ -250,19 +250,23 @@ function mSkills(t){if(!alive(t))return;t.phase="skill";const S=t.E.state,mult=c
     await run(t,t.E.useSkill(i));if(!alive(t))return;if(t.E.state.phase==="end")return finish(t);mReady(t)}}
 
 /* ---------- 魂系模式 ---------- */
+// 自動換到下一個畫面（斬擊題、Boss 回合…）之前，先等剛才的單字唸完（最多 3 秒），不再唸到一半被切掉；暫停中也等
+function calm(t,fn){if(!speechBusy())return fn(t);const seq=t.seq;
+  return waitSpeech(3000).then(async()=>{while(alive(t)&&t.paused)await wait(100);if(!alive(t)||t.seq!==seq)return;return fn(t)})}
 const atbHtml=s=>"ATB "+[0,1,2].map(i=>`<b class="${i<s.atb?"on":""}"></b>`).join("");
 const soulHud=()=>`<div class="shud"><span id="sphase"></span><div class="stime"><i id="stb"></i></div><span id="satb" class="satb"></span></div>`;
 // 魂系作答後只唸英文＋中文（例句改成答案列上可點的喇叭），而且不鎖按鈕：按「繼續」就中斷朗讀
 const readShort=(w,btn)=>{speak(w.en,btn,{label:"英文",done:()=>speak(w.zh,btn,{lang:"zh",chain:1,label:"中文"})})};
 const exSpk=w=>w.ex?`<span class="exsay">${spkBtn(w.ex,"朗讀例句")}<span class="small">例句</span></span>`:"";
 // 玩家回合：答對自動連斬
-function sQ(t){if(!alive(t)||!$("#bq"))return;++t.seq;t.view.setTimeScale(1);closeMenu();stopSpeech();const q=t.E.nextAttackQuestion();
+const sQ=t=>calm(t,sQ_);
+function sQ_(t){if(!alive(t)||!$("#bq"))return;++t.seq;t.view.setTimeScale(1);closeMenu();stopSpeech();const q=t.E.nextAttackQuestion();
   if(!q)return run(t,t.E.startEnemyTurn()).then(()=>alive(t)&&sEnemy(t));
   const w=q.w,m=q.mode;t.phase="q";t.qkind="atk";
   $("#bq").innerHTML=soulHud()+qCard(t,w,m);$("#satb").innerHTML=atbHtml(t.E.snapshot());
   const tm=timer(t,q.windowMs,q.leftMs,[$("#stb"),$("#tb")],async()=>{if(t.phase!=="q")return;t.phase="busy";markOpts(t,-9);answerLine(w,false,exSpk(w));const seq=t.seq;if(!await settle(t,seq,t.E.attackTimeout()))return;sGo(t)},
     left=>{const el=$("#sphase");if(el)el.textContent=`攻擊時間 ${(left/1000).toFixed(1)} 秒`});
-  hook(t,w,m,async(ok,idx,given,loose)=>{const ms=tm.stop();mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
+  hook(t,w,m,async(ok,idx,given,loose)=>{const ms=tm.stop();mark(w,ok,given,t.qm||t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerAttack(ok,ms),s=t.E.snapshot(),sk=evs.find(e=>e.type==="skill"),sc=q.scale||1;
     say(ok?`答對！${loose?"（"+loose+"）":""}${sk?(sk.perfect?"完美！":"")+sk.n+" 連斬":""}。剩餘攻擊時間 ${(s.atkLeft*sc/1000).toFixed(1)} 秒`:`答錯了，多扣 ${(SOUL.missPenaltyMs*sc/1000).toFixed(1)} 秒！剩餘攻擊時間 ${(s.atkLeft*sc/1000).toFixed(1)} 秒`,ok?"good":"bad");
     setAns(true);const seq=t.seq;
@@ -293,12 +297,13 @@ async function settle(t,seq,evs,o={}){if(evs.some(e=>CLEARS.has(e.type))){if(!aw
 // 依規則引擎目前的階段走到下一個畫面
 function sGo(t){if(!alive(t))return;const ph=t.E.state.phase;if(ph==="end")return finish(t);if(ph==="slash")return sSlash(t);if(ph==="perk")return sPerk(t);if(ph==="assault")return sAssault(t);if(ph==="pturn")return sQ(t);if(ph==="enemy")return sEnemy(t);if(ph==="cmd")return soulNext(t,t.seq)}
 // 斬擊題：連斬第 2 刀起，每一刀複習一個這一局答對過的字（選擇題、4 秒）。答對砍下去、接著下一刀；答錯或超時連斬中斷，停下來看答案
-function sSlash(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const q=t.E.nextSlash();if(!q)return sGo(t);
+const sSlash=t=>calm(t,sSlash_);
+function sSlash_(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const q=t.E.nextSlash();if(!q)return sGo(t);
   const w=q.w,m=q.mode;t.phase="q";t.qkind="slash";
   $("#bq").innerHTML=soulHud()+qCard(t,w,m,{cls:"chainq k-slash",plain:true});
   say(`斬擊 ${q.index+1}/${q.total}：${q.why==="miss"?"複習剛才答錯的字——":q.why==="slow"?"複習剛才想比較久的字——":""}答對才砍得下去！`,q.why==="miss"?"bad":"good");
   let done=false,tm=null;
-  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
+  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.qm||t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerSlash(ok,opt&&opt.timeout?q.limitMs+1:ms,opt||{});
     if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,700);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}
     const r=await settle(t,seq,evs,{flask:true});if(!r)return;if(t.E.state.phase!=="cmd")return sGo(t);
@@ -308,17 +313,19 @@ function sSlash(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();
     left=>{const el=$("#sphase");if(el)el.textContent=`斬擊 ${q.index+1}/${q.total}・${(left/1000).toFixed(1)} 秒`});
   hook(t,w,m,(ok,idx,given)=>fin(ok,idx,given))}
 // 練等：打倒 Boss 後 3 選 1（只在這一局有效），選完才進下一隻
-function sPerk(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const offer=t.E.perkOffer;if(!offer)return sGo(t);
+const sPerk=t=>calm(t,sPerk_);
+function sPerk_(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const offer=t.E.perkOffer;if(!offer)return sGo(t);
   t.phase="perk";const n=t.E.state.perks.length;
   $("#bq").innerHTML=`<div class="cmdrow perkrow" id="skov"><div class="cmdhead"><b>練等・選一個強化</b><span>只在這一局有效・已選 ${n} 個</span></div><div class="cmds perks">${offer.map((p,i)=>`<button data-p="${p.id}"><b><span class="k">${i+1}</span>${esc(p.name)}${p.lv?` Lv.${p.lv+1}`:""}</b><span class="c">${esc(p.d)}</span></button>`).join("")}</div></div>`;
   const box=$("#skov");box.onclick=async e=>{const b=e.target.closest("[data-p]");if(!b||t.phase!=="perk"||t.paused||t.seq!==seq)return;t.phase="busy";box.remove();await run(t,t.E.choosePerk(b.dataset.p));if(alive(t)&&t.seq===seq)sGo(t)}}
 // 突擊：連續答 N 題（選擇題，每題 2–5 秒），答對砍一刀，答錯或超時結束，接著換玩家回合
-function sAssault(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const q=t.E.nextAssault();if(!q)return sGo(t);
+const sAssault=t=>calm(t,sAssault_);
+function sAssault_(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const q=t.E.nextAssault();if(!q)return sGo(t);
   const w=q.w,m=q.mode;t.phase="q";t.qkind="assault";
   $("#bq").innerHTML=soulHud()+qCard(t,w,m,{cls:"chainq k-assault",plain:true});$("#satb").innerHTML=atbHtml(t.E.snapshot());
   say(`突擊 ${q.index+1}/${q.total}：答對就砍一刀！`,"good");
   let done=false,tm=null;
-  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
+  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.qm||t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     if(!await settle(t,seq,t.E.answerAssault(ok,opt&&opt.timeout?q.limitMs+1:ms,opt||{})))return;sGo(t)};
   tm=timer(t,q.limitMs,q.limitMs,[$("#stb"),$("#tb")],()=>{if(t.phase==="q"){t.phase="busy";say("來不及了！","bad");fin(false,-9,"（超時）",{timeout:true})}},
     left=>{const el=$("#sphase");if(el)el.textContent=`突擊 ${q.index+1}/${q.total}・${(left/1000).toFixed(1)} 秒`});
@@ -340,20 +347,22 @@ function sCmd(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();co
     if(ph!=="cmd")return sGo(t);
     if(alive(t)&&t.seq===seq&&t.phase==="busy")sCmd(t)}}
 // 喝藥：出一題（選擇題），攻擊時間照樣倒數；答對喝下、答錯灑掉。喝的時候 Boss 會壓近，也可能突襲。
-function sFlask(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();const q=t.E.flaskQuestion();if(!q)return sCmd(t);
+const sFlask=t=>calm(t,sFlask_);
+function sFlask_(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();const q=t.E.flaskQuestion();if(!q)return sCmd(t);
   const w=q.w,m=q.mode;t.phase="q";t.qkind="flask";
   $("#bq").innerHTML=soulHud()+qCard(t,w,m,{cls:"flaskq",plain:true});$("#satb").innerHTML=atbHtml(t.E.snapshot());
   let done=false;
   const after=async evs=>{if(!await settle(t,seq,evs))return;if(t.E.state.phase!=="cmd")return sGo(t);soulNext(t,seq)};
   const tm=timer(t,q.windowMs,q.leftMs,[$("#stb"),$("#tb")],async()=>{if(t.phase!=="q"||done)return;done=true;t.phase="busy";markOpts(t,-9);answerLine(w,false,exSpk(w));await after(t.E.answerFlask(false,q.leftMs,{timeout:true}))},
     left=>{const el=$("#sphase");if(el)el.textContent=`喝藥中…攻擊時間 ${(left/1000).toFixed(1)} 秒`});
-  hook(t,w,m,async(ok,idx,given)=>{if(done)return;done=true;const ms=tm.stop();mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));setAns(true);
+  hook(t,w,m,async(ok,idx,given)=>{if(done)return;done=true;const ms=tm.stop();mark(w,ok,given,t.qm||t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));setAns(true);
     await after(t.E.answerFlask(ok,ms))})}
 // 敵人回合：每次攻擊先蓄力，再出一題限時閃避題。
 //   連擊：每段一題、段與段之間不停（中招也一樣，下一段接著來）；整招打完才看情況停下來等「繼續」。
 //   延遲攻擊：題目先出現、選項鎖住 lockMs（Boss 舉著武器停住），解鎖後才開始倒數；鎖住時亂點每下作答時間 +flinchMs。
 //   突進：時限短、沒有彈反（沒有金色區）；必殺：全畫面泛紅，答錯擋不住。
-async function sEnemy(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);t.phase="busy";const d=t.E.nextDodge();
+const sEnemy=t=>calm(t,sEnemy_);
+async function sEnemy_(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);t.phase="busy";const d=t.E.nextDodge();
   if(!d){await run(t,t.E.startPlayerTurn());if(alive(t)&&t.seq===seq)sQ(t);return}
   const label=()=>`敵人攻擊 ${d.index+1}/${d.total}`+(d.segs>1?`・連擊 ${d.seg+1}/${d.segs}`:"");
   $("#bq").innerHTML=soulHud();$("#sphase").textContent=label();$("#satb").innerHTML=atbHtml(t.E.snapshot());
@@ -368,7 +377,7 @@ async function sEnemy(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeM
   else if(d.seg>0)say(`連擊第 ${d.seg+1} 段！時限更短，金色區內答對＝彈開。`,"bad");
   else say("剩 60% 以上時間答對（金色區）＝完美彈反；拖到紅色區才答對會被擦傷。","bad");
   let done=false,early=0,tm=null;
-  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";t.onEarly=null;setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
+  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";t.onEarly=null;setAns(true);mark(w,ok,given,t.qm||t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerDodge(ok,opt&&opt.timeout?d.limitMs+1:ms,{...(opt||{}),early});
     if(!await settle(t,seq,evs))return;
     if(t.E.state.phase==="end"){await wait(300);return alive(t)&&finish(t)}

@@ -2,7 +2,7 @@
 //   玩家回合：限時內答題累積 ATB 出招；敵人回合：每次攻擊出一題閃避題，答題速度決定彈反／閃避／擦傷／中招。
 //   並依最近的答題速度動態調整難度。不碰 DOM、不計時：作答毫秒數由外部傳入。
 import { SOUL, SOUL_BOSSES, SOUL_CMDS, SOUL_BIG, SOUL_PERKS, PLAYER_HP, HEAL_ON_KILL } from './data.js';
-import { shuffle, mcOf } from '../core/grading.js';
+import { shuffle, mcOf, pickMode } from '../core/grading.js';
 import { comboMult } from './monster.js';
 
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -22,8 +22,8 @@ export function gradeDodge(ok,ms,limitMs,perfectMs){if(!ok||ms>limitMs)return"hi
 
 // ambushRng：突襲判定用的亂數（預設同 rng；測試可單獨控制）
 // typeLimit(w)：中翻英・填空時這一題的作答時限（毫秒，依打字速度換算；見 core/typing.js）。有給就把攻擊時間換算成這一題的尺度
-export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEvent,typeLimit=null}){const arng=ambushRng||rng;
-  const B={kind:"soul",mode,pool,queue:shuffle(pool),hp:PLAYER_HP,stamina:SOUL.staminaMax,atb:0,mi:0,mhp:SOUL_BOSSES[0].hp,bphase:0,
+export function createSoulBattle({pool,mode,modes=null,rng=Math.random,ambushRng=null,onEvent,typeLimit=null}){const arng=ambushRng||rng;
+  const B={kind:"soul",mode,modes,pool,queue:shuffle(pool),hp:PLAYER_HP,stamina:SOUL.staminaMax,atb:0,mi:0,mhp:SOUL_BOSSES[0].hp,bphase:0,
     combo:0,best:0,fast:99,right:0,n:0,wrong:[],kills:0,parries:0,atkLeft:0,recent:[],phase:"intro",w:null,over:null,enemy:null,
     flasks:SOUL.flaskStart,drinks:0,punish:false,ambushed:false,ambushN:0,ambushes:0,knocks:0,
     // 練等（只在這一局）：pk＝各強化的層數、perks＝依序選過的強化、offer＝目前可選的 3 個
@@ -144,14 +144,14 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
     /* ---- 玩家回合 ---- */
     // 攻擊時間用完回傳 null（接著呼叫 startEnemyTurn）
     // 中翻英・填空：這一題的時限＝打字換算的時間（scale＝時限／攻擊窗口）。攻擊時間、完美判定都照比例換算，所以難度和選擇題一樣
-    nextAttackQuestion(){if(B.atkLeft<=0)return null;const w=nextWord();B.w=w;B.phase="q";B.qScale=B.mode==="zh2enT"&&typeLimit?Math.max(.2,typeLimit(w)/B.win):1;
-      return{w,mode:B.mode,leftMs:Math.round(B.atkLeft*B.qScale),windowMs:Math.round(B.win*B.qScale),scale:B.qScale}},
+    nextAttackQuestion(){if(B.atkLeft<=0)return null;const w=nextWord();B.w=w;B.phase="q";const qm=pickMode(B.mode,B.modes,w,rng);B.qScale=qm==="zh2enT"&&typeLimit?Math.max(.2,typeLimit(w)/B.win):1;
+      return{w,mode:qm,leftMs:Math.round(B.atkLeft*B.qScale),windowMs:Math.round(B.win*B.qScale),scale:B.qScale}},
     /* ---- 練等 ---- */
     get perkOffer(){return B.phase==="perk"&&B.offer?B.offer.map(perkInfo):null},
     choosePerk(id){const out=[],ev=mk(out);if(B.phase!=="perk"||!B.offer||!B.offer.includes(id))return out;applyPerk(id);B.offer=null;ev("perk",{perk:perkInfo(id)});nextBoss(ev);return out},
     /* ---- 突擊 ---- */
     nextAssault(){if(B.phase!=="assault"||!B.as)return null;const w=nextWord();B.w=w;B.phase="assaultQ";const limitMs=rr(SOUL.assaultRange)+500*pk("dodgeT");B.as.limitMs=limitMs;
-      return{w,mode:mcOf(B.mode),limitMs,index:B.as.i,total:B.as.total}},
+      return{w,mode:mcOf(pickMode(B.mode,B.modes,w,rng)),limitMs,index:B.as.i,total:B.as.total}},
     // 答對一題砍一刀（最後一題是重擊）；答錯或超時突擊結束。結束後換玩家回合
     answerAssault(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="assaultQ")return out;const w=B.w,A=B.as;B.n++;if(opt.timeout)ms=Math.max(ms,A.limitMs+1);record(ok,ms);A.i++;
       const good=ok&&ms<=A.limitMs;
@@ -182,7 +182,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
       B.phase="cmd";return out},
     /* ---- 斬擊複習題 ---- */
     nextSlash(){if(B.phase!=="slash"||!B.chain)return null;const C=B.chain,[w,why]=reviewWord(C);C.used.add(w.id);B.w=w;B.phase="slashQ";C.limitMs=SOUL.slashLimitMs+500*pk("dodgeT");
-      return{w,mode:mcOf(B.mode),limitMs:C.limitMs,index:C.i,total:C.n,review:why!=="new",why}},
+      return{w,mode:mcOf(pickMode(B.mode,B.modes,w,rng)),limitMs:C.limitMs,index:C.i,total:C.n,review:why!=="new",why}},
     // 答對砍下這一刀；答錯或超時連斬中斷（不會被打倒，但這個字稍後再考）。複習題不扣攻擊時間
     answerSlash(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="slashQ"||!B.chain)return out;const C=B.chain,w=B.w;B.n++;if(opt.timeout)ms=Math.max(ms,C.limitMs+1);record(ok,ms);
       if(ok&&ms<=C.limitMs){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);learn(w,ms);if(slashHit(ev,C,C.i)){faint(ev);return out}C.i++;
@@ -200,7 +200,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
 
     /* ---- 藥壺 ---- */
     // 喝藥題：選擇題，攻擊時間照樣倒數（喝藥本身至少要花 flaskCostMs）
-    flaskQuestion(){if(B.phase!=="flask")return null;return{w:B.w,mode:mcOf(B.mode),leftMs:B.atkLeft,windowMs:SOUL.windowMs,flasks:B.flasks}},
+    flaskQuestion(){if(B.phase!=="flask")return null;return{w:B.w,mode:mcOf(pickMode(B.mode,B.modes,B.w,rng)),leftMs:B.atkLeft,windowMs:SOUL.windowMs,flasks:B.flasks}},
     // ok：答對才喝下（回復 flaskHeal×最大 HP）；答錯藥灑掉。次數都會扣。喝完攻擊時間剩不到 flaskPunishMs，下個敵人回合 Boss 先突進
     answerFlask(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="flask")return out;const w=B.w;
       // 喝藥時最容易被突襲：藥沒喝到、但壺不扣（題目作廢），花掉的時間照扣
@@ -227,7 +227,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
       const info={kind,seg,segs:m.segs,moveIndex:E.mi,moves:E.plan.length,chain:seg<m.segs-1,lockMs,noParry,danger:kind==="danger",ambush:!!E.ambush};
       B.w=w;E.cur={limitMs,perfectMs,move:m.name,foeMul:d.foeMul,...info};B.phase="dodge";
       ev("telegraph",{boss:b,move:m.name,index:E.i,total:E.total,limitMs,perfectMs,...info});
-      return{w,mode:mcOf(B.mode),limitMs,perfectMs,index:E.i,total:E.total,move:m.name,...info,events:out}},
+      return{w,mode:mcOf(pickMode(B.mode,B.modes,w,rng)),limitMs,perfectMs,index:E.i,total:E.total,move:m.name,...info,events:out}},
     // opt：{timeout, early（延遲攻擊鎖住期間亂點的次數）}
     answerDodge(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="dodge")return out;const w=B.w,E=B.enemy,cur=E.cur,b=boss(),p=ph();
       E.i++;if(++E.si>=E.plan[E.mi].segs){E.mi++;E.si=0}B.n++;

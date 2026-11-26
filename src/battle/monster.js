@@ -3,14 +3,14 @@
 // 事件切得很細，方便動畫逐段對接：招式起手（skill）、每一段傷害（hit）、連招每一階段（chainStage）、
 // 怪物出手（foeAttack）與玩家受擊（playerHit）、登場／倒下／回復／勝敗都各自獨立。
 import { MON, SKILLS, MAXEN, PLAYER_HP, HEAL_ON_KILL, QUESTION_MS } from './data.js';
-import { shuffle } from '../core/grading.js';
+import { shuffle, pickMode } from '../core/grading.js';
 
 export const comboMult=combo=>1+Math.min(.5,.1*Math.max(0,combo-1));
 export const energyGain=sec=>Math.max(1,Math.min(10,Math.round(10-sec)));
 
 // typeLimit(w,k)：中翻英・填空的時限（思考時間乘 k）；連招蓄力題改用它
-export function createMonsterBattle({pool,mode,rng=Math.random,onEvent,typeLimit=null}){
-  const B={kind:"monster",mode,pool,queue:shuffle(pool),hp:PLAYER_HP,en:0,mi:0,mhp:MON[0].hp,combo:0,best:0,fast:99,right:0,n:0,wrong:[],kills:0,heals:0,chain:null,phase:"intro",w:null,over:null};
+export function createMonsterBattle({pool,mode,modes=null,rng=Math.random,onEvent,typeLimit=null}){
+  const B={kind:"monster",mode,modes,pool,queue:shuffle(pool),hp:PLAYER_HP,en:0,mi:0,mhp:MON[0].hp,combo:0,best:0,fast:99,right:0,n:0,wrong:[],kills:0,heals:0,chain:null,phase:"intro",w:null,over:null};
   const snap=()=>({hp:B.hp,hpMax:PLAYER_HP,en:B.en,enMax:MAXEN,mi:B.mi,mhp:B.mhp,mhpMax:MON[B.mi].hp,combo:B.combo,right:B.right,n:B.n,kills:B.kills,heals:B.heals,
     chain:B.chain?{id:B.chain.s.id,name:B.chain.s.name,stage:B.chain.stage,total:B.chain.s.chain.length}:null});
   const mk=(out)=>(type,p)=>{const e={type,...p,s:snap()};out.push(e);onEvent&&onEvent(e);return e};
@@ -36,7 +36,7 @@ export function createMonsterBattle({pool,mode,rng=Math.random,onEvent,typeLimit
     // 出下一題。連招蓄力中每題有較短的限時，超時算答錯；一般題只計能量不會超時。
     nextQuestion(){if(B.queue.length<2)B.queue.push(...shuffle(B.pool));const w=B.queue.shift();B.w=w;B.phase="q";
       // 連招蓄力題：中翻英・填空時＝打字時間＋思考時間（思考時間隨蓄力階段縮短：原本 5 秒的階段給滿 2 秒）
-      const c=B.chain,tl=c&&B.mode==="zh2enT"&&typeLimit?typeLimit(w,c.s.times[c.stage]/5):0;return{w,mode:B.mode,limitMs:c?(tl||c.s.times[c.stage]*1000):QUESTION_MS,timed:!!c,chain:c?{name:c.s.name,stage:c.stage,total:c.s.chain.length}:null}},
+      const qm=pickMode(B.mode,B.modes,w,rng),c=B.chain,tl=c&&qm==="zh2enT"&&typeLimit?typeLimit(w,c.s.times[c.stage]/5):0;return{w,mode:qm,limitMs:c?(tl||c.s.times[c.stage]*1000):QUESTION_MS,timed:!!c,chain:c?{name:c.s.name,stage:c.stage,total:c.s.chain.length}:null}},
     answer(ok,sec,opt={}){const out=[],ev=mk(out);if(B.phase!=="q")return out;const w=B.w;B.n++;
       if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,sec);
         const gain=energyGain(sec),before=B.en;B.en=Math.min(MAXEN,B.en+gain);ev("gain",{amount:B.en-before,raw:gain,sec,en:B.en});

@@ -198,7 +198,9 @@ export function createSoulScene(eng,fx,api){
   const heroPolar=()=>{const p=hero.root.position,b=H0;hs.th=Math.atan2(p.x-b.x,p.z-b.z);hs.r=Math.min(RMAX,Math.hypot(p.x-b.x,p.z-b.z))};
   const dust=(p,n=8,c=[0x6b7078,0x8a8f98])=>fx.emitN({p:v3(p.x,.1,p.z),n,color:c,speed:[.4,1.4],flat:.25,up:.4,size:[.3,.6],life:[.4,.9],alpha:.4,drag:2,grow:.8});
   const bfx=createBossFx({eng,fx,scene,dust});let stopCharge=()=>{},stopAura=()=>{};
-  const sparks=(p,n,color=[0xffd9a0,0xffffff,0xff9a3a],sp=7,dir)=>fx.emit({p,n,color,speed:[sp*.25,sp],dir,spread:dir?.7:1,size:[.04,.1],life:[.25,.7],gravity:9,drag:1.2});
+  // 火花：光點＋拉長的火花條（數量約一半、速度快一倍），重擊時條數多、拖尾長，光暈才看得清楚
+  const sparks=(p,n,color=[0xffd9a0,0xffffff,0xff9a3a],sp=7,dir)=>{fx.emit({p,n,color,speed:[sp*.25,sp],dir,spread:dir?.7:1,size:[.05,.12],life:[.25,.7],gravity:9,drag:1.2,kind:1});
+    fx.streaks({p,n:Math.round(n*.6),color,speed:[sp*.6,sp*1.8],dir,spread:dir?.8:1,life:[.15,.5],hdr:n>40?4.5:3.2,width:n>40?.03:.024})};
 
   /* ---------- 鎖定視角 ----------
      鏡頭在主角右後方、壓低仰望 Boss。俯仰角與視角每幀自動算：畫面下緣剛好留住主角的腳、上緣留住 Boss 頭頂，

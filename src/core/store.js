@@ -36,7 +36,7 @@ export const saveSetup=()=>{if(!lsSet("vc-setup",JSON.stringify(setup)))once("ls
 // over：只套用這一次的設定（例如錯題頁的「練習待複習」），不會改到 setup
 export function pool(over){const c=over?{...setup,...over}:setup,D=allDicts(),ids=c.dict==="__all"?Object.keys(D):[c.dict];let ws=[];ids.forEach(id=>D[id]&&D[id].words.forEach(w=>ws.push({...w,dict:id})));
   if(c.scope==="w")ws=ws.filter(w=>!isPhrase(w));if(c.scope==="p")ws=ws.filter(isPhrase);
-  if(c.wrong)ws=ws.filter(w=>S.miss[w.dict]&&S.miss[w.dict][w.id]);if(c.mode==="cloze")ws=ws.filter(w=>w.ex&&clozeAns(w));return ws}
+  if(c.wrong)ws=ws.filter(w=>S.miss[w.dict]&&S.miss[w.dict][w.id]);if(c.mode==="cloze")ws=ws.filter(w=>w.ex&&clozeAns(w));if(c.mode==="mix"&&c.modes&&c.modes.every(m=>m==="cloze"))ws=ws.filter(w=>w.ex&&clozeAns(w));return ws}
 // 刪除字典或條目時，一併清掉錯題紀錄與待複習計數（wid 不給＝整本字典）
 export function forget(d,wid){if(wid===undefined){delete S.miss[d];delete S.wlog[d]}else{if(S.miss[d])delete S.miss[d][wid];if(S.wlog[d])delete S.wlog[d][wid]}}
 

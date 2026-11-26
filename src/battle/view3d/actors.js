@@ -172,6 +172,16 @@ const LOOPS={Idle:"idle",IdleAggro:"idle",Walk:"walk",Run:"run",Stalk:"stalk",St
 const FALLBACK={IdleAggro:["Idle"],Stalk:["Walk"],StrafeL:["Walk"],StrafeR:["Walk"],Delayed:["Attack2","Attack"],Dash:["Attack"],Combo3:[],Roar:[]};
 // 這些片段播放時開武器拖尾
 const SWING=/^(Slash|HeavySlash|Combo|Combo3|Attack|Attack2|Delayed|Dash)$/;
+/* 揮擊的時間扭曲：起手慢 → 揮到命中那一格最快 → 收招慢下來。
+   命中秒數與片長都不變（每一段頭尾都對齊原本的時間），所以閃避判定、傷害數字的時間點不受影響；只改變段內的快慢分布。
+   PEAK＝命中瞬間相對原速的倍率；段落：起手（緩進）、命中之間（快→慢→快）、收招（快→緩停） */
+const PEAK=1.85,LOW=.25;
+const wIn=v=>{const q=(PEAK-LOW)/(1-LOW);return LOW*v+(1-LOW)*Math.pow(v,q)};
+const wOut=v=>1-wIn(1-v);
+const wMid=v=>v+(PEAK-1)*v*(1-v)*(1-2*v);
+function warpTime(knots,el){const n=knots.length-1;if(el<=0)return 0;if(el>=knots[n])return knots[n];
+  let i=0;while(i<n-1&&el>knots[i+1])i++;const a=knots[i],b=knots[i+1],v=(el-a)/Math.max(1e-6,b-a);
+  return a+(b-a)*(i===0?wIn(v):i===n-1?wOut(v):wMid(v))}
 // 交叉淡入淡出。three.js 的 crossFadeFrom 會讓「被淡出的片段」從權重 1 開始淡出——如果它自己還在淡入中（例如剛切到待機又馬上出招），
 // 那一格權重會突然跳到 1，畫面就跳一下。這裡改成從它「目前的權重」開始淡出。
 function xfade(from,to,d){if(!from||from===to){to.stopFading();to.setEffectiveWeight(1);return}
@@ -255,7 +265,11 @@ export class Actor{
     const act=this.actions[name]&&this._act(name);
     if(act){this.resetPose(true);act.reset();act.setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce,Infinity);act.clampWhenFinished=true;act.timeScale=speed;act.setEffectiveWeight(1);
       if(this.curAct&&this.curAct!==act){xfade(this.curAct,act,fd)}act.play();this.curAct=act;this.bobMode="none";
-      if(SWING.test(name)){if(this.trail)this.trail.on(act.getClip().duration/speed*.8);if(this.onSwing)this.onSwing(name,speed)}
+      this._warp=null;
+      if(SWING.test(name)){if(this.trail)this.trail.on(act.getClip().duration/speed*.8);if(this.onSwing)this.onSwing(name,speed);
+        // 有命中時間的揮擊才扭曲（延遲攻擊 Delayed 走 playSeg，不經過這裡）
+        const D=act.getClip().duration,hits=(this.hitTimes(name)||[this.impactTime(name,1)]).filter(h=>h>.03&&h<D-.03);
+        if(!loop&&hits.length&&!this.eng.rm){this._warp={act,D,el:0,speed,k:1,knots:[0,...hits,D]};act.timeScale=0;act.time=0}}
       if(loop)return Promise.resolve();
       return this.eng.wait(act.getClip().duration/speed).then(()=>{if(tok===this.seq&&!hold&&!PROC[want]?.hold&&!PROC[name]?.hold)this.idle()})}
     // 沒有這個動作片段 → 程式補間（真模型則讓待機片段繼續在底下播）
@@ -273,10 +287,10 @@ export class Actor{
   playSeg(name,t0,t1,speed=1){const a0=this.actions[name];if(!a0||this.eng.dead||this.gone)return null;const tok=++this.seq;let a=a0;
     if(this.curAct!==a||t0!=null){if(this.curAct!==a||t0===0){a=this._act(name);this.resetPose(true);a.reset();a.setLoop(THREE.LoopOnce,Infinity);a.clampWhenFinished=true;a.setEffectiveWeight(1);if(this.curAct&&this.curAct!==a)xfade(this.curAct,a,FADE_IN);a.play();this.curAct=a;this.bobMode="none"}
       if(t0!=null)a.time=t0}
-    a.paused=false;a.timeScale=speed;const from=a.time;if(this.trail)this.trail.on(Math.max(.1,(t1-from)/speed+.12));
+    this._warp=null;a.paused=false;a.timeScale=speed;const from=a.time;if(this.trail)this.trail.on(Math.max(.1,(t1-from)/speed+.12));
     return this.eng.wait(Math.max(0,(t1-from)/speed)).then(()=>{if(tok===this.seq&&this.curAct===a)a.timeScale=.04;return tok===this.seq})}
   // 把目前片段放慢到幾乎停住（延遲攻擊的「舉著武器停住」）
-  freeze(k=.03){if(this.curAct)this.curAct.timeScale=k}
+  freeze(k=.03){if(this._warp&&this._warp.act===this.curAct){this._warp.k=k;return}if(this.curAct)this.curAct.timeScale=k}
   // 受擊位移與後仰（彈簧：先被推開，再回到原位，帶一點過衝）。dist：公尺（往自己背後）、lean：弧度（後仰）
   // 不是瞬間給速度（會在一格內跳一大段），而是把「目標偏移」推出去再讓它衰減，彈簧追著目標走：約 60ms 內推到、再帶點過衝回原位
   knock(dist=.2,lean=.15){if(this.eng.rm){dist*=.4;lean*=.4}const k=this.kn;k.tz=(k.tz||0)+dist;k.tr=(k.tr||0)+lean}
@@ -290,7 +304,10 @@ export class Actor{
   setOutline(on){this.content.traverse(o=>{if(o.userData.isOutline)o.visible=on&&this.opacity>.9})}
   setOpacity(v){this.opacity=v;for(const x of this.mats){x.m.transparent=v<1?true:x.t0;x.m.opacity=x.o0*v}const ol=this.eng.quality!=="low";this.content.traverse(o=>{if(o.userData.isOutline)o.visible=ol&&v>.9});this.shadow.material.opacity=(this.cute?.55:.75)*v}
 
-  _update(dt,time){if(this.mixer)this.mixer.update(dt);
+  _update(dt,time){const w=this._warp;
+    if(w){if(this.curAct!==w.act){this._warp=null;if(w.act.timeScale===0)w.act.timeScale=w.speed}
+      else{w.el+=dt*w.speed*w.k;w.act.time=warpTime(w.knots,w.el);if(w.el>=w.D){w.act.time=w.D;this._warp=null}}}
+    if(this.mixer)this.mixer.update(dt);
     // 待機／走路／飛行的程式擺動
     this.bobT+=dt;const t=this.bobT,b=this.bob,h=this.h,fly=this.isStandin?(this.o.fly||0):0,P=this.parts;
     let y=fly,sy=1,rz=0,rx=0,sw=0;

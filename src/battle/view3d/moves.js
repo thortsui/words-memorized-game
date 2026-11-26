@@ -27,8 +27,13 @@ export function createMoves(ctx){
     4:[["c0","c1","c2","h"],["s","sf","thrust","leap"],["spin","c1","sf","h"]],
     5:[["c0","c1","c2","s","leap"],["s","sf","thrust","c2","h"],["spin","c0","c1","sf","leap"]]};
   // 劍砍到金屬：白金火花＋小閃光；重擊（最後一段）火花加倍、多一圈衝擊環
-  const metal=(c,big)=>{fx.emit({p:c,n:big?60:32,color:[0xfff4d0,0xffffff,0xffb050,0xff8a2a],speed:[2.5,big?12:9],size:[.05,.13],life:[.2,.55],gravity:9,drag:1.1});
-    fx.flash(c,{color:0xfff0d0,size:big?1.6:.9,dur:big?.2:.12,opacity:.9});if(big)fx.burstRing(c,{color:0xffe0a0,r1:1.4,dur:.3})};
+  // 火花分三層：拉長的火花條（主體，HDR 亮度吃光暈）＋細碎光點＋白熱閃光；方向偏向鏡頭側與上方，才看得到噴出去
+  const metal=(c,big)=>{const cam=eng.camera.position,toCam=v3(cam.x-c.x,0,cam.z-c.z).normalize(),dir=v3(toCam.x*.55,.65,toCam.z*.55);
+    fx.streaks({p:c,n:big?70:40,dir,spread:1.1,speed:[5,big?17:13],life:[.18,big?.6:.45],hdr:big?4.5:3.4,width:big?.03:.024,len:.05});
+    fx.streaks({p:c,n:big?26:14,color:[0xffffff,0xfff6dc],speed:[8,big?20:15],life:[.08,.18],hdr:6,width:.018,len:.035,gravity:4});
+    fx.emit({p:c,n:big?50:26,color:[0xfff4d0,0xffffff,0xffb050,0xff8a2a],speed:[2.5,big?12:9],size:[.06,.16],life:[.2,.6],gravity:9,drag:1.1,kind:1});
+    fx.flash(c,{color:0xffffff,size:big?.9:.55,dur:.07,opacity:1});
+    fx.flash(c,{color:0xffd9a0,size:big?2.2:1.3,dur:big?.24:.16,opacity:.95});fx.burstRing(c,{color:0xffe0a0,r1:big?1.6:.9,dur:big?.3:.2})};
   async function chainStep(code,i,p){const P=hero.pose;
     if(code[0]==="c"){const k=+code[1],ht=hero.comboTimes("Combo",3),t0=k?ht[k-1]+.03:0,sp=1.2;
       if(hero.has&&hero.has("Combo")&&hero.playSeg("Combo",t0,ht[k],sp)){await eng.wait(Math.max(.1,(ht[k]-t0)/sp));return}
