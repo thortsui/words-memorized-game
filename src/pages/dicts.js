@@ -16,7 +16,7 @@ export function renderDicts(){const D=allDicts(),ids=Object.keys(D);
   app.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{setup.dict=b.dataset.go;saveSetup();location.hash="practice"});
   app.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>location.hash="dict-"+b.dataset.open);
   $("#blank").onclick=()=>{const id=rid();S.dicts[id]={id,name:"新字典 "+new Date().toLocaleDateString("zh-TW"),words:[]};if(!save()){delete S.dicts[id];return}location.hash="dict-"+id};
-  $("#exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([exportJson()],{type:"application/json"}));a.download="單字剪卡備份-"+localDate()+".json";document.body.appendChild(a);a.click();a.remove()};
+  $("#exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([exportJson()],{type:"application/json"}));a.download="單字魂備份-"+localDate()+".json";document.body.appendChild(a);a.click();a.remove()};
   $("#imp").onchange=async e=>{const inp=e.target,f=inp.files[0];if(!f)return;
     let j;try{j=JSON.parse(await f.text())}catch(x){inp.value="";toast("這不是有效的備份檔（不是 JSON 格式），沒有匯入任何資料",5000);return}
     inp.value=""; // 清空，取消後再選同一個檔案才會再觸發 change
