@@ -66,6 +66,8 @@ export function one(pl, opt = {}) {
     else if (ph === 'enemy') { const amb = B.enemy && B.enemy.ambush; if (!amb) { inTurn = false; st.eturns++; st.eturnsPerBoss[B.mi]++; st.sec += TM.eturn; st.dSum += E.difficulty().d; st.dN++ }
       let d; while (!B.over && B.phase === 'enemy' && (d = E.nextDodge())) dodgeOne(d);
       if (!B.over && B.phase === 'enemy') { count(E.startPlayerTurn()) } }
+    else if (ph === 'slash') { const q = E.nextSlash(); const t = pl.think() * .85; const ok = Math.random() < Math.min(1, pl.acc + .1); st.q++;
+      if (t > q.limitMs) { st.sec += q.limitMs / 1000; count(E.answerSlash(false, q.limitMs, { timeout: true })) } else { st.sec += t / 1000 + .45; count(E.answerSlash(ok, t)) } after() }
     else if (ph === 'perk') { const o = B.offer; const pick = pl.perk ? pl.perk(o) : o[Math.floor(Math.random() * o.length)]; count(E.choosePerk(pick)); st.sec += 3 }
     else if (ph === 'assault') { const q = E.nextAssault(); const t = pl.think(); const ok = Math.random() < pl.acc; st.q++;
       if (t > q.limitMs) { st.sec += q.limitMs / 1000; count(E.answerAssault(false, q.limitMs, { timeout: true })) } else { st.sec += t / 1000 + 1.5; count(E.answerAssault(ok, t)) } after() }

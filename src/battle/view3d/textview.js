@@ -30,6 +30,7 @@ export function mountText(container,api){
     quickSlash:p=>start(p,"迅擊"),
     weakBreak:p=>start(p,"弱點擊破"),
     assault:async p=>{line(`！！ 突擊：連答 ${p.total} 題`,"big good");await W(300)},assaultEnd:async()=>{line("突擊結束。");await W(150)},
+    slashEnd:async p=>{if(p.broken)line(`斬擊中斷（${p.landed}/${p.total}）`,"bad")},
     perk:async p=>{line(`強化：${p.perk.name}`,"good");await W(200)},
     counter:p=>start(p,"反擊"),
     foeAttack:async p=>{line(`${p.monster.name} 使出 ${p.move}`,"bad");await W(380)},

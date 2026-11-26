@@ -456,6 +456,8 @@ export function createSoulScene(eng,fx,api){
       fx.banner("突擊","soul",1);fx.pulseVig("white",.45,.3);sfx("parry",{v:.9});eng.hitStop(110);
       if(b){bossRecover(.1);b.glow(0xffd75a,1.4);eng.to(b,{glowK:phaseTint?.7:0},1);if(b.has("Stagger"))b.play("Stagger",{speed:1.1,hold:true})}
       csReset(.4);hero.play("Idle");await eng.wait(.45)},
+    // 連斬結束：中斷的話主角收刀退回（砍完的話最後一刀已經收招）
+    async slashEnd(p){if(p.broken&&!p.interrupted){await moves.finish();heroBusy=false}},
     async assaultEnd(){const b=boss;if(b)b.play(idleName());await eng.wait(.15)},
     // 練等：主角腳下金環、頭上冒出強化名稱
     async perkOffer(){if(hero.has("Victory"))hero.play("Victory",{hold:true});await eng.wait(.2)},

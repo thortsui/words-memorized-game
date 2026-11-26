@@ -110,7 +110,8 @@ const MSG={
   quickSlash:()=>["答得夠快，追加迅擊！","good"],
   foeAttack:e=>[`${e.timeout?"時間到！":"答錯了！"}${e.monster.name} 使出了 ${e.move}！`,"bad"],
   playerTurn:e=>[`你的回合！這回合 ${(e.windowMs/1000).toFixed(1)} 秒。答對自動連斬：剩 60% 以上時間答完＝完美 5 連斬，連續 3 題完美＝弱點擊破（看答案時時間暫停）`,"good"],
-  weakBreak:()=>["弱點擊破！連續快答看穿破綻，追加連斬！","good"],
+  weakBreak:()=>["弱點擊破！連續完美看穿破綻，追加連斬！","good"],
+  slashEnd:e=>e.interrupted?null:e.broken?[`斬擊中斷！砍中 ${e.landed}/${e.total} 刀——記住正確答案`,"bad"]:[`${e.total} 連斬完成！`,"good"],
   assault:e=>[`看穿攻勢！${e.cut?`打斷 Boss 剩下的 ${e.cut} 擊，`:""}突擊——連續答對 ${e.total} 題，每題砍一刀！`,"good"],
   assaultEnd:e=>[e.hits>=e.total?"突擊完成！":`突擊中斷（命中 ${e.hits}/${e.total}）`,e.hits>=e.total?"good":"bad"],
   perkOffer:()=>["練等！選一個強化（只在這一局有效）","good"],
@@ -260,6 +261,8 @@ function sQ(t){if(!alive(t)||!$("#bq"))return;++t.seq;t.view.setTimeScale(1);clo
     const evs=t.E.answerAttack(ok,ms),s=t.E.snapshot(),sk=evs.find(e=>e.type==="skill");
     say(ok?`答對！${loose?"（"+loose+"）":""}${sk?(sk.perfect?"完美！":"")+sk.n+" 連斬":""}。剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`:`答錯了，多扣 ${SOUL.missPenaltyMs/1000} 秒！剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`,ok?"good":"bad");
     setAns(true);const seq=t.seq;
+    // 連斬第 2 刀起要答斬擊題：先砍第一刀，接著出題
+    if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,700);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}
     const r=await settle(t,seq,evs,{flask:true});if(!r)return;if(t.E.state.phase!=="cmd")return sGo(t); // 被突襲、打倒 Boss（練等）、陣亡
     if(r==="flask"){await run(t,t.E.command(4));if(!alive(t))return;return sFlask(t)}
     soulNext(t,seq)},()=>tm.stop());
@@ -283,7 +286,22 @@ async function settle(t,seq,evs,o={}){if(evs.some(e=>CLEARS.has(e.type))){if(!aw
   const f=o.flask&&t.E.state.phase==="cmd"?t.E.commands().find(c=>c.flask&&c.ready):null;
   const r=await waitNext(t,seq,"下一題 ▶",f);return alive(t)&&t.seq===seq?r:false}
 // 依規則引擎目前的階段走到下一個畫面
-function sGo(t){if(!alive(t))return;const ph=t.E.state.phase;if(ph==="end")return finish(t);if(ph==="perk")return sPerk(t);if(ph==="assault")return sAssault(t);if(ph==="pturn")return sQ(t);if(ph==="enemy")return sEnemy(t);if(ph==="cmd")return soulNext(t,t.seq)}
+function sGo(t){if(!alive(t))return;const ph=t.E.state.phase;if(ph==="end")return finish(t);if(ph==="slash")return sSlash(t);if(ph==="perk")return sPerk(t);if(ph==="assault")return sAssault(t);if(ph==="pturn")return sQ(t);if(ph==="enemy")return sEnemy(t);if(ph==="cmd")return soulNext(t,t.seq)}
+// 斬擊題：連斬第 2 刀起，每一刀複習一個這一局答對過的字（選擇題、4 秒）。答對砍下去、接著下一刀；答錯或超時連斬中斷，停下來看答案
+function sSlash(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const q=t.E.nextSlash();if(!q)return sGo(t);
+  const w=q.w,m=q.mode;t.phase="q";t.qkind="slash";
+  $("#bq").innerHTML=soulHud()+qCard(t,w,m,{cls:"chainq k-slash",plain:true});
+  say(`斬擊 ${q.index+1}/${q.total}：${q.review?"複習答對過的字——":""}答對才砍得下去！`,"good");
+  let done=false,tm=null;
+  const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
+    const evs=t.E.answerSlash(ok,opt&&opt.timeout?q.limitMs+1:ms,opt||{});
+    if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,700);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}
+    const r=await settle(t,seq,evs,{flask:true});if(!r)return;if(t.E.state.phase!=="cmd")return sGo(t);
+    if(r==="flask"){await run(t,t.E.command(4));if(!alive(t))return;return sFlask(t)}
+    soulNext(t,seq)};
+  tm=timer(t,q.limitMs,q.limitMs,[$("#stb"),$("#tb")],()=>{if(t.phase==="q"){t.phase="busy";say("來不及了！連斬中斷","bad");fin(false,-9,"（超時）",{timeout:true})}},
+    left=>{const el=$("#sphase");if(el)el.textContent=`斬擊 ${q.index+1}/${q.total}・${(left/1000).toFixed(1)} 秒`});
+  hook(t,w,m,(ok,idx,given)=>fin(ok,idx,given))}
 // 練等：打倒 Boss 後 3 選 1（只在這一局有效），選完才進下一隻
 function sPerk(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const offer=t.E.perkOffer;if(!offer)return sGo(t);
   t.phase="perk";const n=t.E.state.perks.length;
