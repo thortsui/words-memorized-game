@@ -51,8 +51,8 @@ for model, need in MODELS.items():
     extra = [n for n in names if n not in need]
     missb = [b for b in BONES if b not in nodes] if model in ("hero_knight", "boss_sentinel", "boss_executioner") else []   # 生物 Boss 骨架各自不同
     mb = len(data) / 1048576
-    big = [i for i in imgs if Image and max(i[2]) > 1024]
-    ok = not miss and not extra and not missb and tris <= 30000 and mb <= 3.0 and not big
+    big = [i for i in imgs if Image and max(i[2]) > 2048]   # 第二版 Boss：貼圖上限 2048、三角面上限 40k（手機仍可負擔）
+    ok = not miss and not extra and not missb and tris <= 40000 and mb <= 3.0 and not big
     ok_all &= ok
     print(f"== {model}: {'OK' if ok else 'FAIL'}  {mb:.2f} MB  tris={tris}  verts={verts}  joints={joints}  materials={[m['name'] for m in js['materials']]}")
     print("   actions:", ", ".join(f"{n}({durs[n]:.2f}s)" for n in names))

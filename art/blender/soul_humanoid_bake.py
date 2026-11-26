@@ -330,7 +330,69 @@ def polish(B):
     print("POLISH bevel", nb, "cloth", nc, flush=True)
 
 
-def assemble(B, model, size=(1024, 1024), bake=True, samples=24, quick=False):
+
+# ---------------------------------------------------------------- 高模細節（第二版）
+# 低模零件 → 細分＋依材質位移（敲擊凹痕、鏽蝕坑洞、布料皺紋、皮革折痕、樹皮紋）成高模，
+# 顏色／粗糙度／法線都從高模「烘到」低模的貼圖（selected to active），凹痕裡會積到髒污、稜線吃到高光。
+DETAIL = {
+    "metal": [("VORONOI", 0.0025, 0.05, "F1"), ("CLOUDS", 0.0009, 0.006, None), ("CLOUDS", 0.0012, 0.02, None)],
+    "cloth": [("CLOUDS", 0.0035, 0.035, None), ("CLOUDS", 0.0012, 0.008, None)],
+    "leather": [("CLOUDS", 0.0022, 0.02, None), ("VORONOI", 0.001, 0.008, "F2")],
+    "bark": [("CLOUDS", 0.006, 0.03, None), ("VORONOI", 0.003, 0.012, "F1")],
+    "bone": [("CLOUDS", 0.0015, 0.012, None)],
+    "wood": [("CLOUDS", 0.002, 0.02, None)],
+}
+
+
+def _disp_tex(kind, scale, feat):
+    t = bpy.data.textures.new("dt", kind)
+    t.noise_scale = scale
+    if kind == "CLOUDS":
+        t.noise_depth = 3
+    if kind == "VORONOI" and feat:
+        t.distance_metric = "DISTANCE"
+        t.color_mode = "INTENSITY"
+        t.weight_1, t.weight_2 = (1.0, 0.0) if feat == "F1" else (0.0, 1.0)
+    return t
+
+
+def make_high(ob, detail_of, U=1.0):
+    """detail_of: matkey -> DETAIL 類別（None＝不加位移）。回傳高模物件（與低模共用材質）。"""
+    hi = ob.copy()
+    hi.data = ob.data.copy()
+    hi.name = ob.name + "_high"
+    bpy.context.scene.collection.objects.link(hi)
+    for g in list(hi.vertex_groups):
+        hi.vertex_groups.remove(g)
+    sub = hi.modifiers.new("sub", "SUBSURF")
+    sub.subdivision_type = "SIMPLE"
+    sub.levels = sub.render_levels = 2
+    _apply_mod(hi, sub)
+    # 每一類材質一個頂點群組（材質邊界的頂點兩邊都算，位移量取各自的，接縫不會裂開太多）
+    cats = {}
+    me = hi.data
+    for p in me.polygons:
+        sl = hi.material_slots[p.material_index].material
+        key = next((d["key"] for d in SRC.values() if d["mat"] == sl), None)
+        c = detail_of(key)
+        if c:
+            cats.setdefault(c, set()).update(p.vertices)
+    for c, vs in cats.items():
+        gn = "det_" + c          # 只留名字：套用修改器後群組的 Python 參照會失效
+        hi.vertex_groups.new(name=gn).add(list(vs), 1.0, "REPLACE")
+        for kind, strength, scale, feat in DETAIL[c]:
+            md = hi.modifiers.new("d", "DISPLACE")
+            md.texture = _disp_tex(kind, scale * U, feat)
+            md.texture_coords = "GLOBAL"
+            md.strength = strength * U
+            md.mid_level = 0.5
+            md.vertex_group = gn
+            _apply_mod(hi, md)
+    print("HIGH", ob.name, len(me.polygons), "faces", flush=True)
+    return hi
+
+
+def assemble(B, model, size=(1024, 1024), bake=True, samples=24, quick=False, detail_of=None, U=1.0):
     """把分件依材質組別合併、展 UV、烘焙，回傳合併後的單一網格物件。"""
     sc = bpy.context.scene
     polish(B)
@@ -345,7 +407,12 @@ def assemble(B, model, size=(1024, 1024), bake=True, samples=24, quick=False):
         joined[gk] = _join(groups[gk], f"{model}_{gk}")
     finals = []
     sc.render.engine = "CYCLES"
-    sc.cycles.device = "CPU"
+    try:
+        import soul_creature_lib as _CL
+        print("BAKE device", _CL.use_gpu(), flush=True)
+    except Exception as e:
+        print("BAKE device CPU", e, flush=True)
+        sc.cycles.device = "CPU"
     sc.cycles.samples = samples
     sc.cycles.use_denoising = False
     sc.render.bake.margin = 6
@@ -359,9 +426,15 @@ def assemble(B, model, size=(1024, 1024), bake=True, samples=24, quick=False):
         if bake:
             imgs = {"color": _new_img(f"{model}_{gk}_color", sz, "sRGB"), "orm": _new_img(f"{model}_{gk}_orm", sz, "Non-Color"),
                     "normal": _new_img(f"{model}_{gk}_normal", sz, "Non-Color")}
+            hi = make_high(ob, detail_of, U) if detail_of else None
             bpy.ops.object.select_all(action="DESELECT")
+            if hi:
+                hi.select_set(True)
             ob.select_set(True)
             bpy.context.view_layer.objects.active = ob
+            sc.render.bake.use_selected_to_active = bool(hi)
+            sc.render.bake.cage_extrusion = 0.012 * U
+            sc.render.bake.max_ray_distance = 0.04 * U
             mats = [s.material for s in ob.material_slots]
             for p in ("color", "orm", "normal"):
                 for m in mats:
@@ -379,6 +452,9 @@ def assemble(B, model, size=(1024, 1024), bake=True, samples=24, quick=False):
                 bpy.ops.object.bake(type="NORMAL" if p == "normal" else "EMIT")
                 _save(imgs[p], paths[p])
                 print("BAKED", model, gk, p, flush=True)
+            if hi:
+                bpy.data.objects.remove(hi)
+            sc.render.bake.use_selected_to_active = False
         # 最終材質
         fm = bpy.data.materials.new(f"{model}_{gk}")
         fm.use_nodes = True

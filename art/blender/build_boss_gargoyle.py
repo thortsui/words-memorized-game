@@ -20,6 +20,7 @@ PREV = os.path.join(HERE, "preview")
 TMP = os.path.join(PREV, "_frames")
 BAKED = os.path.join(HERE, "textures", "baked", NAME)
 HEIGHT = 2.75  # 含翼尖
+TEX = int(os.environ.get("BOSS_TEX", "2048"))  # 烘焙圖集邊長
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 STAGE = argv[0] if argv else "all"
 
@@ -92,9 +93,13 @@ def build_model():
                bones=[("Hips", 0), ("Spine1", 0.30), ("Spine2", 0.56), ("Neck", 0.95)], blend=0.16))
     # 背脊隆起與棘
     add(L.ellipsoid("Hump", (0, 0.14, 1.98), (0.34, 0.20, 0.24), rot=(-20, 0, 0), bones="Spine2"))
-    for i, (y, z, h) in enumerate([(0.24, 2.10, 0.13), (0.30, 1.88, 0.12), (0.30, 1.66, 0.10), (0.30, 1.44, 0.08)]):
-        add(L.loft(f"Spike{i}", [(0, y - 0.10, z - 0.02), (0, y + h, z + h * 0.7)], [(0.05, 0.07), 0.008], segs=6, sub=2, caps=("flat", "point"),
-                   bones="Spine2" if i < 2 else "Spine1"))
+    for i, (y, z, h) in enumerate([(0.10, 2.20, 0.16), (0.22, 2.08, 0.24), (0.29, 1.93, 0.22), (0.31, 1.78, 0.19), (0.31, 1.62, 0.16), (0.30, 1.47, 0.13), (0.28, 1.32, 0.10)]):
+        add(L.loft(f"Spike{i}", [(0, y - 0.10, z - 0.03), (0, y + h * 0.55, z + h * 0.35), (0, y + h, z + h * 0.85)], [(0.055, 0.085), (0.03, 0.05), 0.006], segs=6, sub=2,
+                   caps=("flat", "point"), bones="Spine2" if i < 4 else "Spine1"))
+        for s2 in (1, -1):  # 兩側較小的副棘
+            if 0 < i < 6:
+                add(L.loft(f"SpikeS{i}", [(0.10 * s2, y - 0.08, z - 0.02), (0.15 * s2, y + h * 0.5, z + h * 0.45)], [0.035, 0.005], segs=6, sub=2,
+                           caps=("flat", "point"), bones="Spine2" if i < 4 else "Spine1"))
     # 胸、腹、斜方
     for s, sx in ((1, ".L"), (-1, ".R")):
         add(L.ellipsoid("Pec" + sx, (0.21 * s, -0.27, 1.86), (0.26, 0.15, 0.19), rot=(8, 0, 12 * s), bones="Spine2"))
@@ -117,8 +122,12 @@ def build_model():
     for s, sx in ((1, ".L"), (-1, ".R")):
         add(L.ellipsoid("Brow" + sx, (0.105 * s, -0.65, 2.18), (0.095, 0.08, 0.045), rot=(18, 0, -20 * s), bones="Head", segs=10, rings=6))
         add(L.ellipsoid("Cheek" + sx, (0.12 * s, -0.56, 2.05), (0.06, 0.09, 0.06), bones="Head", segs=10, rings=6))
-        add(L.loft("Horn" + sx, [(0.12 * s, -0.47, 2.26), (0.20 * s, -0.43, 2.40), (0.24 * s, -0.33, 2.50), (0.21 * s, -0.21, 2.52)],
-                   [0.072, 0.058, 0.036, 0.006], segs=8, caps=("flat", "point"), bones="Head"))
+        ridge = lambda a, t: 1 + 0.10 * max(0.0, math.sin(5 * a)) * (1 - t)       # 角上一圈圈的稜
+        add(L.loft("Horn" + sx, [(0.12 * s, -0.47, 2.24), (0.23 * s, -0.42, 2.40), (0.34 * s, -0.28, 2.52), (0.44 * s, -0.10, 2.52), (0.50 * s, 0.04, 2.42),
+                                 (0.49 * s, 0.10, 2.30), (0.43 * s, 0.06, 2.22)],
+                   [0.085, 0.075, 0.062, 0.048, 0.034, 0.020, 0.004], segs=10, sub=4, caps=("flat", "point"), shape=ridge, bones="Head"))
+        add(L.loft("HornUp" + sx, [(0.08 * s, -0.42, 2.27), (0.12 * s, -0.38, 2.42), (0.15 * s, -0.30, 2.58), (0.13 * s, -0.20, 2.68)],
+                   [0.05, 0.042, 0.026, 0.004], segs=8, sub=3, caps=("flat", "point"), shape=ridge, bones="Head"))
         add(L.loft("HornS" + sx, [(0.05 * s, -0.56, 2.25), (0.07 * s, -0.55, 2.33), (0.07 * s, -0.50, 2.37)], [0.03, 0.022, 0.005], segs=6,
                    caps=("flat", "point"), bones="Head"))
         ear = [L.polyline([(0.14 * s, -0.42, 2.17), (0.27 * s, -0.33, 2.22), (0.36 * s, -0.24, 2.20)], 5),
@@ -212,8 +221,10 @@ def build_model():
     def post(high):
         L.displace(high, "CLOUDS", 0.030, 0.26, 2)
         L.displace(high, "CLOUDS", 0.008, 0.06, 2)
+        L.displace(high, "VORONOI", 0.007, 0.045)        # 鑿痕：石面一塊塊的削切面
+        L.displace(high, "STUCCI", 0.0025, 0.012)        # 風化的細小坑洞
 
-    org = L.organic("StoneBody", P, stone, voxel=0.0085, tris=27600, smooth=9, post=post)
+    org = L.organic("StoneBody", P, stone, voxel=0.0068, tris=35000, smooth=7, post=post)
 
     # --- 餘燼眼（獨立小件）
     eyes = []
@@ -246,7 +257,7 @@ def build_model():
               ("Wing2" + sx, (0.62 * s, 0.50, 2.30), (0.80 * s, 0.36, 2.74), "Wing1" + sx),
               ("WingF" + sx, (0.80 * s, 0.36, 2.74), (0.90 * s, 0.62, 1.60), "Wing2" + sx)]
     arm = L.make_armature("Gargoyle", B)
-    mesh = L.assemble("GargoyleMesh", arm, [(org[0], org[1], org[2], stone)], eyes, BAKED, size=1024, emit_strength=4.0, emit_size=1024)
+    mesh = L.assemble("GargoyleMesh", arm, [(org[0], org[1], org[2], stone)], eyes, BAKED, size=TEX, emit_strength=4.0, emit_size=1024)
     os.makedirs(os.path.dirname(MODEL_BLEND), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=MODEL_BLEND)
     return arm, mesh

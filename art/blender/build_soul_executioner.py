@@ -22,6 +22,7 @@ OUT_GLB = os.path.join(HERE, "export_raw", MODEL + ".glb")   # 未壓縮原檔�
 OUT_BLEND = os.path.join(HERE, "source", MODEL + ".blend")
 TILES = os.path.join(HERE, "preview", "_tiles", MODEL)
 NOVIEWS = "--noviews" in argv
+TEXS = int(os.environ.get("BOSS_TEX", "2048"))  # 烘焙圖集邊長
 
 reset_scene()
 body = Body(H=2.2, bulk=1.24, wf=1.16, head=0.275, hz=0.52, neck=0.036, limb=1.06, arm_a=56)
@@ -188,17 +189,62 @@ B.grid("Hood", 26, 12, hood_fn, "hood", {"Head": 0.9, "Neck": 0.1}, [hc, hc - Z 
 mantle(B, body, "hood", t0=0.70, t1=1.14, off=0.040, rag=0.10, drop=0.06, front_drop=0.05, asym=0.04, back_drop=0.08, seed=17,
        collar=0.045, folds=8, fold_amp=0.016, w={"Spine2": 0.75, "Neck": 0.25})
 
+# ---------------------------------------------------------------- 腦後的高鐵領（行刑者的剪影：寬肩上方豎起一圈尖刺）
+nk = j["Neck"]
+
+
+def collar_fn(u, v):
+    a = math.radians(lerp(72, 288, u))
+    r = lerp(0.150, 0.215, v ** 0.8) * U
+    lift = 0.012 * U * math.sin(a * 3) * v
+    return nk + V(math.sin(a) * r, -math.cos(a) * r * 0.92 + 0.02 * U, lerp(-0.10, 0.17, v) * U + lift)
+
+
+B.grid("HighCollar", 20, 5, collar_fn, "iron", {"Spine2": 1.0}, [nk + V(0, -0.05, 0.03) * U], rim=0.006 * U, sharp=40, texel=1.0)
+spk = []
+for q in range(11):
+    u = (q + 0.5) / 11
+    p0 = collar_fn(u, 1.0)
+    out = (p0 - nk); out.z = 0; out.normalize()
+    ln = (0.10 + 0.07 * math.sin(math.pi * u)) * U
+    B.tube(f"CollarSpike{q}", [p0 - Z * 0.02 * U, p0 + Z * ln * 0.55 + out * ln * 0.18, p0 + Z * ln + out * ln * 0.35], [0.016 * U, 0.010 * U, 0.0015 * U], 6,
+           "ironB", {"Spine2": 1.0}, sharp=30)
+    spk.append((collar_fn(u, 0.55) + out * 0.004 * U, out))
+B.rivets("CollarRivets", spk, "iron", {"Spine2": 1.0}, r=0.009 * U)
+# 腰側掛的鐵鏈與大鎖頭
+for sx, z0 in ((1, zb - 0.02), (-1, zb - 0.03)):
+    a0 = 115 if sx > 0 else 245
+    pa = body.torso.pt(z0, a0, 0.065 * R)
+    pts = [pa + V(sx * 0.02, 0.0, -0.035 * q) * U + V(0, 0.01 * math.sin(q), 0) * U for q in range(8)]
+    chain_links(B, pts, "iron", "Hips", link_r=0.014 * U, wire=0.0042 * U, name=f"HipChain{sx}")
+    lk = pts[-1] - Z * 0.05 * U
+    box(B, f"Padlock{sx}", lk, X, Z, -Y, 0.040 * U, 0.050 * U, 0.016 * U, "ironB", "Hips", exp=4, segs=12)
+    B.tube(f"Shackle{sx}", [lk + V(-0.022, 0, 0.03) * U, lk + V(-0.022, 0, 0.065) * U, lk + V(0, 0, 0.082) * U, lk + V(0.022, 0, 0.065) * U, lk + V(0.022, 0, 0.03) * U],
+           [0.006 * U] * 5, 6, "ironB", "Hips")
+
 # ---------------------------------------------------------------- 寬刃巨劍
 gcR = Body.mir(body.grip_c); bladeR = Body.mir(body.hand_v); edgeR = Body.mir(body.hand_a)
-ST = [(0.0, 0.80, 1.0), (0.035, 1.0, 1.0), (0.50, 1.0, 1.0), (0.90, 1.0, 0.95), (0.955, 0.92, 0.8), (1.0, 0.50, 0.25)]
+ST = [(0.0, 0.80, 1.0), (0.035, 1.0, 1.0), (0.45, 1.12, 1.0), (0.80, 1.38, 0.95), (0.94, 1.42, 0.85), (0.985, 1.36, 0.55), (1.0, 1.20, 0.25)]
 GRIP = 0.50
-sword(B, gcR, bladeR, edgeR, "blade", "ironB", "leatherB", U=U, blade_len=1.30, width=0.072, grip=GRIP, guard=0.16, thick=0.011, st=ST,
+sword(B, gcR, bladeR, edgeR, "blade", "ironB", "leatherB", U=U, blade_len=1.30, width=0.080, grip=GRIP, guard=0.16, thick=0.011, st=ST,
       grip_r=0.0185, guard_r=2.0, pommel=1.6)
 # 刃上的缺口與中脊
 g0 = gcR + bladeR * (GRIP * 0.5 * U)
 edn = (edgeR - bladeR * edgeR.dot(bladeR)).normalized()
 B.tube("BladeSpine", [g0 + bladeR * 0.03 * U, g0 + bladeR * 0.9 * U, g0 + bladeR * 1.2 * U], [(0.016 * U, 0.016 * U), (0.013 * U, 0.014 * U), (0.004 * U, 0.008 * U)],
        4, "blade", "Weapon", flat=edn, sharp=10)
+# 刀尖附近的穿孔（兩面各一個深色圓片＋鐵環），還有刀背的一排鋸齒
+sideR = bladeR.cross(edn).normalized()
+hcen = g0 + bladeR * 1.12 * U + edn * 0.02 * U
+for sg in (-1, 1):
+    B.ellipsoid(f"BladeHole{sg}", hcen + sideR * sg * 0.0095 * U, (edn, bladeR, sideR * sg), (0.034 * U, 0.034 * U, 0.003 * U), 16, 4, "void", "Weapon", v0=0, v1=0.5)
+B.tube("HoleRing", [hcen + (edn * math.cos(a) + bladeR * math.sin(a)) * 0.037 * U for a in [i * math.pi / 8 for i in range(17)]], [(0.006 * U, 0.012 * U)] * 17, 6,
+       "ironB", "Weapon", flat=sideR)
+for q in range(9):
+    t = 0.30 + q * 0.07
+    b0 = g0 + bladeR * t * U - edn * 0.080 * U * (1.0 + 0.4 * t)
+    B.tube(f"BackTooth{q}", [b0 + edn * 0.01 * U, b0 - edn * 0.022 * U + bladeR * 0.012 * U], [(0.016 * U, 0.008 * U), (0.002 * U, 0.002 * U)], 4, "blade", "Weapon",
+           flat=bladeR, sharp=10)
 B.tube("Ricasso", [g0 + bladeR * 0.014 * U, g0 + bladeR * 0.12 * U, g0 + bladeR * 0.16 * U], [(0.078 * U, 0.016 * U), (0.078 * U, 0.016 * U), (0.070 * U, 0.008 * U)],
        6, "ironB", "Weapon", flat=edn, exp=4, sharp=30)
 
@@ -208,7 +254,9 @@ arm = build_armature("BossExecutioner", body, weapon=(gcR, gcR + bladeR * 0.30 *
                              ("ChainR", "ForearmR", [Body.mir(p) for p in ch_pts])])
 tri = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in B.parts)
 print("PARTS", len(B.parts), "TRIS", tri, flush=True)
-mesh = BK.assemble(B, MODEL, size=(1024, 1024), bake=not (QUICK or NOBAKE), quick=QUICK)
+DETAIL_OF = {"iron": "metal", "ironB": "metal", "blade": "metal", "apron": "leather", "leather": "leather", "leatherB": "leather",
+             "hood": "cloth", "gambeson": "cloth"}.get
+mesh = BK.assemble(B, MODEL, size=(TEXS, TEXS), bake=not (QUICK or NOBAKE), quick=QUICK, detail_of=DETAIL_OF, U=U)
 BK.bind(mesh, arm)
 
 legs = [("ThighL", "ShinL", 0.15 * U), ("ThighR", "ShinR", 0.15 * U), ("ShinL", "FootL", 0.12 * U), ("ShinR", "FootR", 0.12 * U)]

@@ -19,6 +19,7 @@ PREV = os.path.join(HERE, "preview")
 TMP = os.path.join(PREV, "_frames")
 BAKED = os.path.join(HERE, "textures", "baked", NAME)
 HEIGHT = 3.65
+TEX = int(os.environ.get("BOSS_TEX", "2048"))  # 烘焙圖集邊長
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 STAGE = argv[0] if argv else "all"
 SWX, SWY, GRIP = -0.86, -0.36, 2.08   # 巨劍軸與握點
@@ -296,7 +297,13 @@ def build_model():
         AR.append(L.loft(f"Claw{k}", [b, p1, p2, p3], [0.038, 0.034, 0.026, 0.004], segs=8, sub=3, caps=("round", "point"), bones=[("Hand.L", 0), ("Fingers.L", 0.25)], blend=0.2))
 
     warp(AR)
-    armor = L.organic("ArmorBody", AR, M_armor, voxel=0.008, tris=16500, smooth=7, uv_angle=85)
+    def armor_post(h):
+        # 高模細節：大面積的敲擊凹痕＋細小刮痕坑洞（烘成法線貼圖，鎧甲不再像塑膠）
+        m = L.displace(h, "VORONOI", 0.0045, 0.07)
+        m.texture.weight_1, m.texture.weight_2 = 1.0, 0.0
+        L.displace(h, "CLOUDS", 0.0015, 0.008, 2)
+        L.displace(h, "STUCCI", 0.0008, 0.004)
+    armor = L.organic("ArmorBody", AR, M_armor, voxel=0.0062, tris=19000, smooth=6, uv_angle=85, post=armor_post)
 
     # ------------------------------------------------ 骷髏頭（寬顎）
     SK.append(L.ellipsoid("Cranium", (0, 0.065, 2.86), (0.185, 0.215, 0.185), bones="Head", segs=20, rings=12))
@@ -354,9 +361,20 @@ def build_model():
                          caps=("flat", "point"), shape=twist, bones="Head"))
         HN.append(L.loft("HornSmall", [(0.05 * s, -0.09, 2.99), (0.055 * s, -0.12, 3.10), (0.04 * s, -0.17, 3.19)], [0.032, 0.024, 0.004], segs=8, sub=4, caps=("flat", "point"), bones="Head"))
         HN.append(L.loft("HornBack", [(0.12 * s, 0.15, 2.92), (0.20 * s, 0.26, 3.02), (0.22 * s, 0.30, 3.16)], [0.04, 0.03, 0.004], segs=8, sub=4, caps=("flat", "point"), shape=twist, bones="Head"))
+        # 誇張特徵：更長、往後再往上捲的主角，加一對向兩側平伸的長角
+        HN.append(L.loft("HornWide", [(0.17 * s, 0.06, 2.86), (0.42 * s, 0.10, 2.80), (0.70 * s, 0.08, 2.84), (0.92 * s, 0.02, 2.98), (1.02 * s, -0.04, 3.14)],
+                         [0.07, 0.062, 0.05, 0.032, 0.004], segs=10, sub=5, caps=("flat", "point"), shape=twist, bones="Head"))
+    # 荊棘冠：頭頂一圈細長黑刺
+    for k in range(11):
+        a = 2 * math.pi * k / 11
+        b = Vector((math.sin(a) * 0.15, 0.04 - math.cos(a) * 0.17, 2.95))
+        d = Vector((math.sin(a) * 0.35, -math.cos(a) * 0.35, 1.0)).normalized()
+        ln = 0.16 + 0.08 * (k % 2)
+        HN.append(L.loft("Thorn", [b, b + d * ln * 0.5, b + d * ln], [0.022, 0.014, 0.003], segs=6, sub=2, caps=("flat", "point"), bones="Head"))
     rescale(HN, 0.93)
     warp(HN)
-    horns = L.organic("Horns", HN, M_horn, voxel=0.006, tris=2800, smooth=3)
+    horns = L.organic("Horns", HN, M_horn, voxel=0.005, tris=4200, smooth=2,
+                      post=lambda h: L.displace(h, "CLOUDS", 0.002, 0.01, 2))
 
     # ------------------------------------------------ 直接建模的零件
     def add(o, sharp=None):
@@ -500,7 +518,7 @@ def build_model():
     B = [(n, (h[0], h[1], zw(h[2])), (t[0], t[1], zw(t[2])), par) for n, h, t, par in B]
     arm = L.make_armature("Devourer", B)
     orgs = [(armor[0], armor[1], armor[2], M_armor), (skull[0], skull[1], skull[2], M_bone), (horns[0], horns[1], horns[2], M_horn)]
-    L.assemble("DevourerMesh", arm, orgs, D, BAKED, size=1024, emit_strength=4.0, emit_size=512, extrusion=0.055, ao_dist=0.6, uv_margin=0.008, normal_strength=0.85, atlas2=[M_armor, M_bone])
+    L.assemble("DevourerMesh", arm, orgs, D, BAKED, size=TEX, emit_strength=4.0, emit_size=512, extrusion=0.055, ao_dist=0.6, uv_margin=0.008, normal_strength=0.85, atlas2=[M_armor, M_bone])
     bpy.ops.wm.save_as_mainfile(filepath=MODEL_BLEND)
 
 

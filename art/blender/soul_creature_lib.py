@@ -481,6 +481,12 @@ def organic(name, parts, mat, voxel=0.01, tris=15000, smooth=6, post=None, wsmoo
     d = low.modifiers.new("d", "DECIMATE")
     d.ratio = min(1.0, tris / nt)
     apply_mods(low)
+    # 減面後薄片（披風、袖子）的面法線可能翻向內側，烘焙時射線會往錯的方向打而漏烘（出現黑斑）：一律重算成朝外
+    bm = bmesh.new()
+    bm.from_mesh(low.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(low.data)
+    bm.free()
     low.data.polygons.foreach_set("use_smooth", [True] * len(low.data.polygons))
     transfer_weights(src, low)
     smooth_weights(low, wsmooth)
@@ -725,12 +731,35 @@ def _px(img):
     return a.reshape(img.size[1], img.size[0], 4)
 
 
+def use_gpu():
+    """有 NVIDIA 顯卡就用 GPU 烘焙（快很多）；沒有就維持 CPU。"""
+    sc = bpy.context.scene
+    try:
+        pr = bpy.context.preferences.addons["cycles"].preferences
+        for kind in ("OPTIX", "CUDA"):
+            try:
+                pr.compute_device_type = kind
+            except TypeError:
+                continue
+            pr.get_devices()
+            devs = [d for d in pr.devices if d.type == kind]
+            if devs:
+                for d in pr.devices:
+                    d.use = d.type == kind
+                sc.cycles.device = "GPU"
+                return kind
+    except Exception as e:
+        print("[gpu] 無法啟用：", e)
+    sc.cycles.device = "CPU"
+    return "CPU"
+
+
 def bake_atlas(final, organics, out_prefix, size=1024, ao_mix=0.75, extrusion=0.025, emit_size=512, quality=88, ao_dist=0.5, only=None):
     """final: 已合併且 UV 已打包的低模；organics: [(high物件, PMat)]。其餘材質槽自我烘焙。
     產生 <prefix>_basecolor.jpg / _normal.jpg / _orm.jpg / _emissive.jpg 並回傳路徑 dict。"""
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
-    sc.cycles.device = "CPU"
+    print("[bake] device", use_gpu())
     sc.world.light_settings.distance = ao_dist
     fills = dict(color=(0.2, 0.2, 0.2, 1), orm=(1, 0.8, 0, 1), emit=(0, 0, 0, 1), normal=(0.5, 0.5, 1, 1), ao=(1, 1, 1, 1))
     imgs = {}
@@ -764,9 +793,22 @@ def bake_atlas(final, organics, out_prefix, size=1024, ao_mix=0.75, extrusion=0.
             sc.cycles.samples = smp
             for m in allm:
                 set_mode(m, mode, imgs[chan])
-            activate(t, highs or ())
-            bk.use_selected_to_active = bool(highs)
+            # AO 直接在低模上算（高模彼此、與其他零件重疊的地方，從籠面打出的射線會落在幾何內部，烘出一片片黑三角）
+            ao_low = chan == "ao"
+            hs_all = [h for h, _ in organics]
+            for h in hs_all:
+                h.hide_render = ao_low
+            if ao_low:
+                for o, _ in temps:
+                    o.hide_render = False
+            activate(t, () if ao_low else (highs or ()))
+            bk.use_selected_to_active = bool(highs) and not ao_low
             bpy.ops.object.bake(type=btype)
+            for h in hs_all:
+                h.hide_render = False
+            if ao_low:
+                for o, hh in temps:
+                    o.hide_render = (o is not t) and hh is not None
         print("[bake]", t.name, "done")
     for m in allm:
         set_mode(m, "full")

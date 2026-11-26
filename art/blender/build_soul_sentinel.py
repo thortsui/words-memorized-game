@@ -22,6 +22,7 @@ OUT_GLB = os.path.join(HERE, "export_raw", MODEL + ".glb")   # 未壓縮原檔�
 OUT_BLEND = os.path.join(HERE, "source", MODEL + ".blend")
 TILES = os.path.join(HERE, "preview", "_tiles", MODEL)
 NOVIEWS = "--noviews" in argv
+TEXS = int(os.environ.get("BOSS_TEX", "2048"))  # 烘焙圖集邊長
 
 reset_scene()
 body = Body(H=2.3, bulk=0.84, wf=0.90, head=0.255, hz=0.545, arm_len=1.06, limb=0.95)
@@ -31,25 +32,28 @@ rnd = random.Random(7)
 
 # ---------------------------------------------------------------- 材質
 D = BK.define_mat
-D("rust", "A", tex="Metal024", size=0.6, U=U, rust=0.78, wear=0.5, dirt=0.9, bump=0.7, val=0.62, moss=0.40, rust_tint=(0.40, 0.29, 0.23))
+D("rust", "A", tex="Metal024", size=0.6, U=U, rust=0.55, wear=0.75, wear_col=(0.52, 0.50, 0.47), dirt=1.0, bump=0.7, val=0.50, sat=0.5,
+  moss=0.28, rust_tint=(0.30, 0.235, 0.20), rust_size=0.32)
 D("mail", "A", tex="Chainmail004", size=0.24, U=U, tint=(0.40, 0.37, 0.34), metal=0.7, rough=0.65, rust=0.6, dirt=1.0, bump=1.0,
   bump_dist=0.006, moss=0.3, ao_shade=0.75, rust_tint=(0.40, 0.29, 0.23))
 D("bone", "A", tex="Rust009", size=0.5, U=U, sat=0.15, val=0.85, tint=(0.60, 0.54, 0.40), rough=0.75, metal=0.0, dirt=1.0, bump=0.5,
   moss=0.22, dirt_col=(0.05, 0.035, 0.02), seed=3.0)
-D("bark", "A", tex="Bark012", size=0.22, U=U, tint=(0.36, 0.30, 0.24), rough=0.9, metal=0.0, dirt=0.6, bump=1.0, moss=0.42, seed=5.0)
+D("bark", "A", tex="Bark012", size=0.22, U=U, tint=(0.22, 0.18, 0.15), rough=0.9, metal=0.0, dirt=0.6, bump=1.0, moss=0.42, seed=5.0)
 D("leaf", "A", color=(0.07, 0.15, 0.04), flat_rough=0.7, dirt=0.3, bump=0.2, ao_shade=0.4)
 D("leather", "A", tex="Leather026", size=0.30, U=U, val=2.8, tint=(0.42, 0.27, 0.16), rough=0.8, metal=0.0, dirt=0.9, wear=0.4,
   wear_col=(0.36, 0.26, 0.18), bump=0.6, moss=0.3)
 D("gambeson", "A", tex="Fabric030", size=0.22, U=U, tint=(0.12, 0.10, 0.08), rough=0.95, metal=0.0, dirt=0.8, bump=0.7, moss=0.2)
 D("void", "A", color=(0.004, 0.004, 0.004), flat_rough=1.0, dirt=0, ao_shade=0.0, bump=0.0)
-D("robe", "B", tex="Fabric030", size=0.30, U=U, tint=(0.30, 0.055, 0.07), rough=0.92, metal=0.0, dirt=0.7, wear=0.6,
+D("robe", "B", tex="Fabric030", size=0.30, U=U, tint=(0.19, 0.045, 0.05), rough=0.92, metal=0.0, dirt=0.7, wear=0.6,
   wear_col=(0.42, 0.22, 0.20), bump=0.9, mud=(0.15, 0.85, 0.7), mud_col=(0.11, 0.085, 0.07), moss=0.2, ao_shade=0.75, stain=0.5, stain_col=(0.07, 0.02, 0.025))
 D("wood", "B", tex="Wood066", size=0.7, U=U, tint=(0.42, 0.36, 0.30), rough=0.85, metal=0.0, dirt=0.9, bump=0.8, moss=0.5, wear=0.3,
   wear_col=(0.5, 0.42, 0.33))
-D("iron", "B", tex="Metal024", size=0.5, U=U, rust=0.95, wear=0.6, dirt=0.8, bump=0.7, val=0.62, moss=0.3, seed=9.0, rust_tint=(0.40, 0.29, 0.23))
+D("iron", "B", tex="Metal024", size=0.5, U=U, rust=0.7, wear=0.7, wear_col=(0.52, 0.50, 0.47), dirt=0.9, bump=0.7, val=0.5, sat=0.5, moss=0.25, seed=9.0,
+  rust_tint=(0.30, 0.235, 0.20), rust_size=0.32)
 D("barkB", "B", tex="Bark012", size=0.22, U=U, tint=(0.36, 0.30, 0.24), rough=0.9, metal=0.0, dirt=0.6, bump=1.0, moss=0.45, seed=6.0)
 D("leafB", "B", color=(0.07, 0.15, 0.04), flat_rough=0.7, dirt=0.3, bump=0.2, ao_shade=0.4)
 D("glow", "G", emit=(1.0, 0.55, 0.18), emit_strength=1.6)
+D("sap", "G", emit=(1.0, 0.42, 0.10), emit_strength=2.2)
 
 
 def leaves(name, pts, mat, w, size=0.03):
@@ -213,6 +217,38 @@ for k in range(6):
     lp.append((c + d * 0.108 * R * 1.22, d))
 # （肩上的葉片取消：會浮在空中）
 
+# ---------------------------------------------------------------- 誇張特徵：左肩背後竄出的樹根冠（越過頭頂，像鹿角一樣分岔）
+def root_branch(name, p, d, n, length, r0, seed, w="Spine2", depth=0, bias=Vector((0, 0, 0))):
+    rr = random.Random(seed)
+    pts = [p.copy()]
+    rad = [r0]
+    d = d.normalized()
+    for i in range(1, n + 1):
+        d = (d + Vector((rr.uniform(-0.32, 0.32), rr.uniform(-0.28, 0.28), rr.uniform(-0.12, 0.22))) + bias).normalized()
+        pts.append(pts[-1] + d * length / n)
+        rad.append(r0 * (1 - i / (n + 0.6)) ** 0.85 + 0.0025 * U)
+    B.tube(name, pts, rad, 9 if r0 > 0.02 * U else 6, "bark", w, texel=0.8)
+    if depth < 1:
+        for q, (k, sgn) in enumerate(((n // 2, 1), ((2 * n) // 3 + 1, -1))):
+            if k >= n:
+                continue
+            dd = (d + Vector((sgn * rr.uniform(0.4, 0.9), rr.uniform(-0.3, 0.5), rr.uniform(0.0, 0.6)))).normalized()
+            root_branch(f"{name}b{q}", pts[k], dd, max(4, n - 3), length * 0.42, rad[k] * 0.62, seed * 7 + q + 1, w, depth + 1, bias)
+    return pts, rad
+
+
+sh = j["UpperArmL"]
+crown_w = {"Spine2": 0.85, "Neck": 0.15}
+for q, (off, d, ln, r0) in enumerate(((V(-0.10, 0.10, 0.02), V(0.10, 0.15, 1.0), 0.58, 0.062), (V(-0.03, 0.12, -0.04), V(0.6, 0.25, 0.8), 0.46, 0.052),
+                                      (V(-0.16, 0.13, -0.02), V(-0.30, 0.25, 1.0), 0.52, 0.048), (V(0.02, 0.10, -0.08), V(0.9, 0.15, 0.30), 0.34, 0.042))):
+    # 往上竄後向前彎（像角一樣罩在頭的上方），粗、短、扭曲
+    pts, rad = root_branch(f"Crown{q}", sh + off * U, d, 9, ln * U, r0 * U, 41 + q, crown_w, bias=Vector((0, -0.06, 0.0)))
+    if q < 2:
+        B.ellipsoid(f"Sap{q}", pts[3], (X, Y, Z), (0.014 * U, 0.014 * U, 0.02 * U), 8, 6, "sap", crown_w)
+# 根部的瘤：把樹根和肩甲／背接起來
+B.ellipsoid("RootKnot", sh + V(-0.08, 0.11, 0.0) * U, (X, Y, Z), (0.10 * U, 0.08 * U, 0.09 * U), 14, 10, "bark", crown_w, texel=0.8)
+B.ellipsoid("RootKnot2", sh + V(-0.17, 0.12, -0.12) * U, (X, Y, Z), (0.07 * U, 0.06 * U, 0.08 * U), 12, 8, "bark", {"Spine2": 1.0}, texel=0.8)
+
 # ---------------------------------------------------------------- 背後的破塔盾
 k = U / 1.278
 sh_c = V(0.03, 0.135 * R + 0.15 * k, body.tz(0.50))
@@ -303,7 +339,9 @@ arm = build_armature("BossSentinel", body, weapon=(gcR, gcR + ax * 0.30 * U),
                      chains=[("RobeF", "Hips", rf_pts), ("RobeB", "Hips", rb_pts)])
 tri = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in B.parts)
 print("PARTS", len(B.parts), "TRIS", tri, flush=True)
-mesh = BK.assemble(B, MODEL, size=(1024, 1024), bake=not (QUICK or NOBAKE), quick=QUICK)
+DETAIL_OF = {"rust": "metal", "iron": "metal", "bone": "bone", "bark": "bark", "barkB": "bark", "leather": "leather",
+             "gambeson": "cloth", "robe": "cloth", "wood": "wood"}.get
+mesh = BK.assemble(B, MODEL, size=(TEXS, TEXS), bake=not (QUICK or NOBAKE), quick=QUICK, detail_of=DETAIL_OF, U=U)
 BK.bind(mesh, arm)
 
 legs = [("ThighL", "ShinL", 0.12 * U), ("ThighR", "ShinR", 0.12 * U), ("ShinL", "FootL", 0.10 * U), ("ShinR", "FootR", 0.10 * U)]
