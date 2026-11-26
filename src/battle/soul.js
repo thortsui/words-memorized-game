@@ -15,7 +15,7 @@ export function difficulty(recent){const r=recent.slice(-SOUL.paceWindow);
   // d 接近上限（高手）時彈反門檻再收緊：tight 從 tightAt 起線性加到 1
   const tight=clamp((d-SOUL.tightAt)/(1-SOUL.tightAt),0,1);
   return{d,pace,limitMul:1-SOUL.limitSwing*d,extra:d>=SOUL.extraAt?1:(SOUL.easeDown&&d<=-SOUL.extraAt)?-1:0,perfectMs:Math.round(SOUL.perfectMs-SOUL.perfectSwing*d-SOUL.perfectTight*tight),dmgMul:1+SOUL.dmgBonus*Math.max(0,d),
-    foeMul:1+SOUL.foeDmgSwing*Math.max(0,d)}} // foeMul：Boss 傷害倍率，只跟動態難度掛勾（答得越快越痛）
+    foeMul:1+SOUL.foeDmgSwing*Math.max(0,d)-(r.filter(x=>x.ok).length/r.length>=.6?(SOUL.foeEase||0)*Math.max(0,-d):0)}} // 減傷只給最近答對率 ≥ 60% 的人（亂點不能佔便宜） // foeMul：Boss 傷害倍率，只跟動態難度掛勾（答得越快越痛）
 
 // 閃避判定：回傳 parry（彈反）／dodge（閃避）／graze（擦傷）／hit（中招）。perfectMs ≤ 0＝這一招不能彈反（突進、必殺）
 export function gradeDodge(ok,ms,limitMs,perfectMs){if(!ok||ms>limitMs)return"hit";if(perfectMs>0&&ms<=Math.min(perfectMs,limitMs*.5))return"parry";if(ms<=limitMs*SOUL.slowAt)return"dodge";return"graze"}

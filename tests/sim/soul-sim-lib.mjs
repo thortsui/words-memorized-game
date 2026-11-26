@@ -71,7 +71,7 @@ export function one(pl, opt = {}) {
       if (t > q.limitMs) { st.sec += q.limitMs / 1000; count(E.answerAssault(false, q.limitMs, { timeout: true })) } else { st.sec += t / 1000 + 1.5; count(E.answerAssault(ok, t)) } after() }
     else break;
   }
-  return { win: B.over === 'win', kills: B.kills, ...st };
+  return { win: B.over === "win", kills: B.kills, endPhase: B.over || B.phase, endHp: B.hp, ...st };
 }
 export function batch(pl, opt, N = 2000) {
   const a = { win: 0, kills: 0, q: 0, eturns: 0, attacks: 0, minSta: 0, guard: 0, parry: 0, dodge: 0, graze: 0, hit: 0, killsDist: [0, 0, 0, 0, 0, 0], et: [0, 0, 0, 0, 0], d: 0, sec: 0, winSec: 0, chainHits: 0, dangerHit: 0, flinch: 0, hpLost: 0, hurtWins: 0, drinks: 0, spills: 0, ambush: 0, ambushHit: 0, punish: 0, knock: 0, weak: 0, assaultN: 0 };

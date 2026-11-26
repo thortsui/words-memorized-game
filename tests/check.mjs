@@ -142,12 +142,12 @@ t("魂系：閃避判定依答題速度分級",()=>{assert.equal(gradeDodge(true
 t("魂系：動態難度隨答題速度變化",()=>{assert.equal(difficulty([]).d,0);const fast=difficulty(Array(8).fill({ok:true,ms:1200})),slow=difficulty(Array(8).fill({ok:true,ms:5500})),bad=difficulty(Array(8).fill({ok:false,ms:1000}));
   assert.equal(fast.d,1);assert.ok(Math.abs(fast.limitMul-(1-SOUL.limitSwing))<1e-9);assert.equal(fast.extra,1);assert.equal(fast.perfectMs,SOUL.perfectMs-SOUL.perfectSwing-SOUL.perfectTight);assert.equal(fast.dmgMul,1+SOUL.dmgBonus);assert.ok(Math.abs(fast.foeMul-(1+SOUL.foeDmgSwing))<1e-9);
   // 答得慢：時限放寬，但 Boss 不會少出手（亂點會被判成「很慢」，不能讓它佔便宜）
-  assert.equal(slow.d,-1);assert.ok(Math.abs(slow.limitMul-(1+SOUL.limitSwing))<1e-9);assert.equal(slow.extra,0);assert.equal(slow.perfectMs,SOUL.perfectMs+SOUL.perfectSwing);assert.equal(slow.dmgMul,1);assert.equal(slow.foeMul,1);assert.equal(bad.d,-1);
+  assert.equal(slow.d,-1);assert.ok(Math.abs(slow.limitMul-(1+SOUL.limitSwing))<1e-9);assert.equal(slow.extra,0);assert.equal(slow.perfectMs,SOUL.perfectMs+SOUL.perfectSwing);assert.equal(slow.dmgMul,1);assert.ok(Math.abs(slow.foeMul-(1-SOUL.foeEase))<1e-9,"答對但很慢：Boss 傷害減輕");assert.equal(difficulty(Array(8).fill({ok:false,ms:500})).foeMul,1,"亂點（答錯）不減傷");assert.equal(bad.d,-1);
   // 彈反門檻只在 d 超過 tightAt 之後才額外收緊；d＝tightAt 時還是 1.5−0.3d
   const mid=difficulty(Array(8).fill({ok:true,ms:(SOUL.paceCenter-SOUL.tightAt*SOUL.paceSpan)*1000}));assert.ok(Math.abs(mid.d-SOUL.tightAt)<1e-9);assert.equal(mid.perfectMs,Math.round(SOUL.perfectMs-SOUL.perfectSwing*SOUL.tightAt));
   assert.equal(difficulty([]).foeMul,1)});
 const fixLim=(E,L=4000)=>{const c=E.state.enemy.cur;c.limitMs=L;c.perfectMs=c.noParry?0:Math.min(SOUL.perfectMs,L*.5)};
-t("魂系：目前的數值（攻擊時間 5–7 秒、閃避 2–5 秒、連擊 3–5 段、擊倒回 35、守門騎士 HP 60）",()=>{assert.deepEqual(SOUL.windowRange,[5000,7000]);assert.deepEqual(SOUL.dodgeClamp,[2000,5000]);assert.equal(SOUL.healOnKill,35);assert.equal(SOUL_BOSSES[0].hp,60);
+t("魂系：目前的數值（攻擊時間 5–7 秒、閃避 2–5 秒、連擊 3–5 段、擊倒回 35、守門騎士 HP 55）",()=>{assert.deepEqual(SOUL.windowRange,[5000,7000]);assert.deepEqual(SOUL.dodgeClamp,[2000,5000]);assert.equal(SOUL.healOnKill,35);assert.equal(SOUL_BOSSES[0].hp,55);
   for(const b of SOUL_BOSSES)for(const r of b.combo)assert.ok(r[0]>=3&&r[1]<=5,b.id+" 連擊 3–5 段");
   assert.ok(SOUL.windowRange[0]-2*SOUL.minCostMs>=SOUL.minCostMs,"最短 5 秒也答得到第 3 題（弱點擊破要連續 3 題）");
   // 高手（0.45–0.85 秒）在 d=1 時的彈反門檻落在這個區間裡：一部分會變成翻滾
@@ -155,7 +155,7 @@ t("魂系：目前的數值（攻擊時間 5–7 秒、閃避 2–5 秒、連擊
 t("魂系：Boss 傷害跟著動態難度加重（只看 d，答得快才會痛）",()=>{const b=SOUL_BOSSES[0];
   const run=recent=>{const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E.start();E.state.recent=recent.slice();E.state.stamina=0;E.nextAttackQuestion();E.attackTimeout();E.nextDodge();
     const ev=E.answerDodge(false,E.state.enemy.cur.limitMs+1,{timeout:true});return ev.find(e=>e.type==="playerHit").dmg};
-  assert.equal(run([]),b.atk);assert.equal(run(Array(8).fill({ok:true,ms:5500})),b.atk);
+  assert.equal(run([]),b.atk);assert.ok(run(Array(8).fill({ok:true,ms:5500}))<b.atk,"答對但慢：減傷");
   // 最後一題超時也會被記進 recent，所以用當下的難度反推預期值
   const fastRecent=Array(8).fill({ok:true,ms:900}),d=difficulty(fastRecent).foeMul;assert.ok(d>1.3);assert.equal(run(fastRecent),Math.round(b.atk*d))});
 t("魂系：玩家回合累積 ATB、迅擊、出招、時間用完換敵人",()=>{const E=createSoulBattle({pool,mode:"en2zhT",ambushRng:()=>1,rng:()=>0});assert.deepEqual(types(E.start()),["bossEnter","playerTurn"]);

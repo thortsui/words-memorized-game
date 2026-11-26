@@ -61,12 +61,13 @@ export const SOUL={
   counterDmg:10,
   minLimitMs:1500,
   // 動態難度：看最近 N 題的平均作答秒數（答錯算 wrongAs 秒）
-  paceWindow:8, paceMin:3, paceCenter:3.2, paceSpan:1.6, wrongAs:6,
+  paceWindow:8, paceMin:3, paceCenter:3, paceSpan:1.6, wrongAs:6,
   limitSwing:.35,      // 時限最多縮短／放寬 35%
   perfectSwing:300,    // 彈反判定最多 ±0.3 秒
   tightAt:.8, perfectTight:420, // d 超過 tightAt 後彈反門檻再收緊，d=1 時多收 0.42 秒（1.5−0.3−0.42＝0.78 秒）：高手也會有一兩成落到翻滾
-  foeDmgSwing:.5,      // Boss 傷害 ×(1＋foeDmgSwing×max(0,d))：只跟動態難度掛勾的壓力（連擊／藥壺／突襲改版後用模擬定在 0.75，熟練約 90%）
+  foeDmgSwing:.9,      // Boss 傷害 ×(1＋foeDmgSwing×max(0,d))：只跟動態難度掛勾的壓力（連擊／藥壺／突襲改版後用模擬定在 0.75，熟練約 90%）
   dmgBonus:0,          // 高難度時的玩家傷害加成（已取消：答得快本來就打得多）
+  foeEase:.6,          // 答得慢（d<0）時 Boss 傷害 ×(1−foeEase×|d|)：只幫跟不上的人，熟練以上不受影響
   extraAt:.6,          // d 超過這個值，Boss 多出手一次（extraSeg：改成連擊多一段，沒有連擊才多一記單擊）
   extraSeg:true,
   easeDown:false,      // true＝d 低於 −extraAt 時少出手一次（已關閉：亂點會被判成「很慢」而佔到便宜）
@@ -118,23 +119,23 @@ export const SOUL_BIG=[
 // kit：各階段的招式比重 {single 單擊, combo 連擊, delayed 延遲, dash 突進}；combo：各階段連擊段數 [最少, 最多]；names：各招式名
 // attacks＝每個敵人回合出幾「招」（連擊一招算多題）
 export const SOUL_BOSSES=[
- {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:60,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
+ {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:55,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
   names:{combo:"鏽戟三連刺",delayed:"沉重高舉斬",dash:"盾牌衝撞"},
   kit:[{single:.6,dash:.2,delayed:.2},{single:.3,combo:.4,dash:.15,delayed:.15}],combo:[[3,3],[3,4]],
   phases:[{at:.5,name:"根鬚暴走",atkMul:1.15,extra:0,limitMul:.95,move:"根鬚纏擊",danger:.35}]},
- {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:170,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
+ {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:140,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
   names:{combo:"狂亂爪擊",delayed:"懸停俯衝",dash:"石翼突襲"},
   kit:[{single:.35,combo:.3,dash:.2,delayed:.15},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[3,4],[3,5]],
   phases:[{at:.5,name:"石翼狂嘯",atkMul:1.15,extra:1,limitMul:.95,move:"碎石吐息",danger:.5}]},
- {id:"priest",name:"霜冠祭司",lv:16,hp:195,atk:13,move:"霜槍突刺",attacks:1,limitMs:4000,model:"boss_priest",arena:"frozen_chapel",
+ {id:"priest",name:"霜冠祭司",lv:16,hp:165,atk:13,move:"霜槍突刺",attacks:1,limitMs:4000,model:"boss_priest",arena:"frozen_chapel",
   names:{combo:"霜槍連刺",delayed:"寒冰蓄勢",dash:"冰面滑襲"},
   kit:[{single:.3,combo:.35,dash:.15,delayed:.2},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[3,4],[4,5]],
   phases:[{at:.5,name:"永凍禱詞",atkMul:1.2,extra:0,limitMul:.9,move:"冰棺降臨",danger:.5}]},
- {id:"executioner",name:"暗影行刑者",lv:22,hp:230,atk:14,move:"斷頭斧斬",attacks:1,limitMs:4000,model:"boss_executioner",arena:"execution_yard",
+ {id:"executioner",name:"暗影行刑者",lv:22,hp:195,atk:14,move:"斷頭斧斬",attacks:1,limitMs:4000,model:"boss_executioner",arena:"execution_yard",
   names:{combo:"處刑連斬",delayed:"高舉斷罪",dash:"影步突進"},
   kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[3,5],[4,5]],
   phases:[{at:.5,name:"處刑之舞",atkMul:1.2,extra:1,limitMul:.9,move:"影分身處刑",danger:.6}]},
- {id:"devourer",name:"噬語魔王",lv:30,hp:300,atk:15,move:"噬語巨劍",attacks:2,limitMs:3600,model:"boss_devourer",arena:"throne_of_words",boss:true,
+ {id:"devourer",name:"噬語魔王",lv:30,hp:255,atk:15,move:"噬語巨劍",attacks:2,limitMs:3600,model:"boss_devourer",arena:"throne_of_words",boss:true,
   names:{combo:"吞字連斬",delayed:"沉默之劍",dash:"虛空突刺"},
   kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[3,5],[4,5],[4,5]],
   phases:[{at:.66,name:"吞噬詞語",atkMul:1.15,extra:0,limitMul:.95,move:"詞語風暴",danger:.5},{at:.33,name:"終焉咒言",atkMul:1.3,extra:1,limitMul:.9,move:"終焉之言",danger:1}]}];
