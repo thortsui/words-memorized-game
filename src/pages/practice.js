@@ -1,5 +1,6 @@
 // 練習設定頁與一般練習（五種題型）
 import { $, app, esc, SC, lsSet, toast, KEY_HINT } from '../core/util.js';
+import { renderCover } from './cover.js';
 import { S, allDicts, setup, saveSetup, pool, mark, unlog, pushHist, allWords, ctx } from '../core/store.js';
 import { MODES, shuffle, clozeAns, clozePos, zhPrompt, opts, normEn, checkEn, checkZhSmart, pickMode, modeName } from '../core/grading.js';
 import { recordTyping } from '../core/typing.js';
@@ -36,7 +37,7 @@ export function renderSetup(){const D=allDicts();if(!D[setup.dict]&&setup.dict!=
   app.querySelectorAll("[data-eng]").forEach(b=>b.onclick=()=>{sp.eng=b.dataset.eng;resetGoogleFail();lsSet("vc-eng3",sp.eng);renderSetup()});
   $("#vsel").onchange=e=>{sp.voiceName=e.target.value;lsSet("vc-voice",sp.voiceName)};
   $("#slow").onclick=()=>{sp.rate=sp.rate<.8?.9:.65;lsSet("vc-rate",sp.rate);renderSetup()};
-  $("#start").onclick=()=>card?startCards(pool({mode:"en2zh"})):setup.game?startBattle(pool(),setup.game==="soul"):startQuiz(pool())}
+  $("#start").onclick=()=>card?startCards(pool({mode:"en2zh"})):setup.game==="soul"?renderCover({onStart:()=>startBattle(pool(),true),onBack:renderSetup}):setup.game?startBattle(pool(),false):startQuiz(pool())}
 
 /* ----- 單字閃卡：上面英文、下面中文、底下例句；點一下換下一張 ----- */
 let cardKey=null;

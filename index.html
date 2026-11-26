@@ -5,13 +5,21 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>單字魂</title>
+<meta name="theme-color" content="#120f0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="單字魂">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23c9a24a%27%20stroke-width%3D%272.4%27%20stroke-linecap%3D%27round%27%3E%3Cpath%20d%3D%27M12%202v15M8.5%2017h7M12%2017v5M10%204.5l2-2.5%202%202.5%27%2F%3E%3Cpath%20d%3D%27M5%209c2%201%202%204%200%205M19%209c-2%201-2%204%200%205%27%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@900&display=swap" rel="stylesheet">
 </head>
 <body>
 <header><div class="hd">
-  <a class="logo" href="#home"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v15M8.5 17h7M12 17v5M10 4.5l2-2.5 2 2.5"/><path d="M5 9c2 1 2 4 0 5M19 9c-2 1-2 4 0 5"/></svg>單字魂</a>
+  <a class="logo" href="#dicts"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v15M8.5 17h7M12 17v5M10 4.5l2-2.5 2 2.5"/><path d="M5 9c2 1 2 4 0 5M19 9c-2 1-2 4 0 5"/></svg>單字魂</a>
+  <div class="upd"><span id="ver" class="ver"></span><button id="updb" class="sm ghost">檢查更新</button></div>
   <nav><a href="#dicts" id="n-dicts">字典</a><a href="#upload" id="n-upload">掃描上傳</a><a href="#practice" id="n-practice">練習</a><a href="#missed" id="n-missed">歷史錯字</a><a href="#history" id="n-history">錯題紀錄</a></nav>
 </div></header>
 <main id="app"></main>

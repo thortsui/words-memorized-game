@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // 虛擬模組 virtual:model-list：public/models 裡現有的 .glb 檔名清單。
@@ -14,5 +14,10 @@ function modelList(){const id='virtual:model-list',rid='\0'+id,dir=resolve('publ
     configureServer(server){const hit=p=>{if(!/[\\/]public[\\/]models[\\/]/.test(p))return;const m=server.moduleGraph.getModuleById(rid);if(m)server.moduleGraph.invalidateModule(m);server.ws.send({type:'full-reload'})};
       server.watcher.on('add',hit);server.watcher.on('unlink',hit)}}}
 
+// 版本號（package.json）與建置時間；建置時另外輸出 version.json 給「檢查更新」比對
+const VER=JSON.parse(readFileSync('package.json','utf8')).version,BUILD=Date.now();
+function versionFile(){return{name:'version-file',generateBundle(){this.emitFile({type:'asset',fileName:'version.json',source:JSON.stringify({version:VER,build:BUILD})})}}}
+
 // base './' 讓 GitHub Pages 子路徑也能直接載入
-export default defineConfig({ base: './', build: { target: 'es2020', chunkSizeWarningLimit: 900 /* three.js 只在進入戰鬥時才載入 */ }, plugins: [modelList()] });
+export default defineConfig({ base: './', define: { __APP_VER__: JSON.stringify(VER), __APP_BUILD__: String(BUILD) },
+  build: { target: 'es2020', chunkSizeWarningLimit: 900 /* three.js 只在進入戰鬥時才載入 */ }, plugins: [modelList(), versionFile()] });

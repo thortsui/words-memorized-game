@@ -552,3 +552,21 @@ body.cover main{max-width:none;padding:0;margin:0}
 @media(max-width:600px){.cov-ui{left:20px;right:20px;top:auto;bottom:calc(28px + env(safe-area-inset-bottom));transform:none}
   .cov::after{background:linear-gradient(0deg,rgba(8,7,6,.92) 0%,rgba(8,7,6,.55) 48%,transparent 75%)}.cov-btns{width:100%}.cov-head{padding-right:40px}.cov-seal{width:32px;height:32px;font-size:19px;top:0}}
 @media(prefers-reduced-motion:reduce){.cov-title span,.cov-seal,.cov-sub,.cov-tag,.cov-btns,.cov-foot{animation:none;opacity:1;transform:none}}
+
+/* ---------- v1.0.0 品牌頁首：墨黑底＋金色字標，一般頁面也有「單字魂」的味道 ---------- */
+header{background:linear-gradient(100deg,#0e0c0a 0%,#1a1511 55%,#2b2015 100%);border-bottom:0;color:#e9dfc8;box-shadow:0 1px 0 #6b5228,0 6px 18px rgba(0,0,0,.18)}
+header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,#f3d58f 30%,#c48d3c 60%,transparent);opacity:.85;background-size:200% 100%;animation:hdShine 6s linear infinite}
+@keyframes hdShine{from{background-position:100% 0}to{background-position:-100% 0}}
+.logo{font:900 23px "Noto Serif TC","Noto Sans TC",serif;letter-spacing:.06em;background:linear-gradient(176deg,#fff1cf,#e2b968 45%,#a46d2b);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo svg{color:#d9a84e;stroke:#d9a84e}
+header nav a{color:#bfb39c}header nav a:hover{color:#f3e6c6}
+header nav a.on{color:#f6d88f;background:rgba(201,162,74,.16)}
+.upd{display:flex;align-items:center;gap:6px;order:2}
+.ver{font:600 12px Lexend,sans-serif;color:#9b8d72;border:1px solid #4d3f2a;border-radius:20px;padding:2px 8px}
+#updb{color:#e2c27e;border:1px solid #6b5228;border-radius:9px;min-height:36px;padding:4px 10px;background:rgba(201,162,74,.08)}
+#updb:hover{background:rgba(201,162,74,.2)}
+.hd nav{order:3}
+.updlg h3{margin:0 0 8px;font:900 20px "Noto Serif TC",serif}.updlg p{margin:6px 0}
+@media(max-width:600px){.upd{margin-left:auto}.hd{row-gap:4px}}
+@media(prefers-reduced-motion:reduce){header::after{animation:none}}
+@media(max-width:600px){.hd nav{flex-wrap:nowrap;overflow-x:auto;width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch}.hd nav::-webkit-scrollbar{display:none}.hd nav a{white-space:nowrap;flex:none}}

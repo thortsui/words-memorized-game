@@ -1,6 +1,7 @@
 // 戰鬥控制器：把規則引擎（monster.js／soul.js）、HUD（DOM）與戰鬥畫面（view3d.js）接在一起。
 // 計時、作答、朗讀、錯題紀錄都在這裡；規則本身在引擎裡，畫面動畫在 view 裡。
 import { $, app, esc, ask, SC, wait, lsGet, lsSet, KEY_HINT } from '../core/util.js';
+import { leaveCover } from '../pages/cover.js';
 import { setup, mark, pushHist, allWords, ctx, save } from '../core/store.js';
 import { clozeAns, opts, normEn, checkEn, checkZhSmart, zhPrompt, clozePos } from '../core/grading.js';
 import { speak, readAll, gate, spkBtn, stopSpeech, releaseSpeech, speechBusy, waitSpeech } from '../core/speech.js';
@@ -23,7 +24,7 @@ const setAns=v=>{const w=app.querySelector(".bwrap");if(w)w.classList.toggle("an
 function nextBtn(label){const nb=document.createElement("button");nb.className="pri nextbtn";nb.id="bnx";nb.textContent=label;$("#bq").appendChild(nb);return nb}
 const say=(t,cls)=>{const el=$("#msg");if(!el)return;el.className="msgbox "+(cls||"");el.textContent=t};
 
-export function startBattle(ws,soul){if(!ws.length)return;ctx.Q=null;stopSpeech();
+export function startBattle(ws,soul){if(!ws.length)return;leaveCover();ctx.Q=null;stopSpeech();
   const t=T=ctx.B={soul:!!soul,mode:setup.mode,pool:ws,bank:allWords(),phase:"busy",readP:Promise.resolve(),raf:0,tmo:0,seq:0};
   // window.__soulTest：自動化測試用（例如 {ambushRng} 強制觸發突襲），一般使用不會有
   const typeLimit=(w,k=1)=>typeLimitMs(enVariants(w.en)[0]||w.en)-Math.round(TYPE_THINK_MS*(1-k));

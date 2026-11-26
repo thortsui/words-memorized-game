@@ -1,4 +1,4 @@
-// 進入點：hash 路由（#home 封面、#dicts、#dict-<id>、#upload、#practice、#missed、#history）
+// 進入點：hash 路由（#dicts、#dict-<id>、#upload、#practice、#missed、#history）
 import './style.css';
 import { $ } from './core/util.js';
 import { ctx, pool } from './core/store.js';
@@ -7,12 +7,13 @@ import { renderUpload } from './pages/upload.js';
 import { renderSetup, startQuiz, startCards } from './pages/practice.js';
 import { renderMissed } from './pages/missed.js';
 import { renderHist } from './pages/history.js';
-import { renderCover, leaveCover } from './pages/cover.js';
+import { leaveCover } from './pages/cover.js';
+import { mountUpdate } from './pages/update.js';
 import { endBattle } from './battle/controller.js';
 import { stopSpeech } from './core/speech.js';
 
-function route(){const h=location.hash.slice(1)||"home";
-  leaveCover();         // 離開封面：停掉 3D 背景
+function route(){const h=location.hash.slice(1)||"dicts";
+  leaveCover();         // 離開魂系封面：停掉 3D 背景
   if(ctx.B)endBattle(); // 換頁就離開戰鬥
   stopSpeech();         // 換頁一律停止朗讀與字幕
   leaveDict(h);         // 離開字典內頁：丟掉還沒儲存的新增／編輯
@@ -29,8 +30,8 @@ function route(){const h=location.hash.slice(1)||"home";
       else{let p=pick(o);if(!p.length&&!o.mode){o.mode="en2zh";p=pick(o)}if(p.length)startQuiz(p,o);else renderSetup()}}else renderSetup()}
   else if(h==="history")renderHist();
   else if(h==="missed")renderMissed();
-  else if(h==="home")renderCover();
   else renderDicts();
   window.scrollTo(0,0)}
 addEventListener("hashchange",route);
 route();
+mountUpdate();
