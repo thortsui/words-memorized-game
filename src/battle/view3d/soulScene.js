@@ -475,6 +475,12 @@ export function createSoulScene(eng,fx,api){
       heroPolar();await eng.wait(.15)},
     // 撐過突襲：回到攻擊回合，Boss 退回站位、繼續走位
     async ambushEnd(){side="player";heroBusy=false;csReset(.4);hero.play("Idle");eng.wait(.5).then(()=>{if(side==="player"){hs.roam=true;aiStart()}});await eng.wait(.15)},
+    /* ---------- 破綻（攻擊回合答錯） ----------
+       Boss 不蓄力、直接用突進片段衝到主角面前一擊打倒：紅色「破綻」字樣、鏡頭急推、頓格；主角播 Die 片段倒地，接著 playerHit 處理爬起來。 */
+    async knockdown(p){const b=boss;moves.abort();aiHalt();heroBusy=true;stopRoam();hs.free=false;hero.root.position.y=0;flaskClear();eng.to(hero.pose.rotation,{x:0},.12);if(!b)return;
+      bossBusy(9);b.glow(0xff2a1a,1.6);fx.banner("破綻","soul danger",.7);fx.pulseVig("danger",.6,.5);sfx("swoosh",{v:.9,low:1});
+      atk=planAtk(b,{kind:"dash"});const at=await bossStrike(1.35);
+      fx.slash(at,{color:0xff3a2a,size:1.7,ang:-.5,dur:.26,sweep:1.6});sparks(at,18,[0xff3a2a,0xffd0a0,0xffffff],7)},
     // 連擊中段的彈刀：不衝上去，只有火花與小傷害（hit 事件直接處理）
     async deflect(){},
     async hit(p){if(p.move==="deflect"){await impact(p,{power:.6,color:0xfff2c0});return}
@@ -564,6 +570,11 @@ export function createSoulScene(eng,fx,api){
       if(k>=1)sfx("heavy",{v:.55});
       fx.text(v3(c.x,c.y+.9,c.z),"-"+p.dmg,"dmg soul hurt"+(k>=1?" big":""),{dur:1,rise:34});
       if(p.kind==="hit"){hero.play(k>=1&&hero.has("HitHeavy")?"HitHeavy":"Hit");sparks(c,16,[0xff3a2a,0x8a1a12,0xffffff],6);fx.burstRing(c,{color:0xff3a2a,r1:1.2});pushBack(p.chain?.5:1.2,.35);dust(hero.root.position,8)}
+      else if(p.kind==="knockdown"){heroBusy=true;const dsp=hero.has("Die")?Math.max(1.5,hero.duration("Die")/.75):1;hero.play(hero.has("Die")?"Die":"HitHeavy",{fade:.05,hold:true,speed:dsp});
+        sparks(c,20,[0xff3a2a,0x8a1a12,0xffffff],7);fx.burstRing(c,{color:0xff3a2a,r1:1.4});pushBack(1.6,.45);eng.wait(.55).then(()=>dust(hero.root.position,14,[0x7a6a60,0x8a8f98]));
+        bossRecover(.35);await eng.wait(1);if(p.lethal)return;
+        // 爬起來：從倒地姿勢慢慢混回待機，回到攻擊回合
+        hero.play("Idle",{fade:.5});await eng.wait(.45);heroBusy=false;side="player";csReset(.5);eng.wait(.3).then(()=>{if(side==="player"){hs.roam=true;aiStart()}});return}
       else if(p.kind==="guard"){pushBack(p.chain?.4:.9,.35)}
       else{sparks(c,6,[0xff6a4a],4)}
       bossRecover(.45);await eng.wait(p.chain?.22:.3+.2*k);if(!p.lethal&&!p.chain)csReset(.5)},

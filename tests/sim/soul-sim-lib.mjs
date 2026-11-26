@@ -31,10 +31,10 @@ function dodgeTime(pl, d) {
 const wantDrink = (pl, E) => { const s = E.state, c = E.commands().find(c => c.flask); return c && c.ready && pl.cmd !== rndCmd && s.hp < 100 * (pl.drinkAt ?? .4) };
 export function one(pl, opt = {}) {
   const E = createSoulBattle({ pool, mode: 'en2zh' }); E.start(); const B = E.state;
-  const st = { q: 0, eturns: 0, eturnsPerBoss: [0, 0, 0, 0, 0], attacks: 0, minSta: 100, guard: 0, parry: 0, dodge: 0, graze: 0, hit: 0, dSum: 0, dN: 0, sec: TM.firstEnter, kinds: {}, chainHits: 0, dangerHit: 0, flinch: 0, hpLost: 0, drinks: 0, spills: 0, ambush: 0, ambushHit: 0, punish: 0 };
+  const st = { q: 0, eturns: 0, eturnsPerBoss: [0, 0, 0, 0, 0], attacks: 0, minSta: 100, guard: 0, parry: 0, dodge: 0, graze: 0, hit: 0, dSum: 0, dN: 0, sec: TM.firstEnter, kinds: {}, chainHits: 0, dangerHit: 0, flinch: 0, hpLost: 0, drinks: 0, spills: 0, ambush: 0, ambushHit: 0, punish: 0, knock: 0 };
   let guardLoop = 0, lastKills = 0, lastPhase = 0;
   const after = () => { if (B.kills > lastKills) { st.sec += TM.enter * (B.kills - lastKills); lastKills = B.kills; lastPhase = 0 } if (B.bphase > lastPhase) { st.sec += TM.phase * (B.bphase - lastPhase); lastPhase = B.bphase } };
-  const count = evs => { for (const e of evs) { if (e.type === 'drink') st.drinks++; if (e.type === 'spill') st.spills++; if (e.type === 'ambush') { st.ambush++; st.sec += TM.ambush } if (e.type === 'flaskPunish') st.punish++ } };
+  const count = evs => { for (const e of evs) { if (e.type === 'drink') st.drinks++; if (e.type === 'spill') st.spills++; if (e.type === 'ambush') { st.ambush++; st.sec += TM.ambush } if (e.type === 'flaskPunish') st.punish++; if (e.type === 'knockdown') { st.knock++; st.sec += TM.knock || 1.2 } } };
   // 一題閃避（敵人回合與突襲共用）
   const dodgeOne = d => { st.attacks++; st.q++; st.kinds[d.kind] = (st.kinds[d.kind] || 0) + 1;
     st.sec += d.seg > 0 || d.kind === 'ambush' ? TM.teleChain : TM.tele;
@@ -71,11 +71,11 @@ export function one(pl, opt = {}) {
   return { win: B.over === 'win', kills: B.kills, ...st };
 }
 export function batch(pl, opt, N = 2000) {
-  const a = { win: 0, kills: 0, q: 0, eturns: 0, attacks: 0, minSta: 0, guard: 0, parry: 0, dodge: 0, graze: 0, hit: 0, killsDist: [0, 0, 0, 0, 0, 0], et: [0, 0, 0, 0, 0], d: 0, sec: 0, winSec: 0, chainHits: 0, dangerHit: 0, flinch: 0, hpLost: 0, hurtWins: 0, drinks: 0, spills: 0, ambush: 0, ambushHit: 0, punish: 0 };
+  const a = { win: 0, kills: 0, q: 0, eturns: 0, attacks: 0, minSta: 0, guard: 0, parry: 0, dodge: 0, graze: 0, hit: 0, killsDist: [0, 0, 0, 0, 0, 0], et: [0, 0, 0, 0, 0], d: 0, sec: 0, winSec: 0, chainHits: 0, dangerHit: 0, flinch: 0, hpLost: 0, hurtWins: 0, drinks: 0, spills: 0, ambush: 0, ambushHit: 0, punish: 0, knock: 0 };
   for (let i = 0; i < N; i++) { const r = one(pl, opt); a.win += r.win; if (r.win) { a.winSec += r.sec; if (r.hpLost > 0) a.hurtWins++ } a.kills += r.kills; a.q += r.q; a.eturns += r.eturns; a.attacks += r.attacks; a.minSta += r.minSta; a.sec += r.sec;
-    for (const k of ['guard', 'parry', 'dodge', 'graze', 'hit', 'chainHits', 'dangerHit', 'flinch', 'hpLost', 'drinks', 'spills', 'ambush', 'ambushHit', 'punish']) a[k] += r[k]; a.killsDist[r.kills]++; r.eturnsPerBoss.forEach((x, i) => a.et[i] += x); a.d += r.dN ? r.dSum / r.dN : 0 }
+    for (const k of ['guard', 'parry', 'dodge', 'graze', 'hit', 'chainHits', 'dangerHit', 'flinch', 'hpLost', 'drinks', 'spills', 'ambush', 'ambushHit', 'punish', 'knock']) a[k] += r[k]; a.killsDist[r.kills]++; r.eturnsPerBoss.forEach((x, i) => a.et[i] += x); a.d += r.dN ? r.dSum / r.dN : 0 }
   const f = x => +(x / N).toFixed(2);
-  return { 'win%': Math.round(a.win / N * 100), kills: f(a.kills), dist: a.killsDist.map(x => Math.round(x / N * 100)).join('/'), q: f(a.q), eTurns: f(a.eturns), eTurnsPerBoss: a.et.map(f).join('/'), atk: f(a.attacks), parry: f(a.parry), dodge: f(a.dodge), guard: f(a.guard), graze: f(a.graze), hit: f(a.hit), chainHits: f(a.chainHits), dangerHit: f(a.dangerHit), flinch: f(a.flinch), hpLost: f(a.hpLost), drinks: f(a.drinks), spills: f(a.spills), ambush: f(a.ambush), ambushHit: f(a.ambushHit), punish: f(a.punish), hurtWin: a.win ? Math.round(a.hurtWins / a.win * 100) : null, minSta: f(a.minSta), avgD: f(a.d), sec: Math.round(a.sec / N), winSec: a.win ? Math.round(a.winSec / a.win) : null } }
+  return { 'win%': Math.round(a.win / N * 100), kills: f(a.kills), dist: a.killsDist.map(x => Math.round(x / N * 100)).join('/'), q: f(a.q), eTurns: f(a.eturns), eTurnsPerBoss: a.et.map(f).join('/'), atk: f(a.attacks), parry: f(a.parry), dodge: f(a.dodge), guard: f(a.guard), graze: f(a.graze), hit: f(a.hit), chainHits: f(a.chainHits), dangerHit: f(a.dangerHit), flinch: f(a.flinch), hpLost: f(a.hpLost), drinks: f(a.drinks), spills: f(a.spills), ambush: f(a.ambush), ambushHit: f(a.ambushHit), punish: f(a.punish), knock: f(a.knock), hurtWin: a.win ? Math.round(a.hurtWins / a.win * 100) : null, minSta: f(a.minSta), avgD: f(a.d), sec: Math.round(a.sec / N), winSec: a.win ? Math.round(a.winSec / a.win) : null } }
 export function table(title, opt, N = 2000) { console.log('\n### ' + title); const out = {}; for (const [n, p] of Object.entries(PLAYERS)) { const r = batch(p, opt, N); out[n] = r; console.log(n.padEnd(22), JSON.stringify(r)) } return out }
 
 const base = JSON.parse(JSON.stringify({ SOUL, B: SOUL_BOSSES }));

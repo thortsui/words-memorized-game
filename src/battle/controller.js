@@ -134,6 +134,7 @@ const MSG={
   flaskRefill:e=>[`撿回一壺藥（藥壺 ${e.flasks}）`,"good"],
   ambush:e=>e.from==="skill"?[`${e.boss.name} 突襲！招式被打斷${e.landed?`（只打中 ${e.landed}/${e.total} 段）`:""}${e.refund?`，返還 ATB ${e.refund} 格`:""}——快答閃開！`,"bad danger"]
     :e.from==="flask"?[`${e.boss.name} 趁你喝藥突襲！藥還沒喝到（壺沒扣）——快答閃開！`,"bad danger"]:[`${e.boss.name} 突襲！這題作廢——快答閃開！`,"bad danger"],
+  knockdown:e=>[e.from==="flask"?`藥灑了還露出破綻！${e.boss.name} 衝上來把你打倒（−${e.dmg}）`:`答錯露出破綻！${e.boss.name} 衝上來把你打倒（−${e.dmg}）`,"bad danger"],
   ambushEnd:e=>[`撐過突襲，繼續攻擊！（剩 ${(e.atkLeft/1000).toFixed(1)} 秒）`,"good"],
 };
 const SFX={gain:"shot",atb:"shot",chainStart:"shot",chainCharge:"shot",telegraph:"hurt",parry:"parry",dodge:"shot",faint:"faint",heal:"win"};

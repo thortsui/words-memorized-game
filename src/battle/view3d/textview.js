@@ -37,7 +37,7 @@ export function mountText(container,api){
     telegraph:async p=>{line(p.kind==="danger"?`！！！ 必殺：${p.move}`:p.kind==="dash"?`！！ 突進：${p.move}`:p.kind==="combo"?`！ ${p.move}（${p.seg+1}/${p.segs}）`:`！ ${p.boss.name} 蓄力：${p.move}`,"bad");await W(p.kind==="combo"&&p.seg?200:420)},
     parry:async p=>{line(p.chain?"彈開！":"彈反！","big good");await W(300)},
     deflect:async()=>{},flaskStart:async()=>{line("拿出藥壺…","good");await W(200)},drink:async p=>{p.onImpact&&p.onImpact();line(`喝下藥壺 +${p.amount} HP`,"good");await W(300)},spill:async()=>{line("藥灑了…","bad");await W(250)},
-    flaskPunish:async()=>{line("Boss 趁機逼近！","bad")},flaskRefill:async()=>{line("藥壺 +1","good")},ambush:async p=>{line(`！！ 突襲：${p.move}`,"big bad");await W(300)},ambushEnd:async()=>{line("撐過突襲，繼續攻擊！","good");await W(150)},delayRelease:async()=>{line("　出手了！","bad")},
+    flaskPunish:async()=>{line("Boss 趁機逼近！","bad")},flaskRefill:async()=>{line("藥壺 +1","good")},ambush:async p=>{line(`！！ 突襲：${p.move}`,"big bad");await W(300)},ambushEnd:async()=>{line("撐過突襲，繼續攻擊！","good");await W(150)},knockdown:async p=>{line(`！！ 破綻：${p.move}——被打倒了`,"big bad");await W(400)},delayRelease:async()=>{line("　出手了！","bad")},
     dodge:async()=>{line("翻滾閃避。","good");await W(300)},
     guard:async()=>{line("耐力不足，勉強格擋。","bad");await W(250)},
     graze:async()=>{line("太慢了，被擦傷。","bad");await W(250)},

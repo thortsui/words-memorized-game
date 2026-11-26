@@ -34,7 +34,7 @@ export const SOUL={
   windowMs:10500,      // 玩家回合的攻擊時間（只在題目顯示中倒數）；10.5 秒＝每題 2.5 秒的玩家答得到第 4 題
   minCostMs:2500,      // 每一題至少消耗這麼多攻擊時間（答得再快，一回合也只有 4 題）
   missPenaltyMs:2000,  // 攻擊回合答錯，多扣的攻擊時間
-  healOnKill:15,       // 打倒 Boss 回復的 HP（有藥壺之後從 40 降到 15：回血改成自己決定什麼時候喝）
+  healOnKill:30,       // 打倒 Boss 回復的 HP（有藥壺之後從 40 降到 15；突襲／破綻變多之後拉回 30）
   atbMax:3,
   staminaMax:100,
   staminaTurn:25,      // 每次輪到玩家回復（連擊改版：敵人回合題數變多，從 15 提高）
@@ -74,14 +74,18 @@ export const SOUL={
   dashDmg:.7,
   dangerLimitMul:.9,   // 必殺（第二階段起）：答對才閃得掉，答錯／超時不能硬擋、吃全額
   dangerDmg:1.25,
-  // ---- 突襲（攻擊回合中 Boss 搶先出手，每個玩家回合最多一次；大招不會被打斷） ----
-  ambushBase:[.02,.025,.03,.035,.04], // 每次判定（答一題／出一招／喝一次藥）的基本機率，依第幾隻 Boss
+  // ---- 突襲（攻擊回合中 Boss 搶先出手，每個玩家回合最多 ambushPerTurn 次；大招不會被打斷） ----
+  ambushBase:[.09,.10,.11,.12,.14], // 每次判定（答一題／出一招／喝一次藥）的基本機率，依第幾隻 Boss
   ambushPhaseMul:1.5,  // 第二階段起
-  ambushSlackMs:2000,  // 作答或猶豫超過這個時間的部分才加機率
-  ambushPerSec:.03,    // 每多拖 1 秒 +3%
-  ambushFlask:.08,     // 喝藥時額外 +8%
-  ambushMax:.3,
-  ambushLimitMul:.75,  // 突襲閃避題的時限倍率
+  ambushSlackMs:1500,  // 作答或猶豫超過這個時間的部分才加機率
+  ambushPerSec:.05,    // 每多拖 1 秒 +5%
+  ambushFlask:.15,     // 喝藥時額外 +15%
+  ambushMax:.45,
+  ambushPerTurn:2,     // 每個玩家回合最多被突襲幾次
+  // ---- 破綻（攻擊回合答錯：Boss 立刻衝上來把你打倒，不能閃、不能擋） ----
+  knockMul:.3,         // 傷害＝Boss 攻擊力×階段倍率×動態難度×這個倍率
+  knockMs:600,         // 倒地爬起來額外花掉的攻擊時間
+  ambushLimitMul:.9,   // 突襲閃避題的時限倍率（突襲變頻繁之後從 .75 放寬）
   ambushResumeMs:1000, // 撐過突襲後攻擊時間還有這麼多才回到攻擊回合，不然直接進敵人回合（剩 0.1 秒回去也答不了）
   // ---- 藥壺（戰鬥中回血） ----
   flaskStart:3,        // 開場幾壺

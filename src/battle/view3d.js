@@ -12,7 +12,7 @@
 //
 // payload 一律帶 s（規則引擎當下的狀態快照）。有傷害的事件另外帶回呼，讓 HUD 在命中瞬間才扣血：
 //   hit       : 每一段傷害各一個事件 {skillId, move, index, total, dmg, mhp, last, kill, big}；命中瞬間呼叫 payload.onImpact()
-//   playerHit : 玩家受擊 {dmg, hp, kind:'hit'|'guard'|'graze', lethal, source}；命中瞬間呼叫 payload.onImpact()
+//   playerHit : 玩家受擊 {dmg, hp, kind:'hit'|'guard'|'graze'|'knockdown', lethal, source}；命中瞬間呼叫 payload.onImpact()
 // 招式流程：skill（起手，含 hitCount/totalDmg）→ hit × N → （faint → heal → enter ／ win）
 //
 // 事件清單見 EVENTS（docs/魂系模式設計.md 有說明）。各事件的演出寫在 view3d/monsterScene.js 與 view3d/soulScene.js。
@@ -21,7 +21,7 @@ import { mountText } from './view3d/textview.js';
 export const EVENTS={
   common:["skill","hit","playerHit","faint","heal","win","lose"],
   monster:["enter","gain","hold","chainStart","chainCharge","chainFire","chainStage","chainDone","chainBreak","foeAttack"],
-  soul:["bossEnter","playerTurn","atb","miss","quickSlash","windowEnd","bossPhase","enemyTurn","telegraph","parry","counter","deflect","delayRelease","dodge","guard","graze","foeHit","flaskStart","drink","spill","flaskPunish","flaskRefill","ambush","ambushEnd"],
+  soul:["bossEnter","playerTurn","atb","miss","quickSlash","windowEnd","bossPhase","enemyTurn","telegraph","parry","counter","deflect","delayRelease","dodge","guard","graze","foeHit","flaskStart","drink","spill","flaskPunish","flaskRefill","ambush","ambushEnd","knockdown"],
 };
 
 // 先用一個丟棄式 canvas 確認 WebGL 能用，不能用就不必下載 three.js
