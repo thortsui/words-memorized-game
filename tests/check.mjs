@@ -175,15 +175,24 @@ t("魂系：玩家回合——答對自動連斬（剩 60% 以上＝完美 5 連
   E.state.atkLeft=4000;E.nextAttackQuestion();const hp0=E.state.hp;ev=E.answerAttack(false,2000);assert.deepEqual(types(ev),["miss","knockdown","playerHit"]);assert.equal(E.state.atkLeft,4000-2000-SOUL.missPenaltyMs-SOUL.knockMs);
   assert.equal(ev[2].kind,"knockdown");assert.equal(E.state.hp,hp0-ev[1].dmg);
   E.state.atkLeft=0;ev=E.command(0);assert.deepEqual(types(ev),["windowEnd","enemyTurn"]);assert.equal(E.state.phase,"enemy")});
-t("魂系：斬擊也要答題——複習這一局答對過的字，答錯或超時連斬中斷（不會被打倒）",()=>{const E=createSoulBattle({pool,mode:"en2zhT",ambushRng:()=>1,rng:()=>0});E.start();E.state.mhp=999;
-  // 還沒有答對過其他字：第一題斬擊出新字
-  E.nextAttackQuestion();const w0=E.state.w;E.answerAttack(true,1000);let s1=E.nextSlash();assert.equal(s1.mode,"en2zh","斬擊題一律選擇題");assert.notEqual(s1.w.id,w0.id);assert.equal(s1.review,false);
-  E.answerSlash(true,600);s1=E.nextSlash();assert.equal(s1.review,true,"之後從答對過的字抽");assert.ok(E.state.known.some(x=>x.id===s1.w.id));
-  // 答錯：連斬中斷、這個字稍後再考、不扣 HP
-  const hp=E.state.hp,landed=2;let ev=E.answerSlash(false,600);assert.deepEqual(types(ev),["miss","slashEnd"]);assert.equal(ev[1].broken,true);assert.equal(ev[1].landed,landed);assert.equal(E.state.hp,hp);assert.equal(E.state.phase,"cmd");
-  assert.ok(E.state.queue.slice(0,4).some(x=>x.id===s1.w.id));
+t("魂系：斬擊也要答題——優先複習答錯過的字，再來是答對但想比較久的；同一套連斬不重複；答錯或超時連斬中斷（不會被打倒）",()=>{
+  const E=createSoulBattle({pool,mode:"en2zhT",ambushRng:()=>1,rng:()=>0});E.start();E.state.mhp=999;const B=E.state,W=pool.slice(0,6);
+  // 這一局答過的字：W0 答錯 2 次、W1 答錯 1 次、W2 答對花 3.5 秒、W3 答對花 1.2 秒、W4 答對花 2.4 秒
+  const h=(w,o)=>{B.hist[w.id]={w,miss:false,misses:0,ms:0,...o}};h(W[0],{miss:true,misses:2});h(W[1],{miss:true,misses:1});h(W[2],{ms:3500});h(W[3],{ms:1200});h(W[4],{ms:2400});
+  B.queue.unshift(W[5]);E.nextAttackQuestion();assert.equal(B.w.id,W[5].id);E.answerAttack(true,800);
+  const order=[];for(let i=1;i<5;i++){const q=E.nextSlash();order.push([q.w.id,q.why]);E.answerSlash(true,600)}
+  assert.deepEqual(order,[[W[0].id,"miss"],[W[1].id,"miss"],[W[2].id,"slow"],[W[4].id,"slow"]],"錯 2 次 → 錯 1 次 → 想最久 → 次久");
+  // 斬擊題答對：答錯過的字算補回來了（下次不再優先）
+  assert.equal(B.hist[W[0].id].miss,false);
+  // 斬擊題一律選擇題；答錯：連斬中斷、這個字稍後再考、不扣 HP，之後它又會被優先抽到
+  E.command(0);B.atkLeft=8000;E.nextAttackQuestion();E.answerAttack(true,800);const q=E.nextSlash();assert.equal(q.mode,"en2zh");
+  const hp=B.hp;let ev=E.answerSlash(false,600);assert.deepEqual(types(ev),["miss","slashEnd"]);assert.equal(ev[1].broken,true);assert.equal(ev[1].landed,1);assert.equal(B.hp,hp);assert.equal(B.phase,"cmd");
+  assert.equal(B.hist[q.w.id].miss,true);assert.ok(B.queue.slice(0,4).some(x=>x.id===q.w.id));
+  E.command(0);E.nextAttackQuestion();E.answerAttack(true,800);assert.equal(E.nextSlash().w.id,q.w.id,"剛答錯的字下一套連斬優先出");
   // 超時也算中斷
-  E.command(0);E.state.atkLeft=8000;E.nextAttackQuestion();E.answerAttack(true,1000);E.nextSlash();ev=E.answerSlash(false,9999,{timeout:true});assert.ok(types(ev).includes("slashEnd"))});
+  ev=E.answerSlash(false,9999,{timeout:true});assert.ok(types(ev).includes("slashEnd"));
+  // 這一局還沒答過別的字：出新字
+  const X=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});X.start();X.state.mhp=999;X.nextAttackQuestion();X.answerAttack(true,800);assert.equal(X.nextSlash().why,"new")});
 t("魂系：彈反／閃避／擦傷／格擋／中招與耐力",()=>{const b=SOUL_BOSSES[0],mkE=()=>{const E=createSoulBattle({pool,mode:"zh2enT",ambushRng:()=>1,rng:()=>0});E.start();E.nextAttackQuestion();E.answerAttack(false,10000,{noKnock:true});E.command(0);return E};
   let E=mkE(),d=E.nextDodge();assert.equal(d.mode,"zh2en");assert.equal(d.limitMs,SOUL.dodgeClamp[0]);fixLim(E);assert.equal(types(d.events)[0],"telegraph");
   let ev=E.answerDodge(true,1000);assert.deepEqual(types(ev),["parry","counter","hit"]);assert.equal(E.state.atb,1);assert.equal(E.state.hp,100);assert.equal(E.nextDodge(),null);assert.deepEqual(types(E.startPlayerTurn()),["playerTurn"]);

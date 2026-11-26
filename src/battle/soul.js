@@ -28,7 +28,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
     // 練等（只在這一局）：pk＝各強化的層數、perks＝依序選過的強化、offer＝目前可選的 3 個
     hpMax:PLAYER_HP,staMax:SOUL.staminaMax,flaskMax:SOUL.flaskMax,pk:{},perks:[],offer:null,
     win:SOUL.windowMs,wstreak:0,weakDone:false,weaks:0,dstreak:0,as:null,assaults:0,
-    known:[],chain:null,slashes:0,slashMiss:0}; // known＝這一局答對過的字（斬擊複習題從這裡抽）
+    known:[],hist:{},chain:null,slashes:0,slashMiss:0}; // known＝這一局答對過的字；hist＝這一局答過的字 {w, miss（答錯還沒在斬擊題補回來）, misses, ms（最近一次答對花的時間）}
   const pk=id=>B.pk[id]||0;
   const rr=a=>Math.round(a[0]+rng()*(a[1]-a[0]));
   const dmgMul=()=>comboMult(B.combo)*diff().dmgMul*(1+.15*pk("blade"));
@@ -40,11 +40,18 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
   const mk=out=>(type,p)=>{const e={type,...p,s:snap()};out.push(e);onEvent&&onEvent(e);return e};
   const nextWord=()=>{if(B.queue.length<2)B.queue.push(...shuffle(B.pool));return B.queue.shift()};
   const record=(ok,ms)=>{B.recent.push({ok,ms});if(B.recent.length>24)B.recent.shift()};
-  const learn=w=>{if(w&&!B.known.some(x=>x.id===w.id))B.known.push(w)};
-  // 斬擊複習題：從答對過的字抽（不重複剛剛那一題）；還沒有答對過的字就出新字
-  const reviewWord=()=>{const last=B.w&&B.w.id,c=B.known.filter(x=>x.id!==last);return c.length?c[Math.floor(rng()*c.length)]:nextWord()};
+  const hist=w=>B.hist[w.id]||(B.hist[w.id]={w,miss:false,misses:0,ms:0});
+  // 答對：記下花了多久（答錯過的字在這裡答對就算補回來了）
+  const learn=(w,ms=0)=>{if(!w)return;if(!B.known.some(x=>x.id===w.id))B.known.push(w);const h=hist(w);h.miss=false;h.ms=ms};
+  const missed=w=>{if(!w)return;const h=hist(w);h.miss=true;h.misses++};
+  // 斬擊複習題（這一局答過的字）：優先答錯過的（錯越多次越先），再來是答對但想比較久的（花的時間越長越先）；
+  // 同一套連斬不重複出同一個字；都沒有就出新字。回傳 [字, 理由]
+  const reviewWord=C=>{const used=C&&C.used||new Set(),cur=B.w&&B.w.id,all=Object.values(B.hist).filter(h=>h.w.id!==cur&&!used.has(h.w.id));
+    const wrong=all.filter(h=>h.miss).sort((a,b)=>b.misses-a.misses||rng()-.5);if(wrong.length)return[wrong[0].w,"miss"];
+    const slow=all.filter(h=>!h.miss&&h.ms>0).sort((a,b)=>b.ms-a.ms);if(slow.length)return[slow[0].w,"slow"];
+    return[nextWord(),"new"]};
   const addStamina=v=>{B.stamina=clamp(B.stamina+v,0,B.staMax)};
-  const requeue=w=>{if((w._rep||0)<3)B.queue.splice(Math.min(3,B.queue.length),0,{...w,_rep:(w._rep||0)+1});if(!w._rep)B.wrong.push(w)};
+  const requeue=w=>{missed(w);if((w._rep||0)<3)B.queue.splice(Math.min(3,B.queue.length),0,{...w,_rep:(w._rep||0)+1});if(!w._rep)B.wrong.push(w)};
 
   // 對 Boss 造成傷害；回傳是否擊倒。跨過血量門檻就進入下一階段。
   function damage(ev,type,p,base){const mult=dmgMul(),dmgs=base.map(x=>Math.round(x*mult)),total=dmgs.length,target=boss().id;
@@ -145,7 +152,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
     // 答對一題砍一刀（最後一題是重擊）；答錯或超時突擊結束。結束後換玩家回合
     answerAssault(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="assaultQ")return out;const w=B.w,A=B.as;B.n++;if(opt.timeout)ms=Math.max(ms,A.limitMs+1);record(ok,ms);A.i++;
       const good=ok&&ms<=A.limitMs;
-      if(good){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);A.hits++;const last=A.i>=A.total,D=SOUL.assaultDmg;
+      if(good){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);A.hits++;learn(w,ms);const last=A.i>=A.total,D=SOUL.assaultDmg;
         const dd=last?D[D.length-1]:D[Math.min(A.i-1,D.length-2)],hh=last?[Math.round(dd*.3),Math.round(dd*.3),dd-2*Math.round(dd*.3)]:[Math.floor(dd/2),Math.ceil(dd/2)];
         if(damage(ev,"skill",{move:"chain",name:last?"突擊・終結":"突擊",n:hh.length,variant:Math.floor(rng()*3),assault:true,index:A.i-1,total:A.total},hh)){faint(ev);return out}}
       else{B.combo=0;requeue(w);ev("miss",{ms,assault:true,timeout:!!opt.timeout})}
@@ -159,7 +166,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
       if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);addStamina(SOUL.staminaHit);
         // 自動連斬：剩下的時間比例決定段數（剩 60% 以上＝完美＝5 連斬）；動作三組隨機一組
         const left=1-ms/B.win,lv=.1*pk("quick"),n=left>=SOUL.chainAt[0]-lv?5:left>=SOUL.chainAt[1]-lv?4:3,perfect=left>=SOUL.perfectAt-lv,hits=SOUL.chainHits[n],variant=Math.floor(rng()*3);
-        learn(w);const C={n,hits,variant,perfect,landed:0,i:1,name:(perfect?"完美・":"")+n+" 連斬"};
+        learn(w,ms);const C={n,hits,variant,perfect,landed:0,i:1,used:new Set([w.id]),name:(perfect?"完美・":"")+n+" 連斬"};
         ev("skill",{move:"chain",skillId:"chain",name:C.name,n,variant,perfect,hitCount:n,totalDmg:0,mult:dmgMul(),target:boss().id});
         if(slashHit(ev,C,0)){faint(ev);return out}
         // 突襲：第一刀之後被打斷，後面的斬擊都沒了
@@ -171,11 +178,11 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
       else{B.combo=0;B.wstreak=0;requeue(w);ev("miss",{ms});if(!opt.noKnock&&knock(ev,"answer"))return out}
       B.phase="cmd";return out},
     /* ---- 斬擊複習題 ---- */
-    nextSlash(){if(B.phase!=="slash"||!B.chain)return null;const C=B.chain,w=reviewWord();B.w=w;B.phase="slashQ";C.limitMs=SOUL.slashLimitMs+500*pk("dodgeT");
-      return{w,mode:mcOf(B.mode),limitMs:C.limitMs,index:C.i,total:C.n,review:B.known.some(x=>x.id===w.id)}},
+    nextSlash(){if(B.phase!=="slash"||!B.chain)return null;const C=B.chain,[w,why]=reviewWord(C);C.used.add(w.id);B.w=w;B.phase="slashQ";C.limitMs=SOUL.slashLimitMs+500*pk("dodgeT");
+      return{w,mode:mcOf(B.mode),limitMs:C.limitMs,index:C.i,total:C.n,review:why!=="new",why}},
     // 答對砍下這一刀；答錯或超時連斬中斷（不會被打倒，但這個字稍後再考）。複習題不扣攻擊時間
     answerSlash(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="slashQ"||!B.chain)return out;const C=B.chain,w=B.w;B.n++;if(opt.timeout)ms=Math.max(ms,C.limitMs+1);record(ok,ms);
-      if(ok&&ms<=C.limitMs){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);learn(w);if(slashHit(ev,C,C.i)){faint(ev);return out}C.i++;
+      if(ok&&ms<=C.limitMs){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);learn(w,ms);if(slashHit(ev,C,C.i)){faint(ev);return out}C.i++;
         if(C.i>=C.n){endChain(ev,C,false);return out}B.phase="slash";return out}
       B.combo=0;B.slashMiss++;requeue(w);ev("miss",{ms,slash:true,timeout:!!opt.timeout});endChain(ev,C,true);return out},
     // 題目顯示中時間用完
@@ -197,7 +204,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
       if(!opt.noAmbush&&!opt.timeout&&arng()<ambushP(ms,SOUL.ambushFlask)){B.atkLeft=Math.max(0,B.atkLeft-Math.max(ms,SOUL.flaskCostMs));B.queue.unshift(w);ambush(ev,"flask",{ms});return out}
       B.flasks--;B.n++;record(ok,ms);
       B.atkLeft=Math.max(0,B.atkLeft-Math.max(ms,SOUL.flaskCostMs));
-      if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.drinks++;const amount=Math.min(flaskHeal(),B.hpMax-B.hp);B.hp+=amount;ev("drink",{amount,hp:B.hp,flasks:B.flasks})}
+      if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.drinks++;learn(w,ms);const amount=Math.min(flaskHeal(),B.hpMax-B.hp);B.hp+=amount;ev("drink",{amount,hp:B.hp,flasks:B.flasks})}
       else{B.combo=0;requeue(w);ev("spill",{flasks:B.flasks,timeout:!!opt.timeout});if(!opt.noKnock&&knock(ev,"flask"))return out}
       if(B.atkLeft<SOUL.flaskPunishMs){B.punish=true;ev("flaskPunish",{})}
       if(B.atkLeft<=0||opt.timeout){B.atkLeft=0;ev("windowEnd",{});enemyTurn(ev);return out}
@@ -228,7 +235,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
       const cm=1+.6*pk("counter"),gm=pk("guard")?.6:1;
       const km=cur.kind==="combo"?SOUL.comboDmg:cur.kind==="delayed"?SOUL.delayDmg:cur.kind==="dash"?SOUL.dashDmg:cur.kind==="danger"?SOUL.dangerDmg:1;
       const full=Math.max(1,Math.round((b.atk+Math.round(rng()*6))*(p?p.atkMul:1)*(cur.foeMul||1)*km));
-      if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);learn(w)}else{B.combo=0;requeue(w)}
+      if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);learn(w,ms)}else{B.combo=0;requeue(w)}
       B.phase="enemy";const base={move:cur.move,ms,kind:cur.kind,chain:cur.chain,timeout:!!opt.timeout,early:opt.early||0};
       if(g==="parry"){B.parries++;B.atb=Math.min(SOUL.atbMax,B.atb+1);addStamina(SOUL.staminaParry);ev("parry",base);
         // 連擊中段的彈反只彈開刀（小傷害、不衝上去）；整招最後一段才完整反擊

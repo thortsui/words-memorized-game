@@ -291,7 +291,7 @@ function sGo(t){if(!alive(t))return;const ph=t.E.state.phase;if(ph==="end")retur
 function sSlash(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu();stopSpeech();t.view.setTimeScale(1);const q=t.E.nextSlash();if(!q)return sGo(t);
   const w=q.w,m=q.mode;t.phase="q";t.qkind="slash";
   $("#bq").innerHTML=soulHud()+qCard(t,w,m,{cls:"chainq k-slash",plain:true});
-  say(`斬擊 ${q.index+1}/${q.total}：${q.review?"複習答對過的字——":""}答對才砍得下去！`,"good");
+  say(`斬擊 ${q.index+1}/${q.total}：${q.why==="miss"?"複習剛才答錯的字——":q.why==="slow"?"複習剛才想比較久的字——":""}答對才砍得下去！`,q.why==="miss"?"bad":"good");
   let done=false,tm=null;
   const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerSlash(ok,opt&&opt.timeout?q.limitMs+1:ms,opt||{});
