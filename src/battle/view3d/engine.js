@@ -1,6 +1,7 @@
 // 3D 引擎底層：renderer、單一 requestAnimationFrame 迴圈、遊戲時間（受時間倍率影響）、補間、頓格、震動、
 // 解析度自動調降、頁面隱藏時暫停、資源釋放。場景（monsterScene／soulScene）只管內容。
 import * as THREE from 'three';
+import { createPost } from './post.js';
 
 export const ease={
   lin:t=>t,
@@ -33,7 +34,10 @@ export function createEngine(container,{reducedMotion=false}={}){
   const camera=new THREE.PerspectiveCamera(45,1,.1,200);
   const E={THREE,renderer,scene,camera,canvas,overlay,wrap,container,rm:reducedMotion,
     dead:false,time:0,timeScale:1,dpr:baseDpr,quality:"high",fps:0,width:1,height:1,aspect:1,
-    onResize:[],onQuality:[]};
+    onResize:[],onQuality:[],post:null};
+  // 後製（場景呼叫 E.usePost 開啟）；低畫質或 context 遺失時直接畫到螢幕
+  E.usePost=o=>{try{E.post=createPost(E,o);if(E.width>1)E.post.setSize(E.width,E.height)}catch(e){console.warn("[view3d] post",e);E.post=null}};
+  E.render=dt=>{if(E.post&&E.quality!=="low"){try{E.post.render(dt);return}catch(e){console.warn("[view3d] post render",e);E.post=null}}renderer.render(scene,camera)};
 
   /* ---------- 補間（以遊戲時間計；real:true 則不受時間倍率影響） ---------- */
   let tweens=[];
@@ -71,9 +75,10 @@ export function createEngine(container,{reducedMotion=false}={}){
   E.resize=()=>{const w=Math.max(1,container.clientWidth),h=Math.max(1,container.clientHeight);
     if(w===E.width&&h===E.height&&!E._forceResize)return;E._forceResize=false;
     E.width=w;E.height=h;E.aspect=w/h;renderer.setSize(w,h,false);camera.aspect=E.aspect;camera.updateProjectionMatrix();
+    E.post&&E.post.setSize(w,h);
     for(const f of E.onResize)f(w,h)
     // setSize 會清空畫布；立刻補畫一格，否則到下一個 rAF 之前會閃一下空白
-    if(E._started&&!E.dead){try{renderer.render(scene,camera)}catch(e){}}};
+    if(E._started&&!E.dead){try{E.render(0)}catch(e){}}};
   const ro=typeof ResizeObserver!=="undefined"?new ResizeObserver(()=>E.resize()):null;ro&&ro.observe(container);
   const onWinResize=()=>E.resize();window.addEventListener("resize",onWinResize);
 
@@ -81,7 +86,7 @@ export function createEngine(container,{reducedMotion=false}={}){
      累計 2 秒低於 38fps（中間沒有回到 48fps 以上）就降一段；任何一秒低於 20fps 就立刻把 ①② 一次做完。模型載完（E.armed）一秒後才開始判斷。 */
   let fpsN=0,fpsT=0,fpsReal=0,lowCount=0,warm=0;
   const LOCK=typeof window!=="undefined"&&window.__v3q||"";
-  const setDpr=d=>{E.dpr=d;renderer.setPixelRatio(d);E._forceResize=true;E.resize()};
+  const setDpr=d=>{E.dpr=d;renderer.setPixelRatio(d);E._forceResize=true;E.width=0;E.resize()};
   const setLow=()=>{if(E.quality==="low")return;E.quality="low";for(const f of E.onQuality){try{f("low")}catch(e){console.warn("[view3d] quality",e)}}};
   function degrade(hard){
     if(E.dpr>1){setDpr(1);if(hard)setLow()}
@@ -106,7 +111,7 @@ export function createEngine(container,{reducedMotion=false}={}){
     // 真的一直很慢的裝置平均幀長會跟著變大，遊戲時間仍和真實時間一致。
     const cap=Math.max(.05,Math.min(.1,avgDt*1.6));avgDt+=(Math.min(rdt,.25)-avgDt)*.08;if(rdt>cap)rdt=cap;
     fpsTick(rdt,real);
-    if(E.paused){renderer.render(scene,camera);return} // 暫停：畫面留著，時間不走
+    if(E.paused){E.render(0);return} // 暫停：畫面留著，時間不走
     // 時間倍率不直接跳：指令選單的慢動作、出招時的 0.85 倍都在約 0.1 秒內滑過去
     tsNow+=(E.timeScale-tsNow)*(1-Math.exp(-rdt*14));if(Math.abs(E.timeScale-tsNow)<.002)tsNow=E.timeScale;
     let k=tsNow*(E.fast||1); // fast：跳過演出時的快轉倍率
@@ -129,7 +134,7 @@ export function createEngine(container,{reducedMotion=false}={}){
       if(s.dir){shakeOff.addScaledVector(s.dir,a*Math.sin(w*.5+s.ph[0]))}
       shakeOff.x+=nx*a;shakeOff.y+=ny*a*.8;roll+=Math.sin(w*.7+s.ph[1])*s.roll*env;sh=true}
     if(sh){camQ.copy(camera.quaternion);shakeOff.applyQuaternion(camera.quaternion);camera.position.add(shakeOff);if(roll)camera.rotateZ(roll*.25)}
-    renderer.render(scene,camera);
+    E.render(rdt);
     if(sh){camera.position.sub(shakeOff);camera.quaternion.copy(camQ)}}
   const start=()=>{if(raf||E.dead)return;last=performance.now();raf=requestAnimationFrame(frame)};
   const stop=()=>{cancelAnimationFrame(raf);raf=0};
@@ -162,6 +167,7 @@ export function createEngine(container,{reducedMotion=false}={}){
     try{E.disposeObject(scene)}catch(e){}
     if(scene.background&&scene.background.isTexture)scene.background.dispose();
     for(const o of extra){try{o.dispose&&o.dispose()}catch(e){}}
+    if(E.post){try{E.post.dispose()}catch(e){}E.post=null}
     renderer.renderLists.dispose();renderer.dispose();
     try{renderer.forceContextLoss()}catch(e){}
     wrap.remove()};

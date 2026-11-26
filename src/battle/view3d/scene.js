@@ -16,7 +16,7 @@ export function create(container,api){
   eng.onQuality.push(q=>S.onQuality&&S.onQuality(q));
   eng.start();
   // 測試用：自動化試玩時（頁面先設 window.__v3test）可以讀 Boss 位置與走位狀態
-  if(typeof window!=="undefined"&&window.__v3test){window.__v3dbg=()=>({...(S.debug?S.debug():{}),fps:eng.fps,time:+eng.time.toFixed(3)});
+  if(typeof window!=="undefined"&&window.__v3test){window.__v3eng=eng;window.__v3dbg=()=>({...(S.debug?S.debug():{}),fps:eng.fps,time:+eng.time.toFixed(3)});
     if(S.frame&&window.__v3test>1){const F=window.__v3frames=[];eng.onUpdate(()=>{F.push(S.frame());if(F.length>40000)F.splice(0,10000)},200)}}
   // 開場先等主角與第一個對手的模型（顯示載入進度）；超過 25 秒（慢速網路）才用替身開打，模型到了再熱替換
   const tip=document.createElement("div");tip.className="v3-loading";tip.innerHTML="<b>載入模型中… 0%</b><span>第一次進入需要下載模型，請稍候</span><i><u></u></i>";eng.wrap.appendChild(tip);

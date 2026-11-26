@@ -57,7 +57,7 @@ export function createLoader(){
 export function toonGradient(){const d=new Uint8Array([110,110,110,255,185,185,185,255,255,255,255,255]);const t=new THREE.DataTexture(d,3,1,THREE.RGBAFormat);t.minFilter=t.magFilter=THREE.NearestFilter;t.needsUpdate=true;return t}
 function toonify(obj,grad){obj.traverse(o=>{if(!o.isMesh)return;const conv=m=>{if(m.isMeshToonMaterial||m.isMeshBasicMaterial||m.isMeshPhongMaterial)return m;
     // 史萊姆的膠體身體保留高光（Phong），其他都轉成卡通漸層
-    if(/SlimeBody/.test(m.name)){const g=new THREE.MeshPhongMaterial({color:m.color.clone(),specular:0xffffff,shininess:70,transparent:m.transparent,opacity:m.opacity,side:m.side,name:m.name});g.emissive.copy(m.color).multiplyScalar(.16);m.dispose();return g}
+    if(/SlimeBody/.test(m.name)){const g=new THREE.MeshPhongMaterial({color:m.color.clone(),specular:0x6f8a7c,shininess:120,transparent:m.transparent,opacity:m.opacity,side:m.side,name:m.name});g.emissive.copy(m.color).multiplyScalar(.16);m.dispose();return g}
     const t=new THREE.MeshToonMaterial({color:m.color?m.color.clone():0xffffff,map:m.map||null,gradientMap:grad,transparent:m.transparent,opacity:m.opacity,side:m.side,alphaTest:m.alphaTest||0,name:m.name});
     if(m.emissive){t.emissive.copy(m.emissive);t.emissiveIntensity=m.emissiveIntensity==null?1:m.emissiveIntensity;t.emissiveMap=m.emissiveMap||null}
     if(m.vertexColors)t.vertexColors=true;m.dispose();return t};

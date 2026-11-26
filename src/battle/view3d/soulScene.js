@@ -50,10 +50,32 @@ function mistTexture(){const S=128,c=document.createElement("canvas");c.width=c.
 function shaftTexture(){const c=document.createElement("canvas");c.width=32;c.height=128;const x=c.getContext("2d"),g=x.createLinearGradient(0,0,0,128);g.addColorStop(0,"rgba(255,255,255,.9)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,32,128);
   const g2=x.createLinearGradient(0,0,32,0);g2.addColorStop(0,"rgba(0,0,0,1)");g2.addColorStop(.5,"rgba(0,0,0,0)");g2.addColorStop(1,"rgba(0,0,0,1)");x.globalCompositeOperation="destination-out";x.fillStyle=g2;x.fillRect(0,0,32,128);return new THREE.CanvasTexture(c)}
 
+// 火盆的火焰：雜訊推動的火舌（著色器），亮度超過 1 讓泛光把它暈開；面向鏡頭（只繞垂直軸轉）
+const FIRE_GEO=new THREE.PlaneGeometry(1,1,1,1).translate(0,.5,0);
+function fireMaterial(){return new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,side:THREE.DoubleSide,
+  uniforms:{uTime:{value:0},uSeed:{value:Math.random()*20},uK:{value:1},uColor:{value:new THREE.Color(0xff7a2a)}},
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform float uTime,uSeed,uK;uniform vec3 uColor;varying vec2 vUv;
+    float hs(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    float ns(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hs(i),hs(i+vec2(1,0)),f.x),mix(hs(i+vec2(0,1)),hs(i+vec2(1,1)),f.x),f.y);}
+    float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*ns(p);p*=2.03;a*=.5;}return v;}
+    void main(){float y=vUv.y,x=vUv.x-.5;
+      float n=fbm(vec2(x*3.2+uSeed,y*2.4-uTime*2.6)),n2=fbm(vec2(x*6.+uSeed*1.7,y*4.-uTime*4.1));
+      float sway=(n-.5)*.5*y+sin(uTime*1.7+uSeed)*.04*y;
+      float w=mix(.36,.02,pow(y,.8))*(.8+.2*uK);
+      float d=w-abs(x+sway);
+      float tip=1.-smoothstep(.45,1.,y+(n2-.5)*.5);
+      float a=smoothstep(0.,.09,d)*tip*smoothstep(0.,.06,y);
+      float core=smoothstep(.04,.2,d)*(1.-smoothstep(.0,.6,y));
+      vec3 col=mix(uColor*vec3(1.,.75,.6),uColor,smoothstep(.0,.3,a));col=mix(col,vec3(1.,.92,.72),core);
+      gl_FragColor=vec4(col*(1.2+2.2*core)*a*uK,a);}`})}
+
 export function createSoulScene(eng,fx,api){
   const {scene,camera,renderer}=eng,load=createLoader();
-  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.5;
-  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.65;
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  // 後製：火焰、Boss 的眼睛、餘燼發出光暈；冷暗部＋暖亮部、壓一點飽和、暗角與底片顆粒
+  eng.usePost({bloom:{strength:.6,radius:.55,threshold:.85},grade:{vig:.36,grain:.03,sat:.94,contrast:1.05,shadow:0xe6f0ff,high:0xfff0dc}});
   const fogC=new THREE.Color(ARENA.gate_ruins.fog);scene.background=fogC;scene.fog=new THREE.FogExp2(fogC,ARENA.gate_ruins.dens);
   // 程式產生的競技場都放在 envProc 裡；arena_cathedral.glb 載入成功後整組隱藏，載入失敗就繼續用它
   const envProc=new THREE.Group();scene.add(envProc);
@@ -67,7 +89,7 @@ export function createSoulScene(eng,fx,api){
 
   /* ---------- 燈光：月光（唯一投影）、從 Boss 背後打過來的冷色輪廓光、半球環境光 ---------- */
   const hemi=new THREE.HemisphereLight(0x55668a,0x1a1c22,1.6),moon=new THREE.DirectionalLight(ARENA.gate_ruins.moon,3.2);
-  moon.position.set(-3.5,13,-11);moon.target.position.set(0,0,1);moon.castShadow=true;moon.shadow.mapSize.set(1024,1024);
+  moon.position.set(-3.5,13,-11);moon.target.position.set(0,0,1);moon.castShadow=true;moon.shadow.mapSize.set(2048,2048);moon.shadow.radius=3;
   {const c=moon.shadow.camera;c.left=-9;c.right=9;c.top=9;c.bottom=-9;c.near=2;c.far=34;moon.shadow.bias=-.0012;moon.shadow.normalBias=.03}
   const rim=new THREE.DirectionalLight(0x9fb8e8,1.7); // 位置每幀跟著「主角→Boss」方向更新，永遠在 Boss 後上方
   // 蓄力時的紅光：一直存在、平常強度 0（燈的數量不變，就不會重編 shader）
@@ -102,7 +124,7 @@ export function createSoulScene(eng,fx,api){
     add(box,i%2?stone:stoneD,[x,h/2,z],[1.7,h,1.7]);if(h>7)add(box,stoneD,[x-sx*.2,h+.3,z+1.8],[1.5,1,3.6]);if(h>9)add(cone,stoneD,[x,h+1.4,z],[1,2.8,1])}
   for(let i=0;i<12;i++){const a=i/12*Math.PI*2+.26,r=10.6,h=[6.5,1.6,5,7.5,2.4,6,.9,7,4.2,6.8,1.2,5.5][i];if(Math.abs(Math.sin(a))<.3&&Math.cos(a)>0)continue;
     const x=Math.sin(a)*r,z=Math.cos(a)*r;add(cyl,stone,[x,h/2,z],[.55,h,.55]);add(box,stoneD,[x,.2,z],[1.5,.4,1.5]);if(h>4)add(box,stoneD,[x,h+.2,z],[1.4,.4,1.4])}
-  {const N=90,rub=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.3,0),stoneL,N),pg=new THREE.InstancedMesh(new THREE.PlaneGeometry(.3,.4),new THREE.MeshLambertMaterial({color:0xb9b29c,side:THREE.DoubleSide}),46),d=new THREE.Object3D();
+  {const N=90,rub=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.3,0),stoneL,N),pg=new THREE.InstancedMesh(new THREE.PlaneGeometry(.3,.4),new THREE.MeshLambertMaterial({color:0x7a7262,side:THREE.DoubleSide}),46),d=new THREE.Object3D();
     for(let i=0;i<N;i++){const a=rand(0,7),r=i<70?rand(8.3,12):rand(5.5,8.2);d.position.set(Math.sin(a)*r,rand(.05,.2),Math.cos(a)*r);d.rotation.set(rand(0,3),rand(0,3),rand(0,3));d.scale.set(rand(.5,1.9),rand(.4,1.2),rand(.5,1.6));d.updateMatrix();rub.setMatrixAt(i,d.matrix)}
     for(let i=0;i<46;i++){const a=rand(0,7),r=rand(2.5,9.5);d.position.set(Math.sin(a)*r,.025+i*.0004,Math.cos(a)*r);d.rotation.set(-Math.PI/2+rand(-.06,.06),0,rand(0,7));d.scale.setScalar(rand(.8,1.3));d.updateMatrix();pg.setMatrixAt(i,d.matrix)}
     envProc.add(rub,pg)}
@@ -110,13 +132,14 @@ export function createSoulScene(eng,fx,api){
   const mists=[],mistTex=mistTexture();for(let i=0;i<2;i++){const m=new THREE.MeshBasicMaterial({map:mistTex,transparent:true,opacity:.1,depthWrite:false,color:0x7f8ea6,fog:false});
     const p=new THREE.Mesh(new THREE.PlaneGeometry(24,24),m);p.position.set(rand(-2,2),.06+i*.1,rand(-3,1));p.rotation.set(-Math.PI/2,0,rand(0,6));p.renderOrder=7;p.userData.sp=(i%2?1:-1)*rand(.02,.05);scene.add(p);mists.push(p)}
   // 火盆：鐵籠、炭火（程式版才有）；火焰光球與點光源兩種場景共用，GLB 載入後搬到 FirePoint
-  const braziers=[],iron=new THREE.MeshStandardMaterial({color:0x1a1a1d,roughness:.6,metalness:.7}),coal=new THREE.MeshBasicMaterial({color:0xff8a2a}),FIRE=10;
+  const braziers=[],iron=new THREE.MeshStandardMaterial({color:0x1a1a1d,roughness:.6,metalness:.7}),coal=new THREE.MeshBasicMaterial({color:0xff8a2a}),FIRE=17;
   for(const [a,r] of [[.95,8.1],[-.95,8.1],[2.25,8.3],[-2.25,8.3]]){const x=Math.sin(a)*r,z=Math.cos(a)*r,g=new THREE.Group();g.position.set(x,0,z);envProc.add(g);
     const bowl=new THREE.Mesh(new THREE.CylinderGeometry(.48,.3,.42,8,1,true),iron);bowl.position.y=.95;bowl.material.side=THREE.DoubleSide;g.add(bowl);
     for(let k=0;k<3;k++){const l=new THREE.Mesh(cyl,iron);l.scale.set(.035,.9,.035);const b=k/3*Math.PI*2;l.position.set(Math.sin(b)*.3,.42,Math.cos(b)*.3);l.rotation.set(Math.cos(b)*.2,0,-Math.sin(b)*.2);g.add(l)}
     const c=new THREE.Mesh(new THREE.SphereGeometry(.34,8,6),coal);c.position.y=1.02;c.scale.y=.5;g.add(c);
-    const flame=fx.orb(v3(x,1.45,z),{color:0xff7a22,size:1.5,opacity:.9}),light=new THREE.PointLight(0xff7a2a,FIRE,16,1.6);light.position.set(x,1.7,z);scene.add(light);
-    braziers.push({pos:v3(x,1.15,z),flame,light,base:FIRE,n:rand(0,9),front:Math.abs(a)<1.5})}
+    const fire=new THREE.Mesh(FIRE_GEO,fireMaterial());fire.position.set(x,1.02,z);fire.renderOrder=11;scene.add(fire);
+    const flame=fx.orb(v3(x,1.45,z),{color:0xff7a22,size:1.5,opacity:.32}),light=new THREE.PointLight(0xff7a2a,FIRE,16,1.6);light.position.set(x,1.7,z);scene.add(light);
+    braziers.push({pos:v3(x,1.15,z),flame,fire,light,base:FIRE,n:rand(0,9),front:Math.abs(a)<1.5})}
 
   /* ---------- 場景模型 arena_cathedral.glb ---------- */
   let arenaGLB=null;const winLook=v3(0,5.2,-13);
@@ -127,18 +150,26 @@ export function createSoulScene(eng,fx,api){
   const lowArena=()=>{if(!arenaGLB)return;arenaGLB.traverse(o=>{const m=o.material;if(!m||Array.isArray(m))return;for(const k of ["normalMap","roughnessMap","metalnessMap","aoMap"])if(m[k]){m[k].dispose();m[k]=null}m.needsUpdate=true})};
   // 先讓主角與第一隻 Boss 下載，場景模型（4.4 MB）排在後面，不要三個同時搶頻寬
   const core=Promise.all([load.warm("hero_knight"),load.warm(api.foes[0]&&api.foes[0].model)]);
-  const arenaP=core.then(()=>load("arena_cathedral")).then(g=>{if(!g||eng.dead)return;const root=g.scene,fps=[];root.updateMatrixWorld(true);
-    root.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=false;if(/Grass/.test(o.name))clearCentre(o.material,7)}if(/^FirePoint/.test(o.name))fps.push(o.getWorldPosition(v3()))});
+  const arenaP=core.then(()=>load("arena_cathedral")).then(g=>{if(!g||eng.dead)return;const root=g.scene,fps=[];let emberMesh=null;root.updateMatrixWorld(true);
+    root.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=false;if(/Grass/.test(o.name))clearCentre(o.material,7);
+      // 散落的書頁：原本的白紙在暗場景裡像發光的方塊，改成泛黃、受潮的舊紙
+      if(/Paper/.test(o.material&&o.material.name||"")){o.material.color.setHex(0x6e6655);o.material.roughness=1}
+      if(/Ember/.test(o.material&&o.material.name||""))emberMesh=o}if(/^FirePoint/.test(o.name))fps.push(o.getWorldPosition(v3()))});
+    // 壓縮時空節點 FirePoint 會被刪掉：改從火盆裡的炭火（Ember 材質）找位置——把頂點依水平距離分群，每群的中心、最高點就是一個火盆
+    if(!fps.length&&emberMesh){const P=emberMesh.geometry.attributes.position,w=v3(),cl=[];
+      for(let i=0;i<P.count;i++){w.fromBufferAttribute(P,i).applyMatrix4(emberMesh.matrixWorld);let c=cl.find(c=>Math.hypot(c.x/c.n-w.x,c.z/c.n-w.z)<1.2);if(!c)cl.push(c={x:0,z:0,y:-1e9,n:0});c.x+=w.x;c.z+=w.z;c.y=Math.max(c.y,w.y);c.n++}
+      for(const c of cl)if(c.n>=6&&c.y>.4)fps.push(v3(c.x/c.n,c.y-.25,c.z/c.n))}
     // 開打之後才到（慢速網路）：先讓霧變濃（約 0.4 秒）再換，換完霧再散開，不會整個場景突然跳變
     if(eng.armed&&!eng.rm){const d0=scene.fog.density;eng.tween(.4,k=>{scene.fog.density=lerp(d0,d0*4.5,k)},ease.in,{real:true}).then(()=>{if(eng.dead)return;swap();eng.tween(.9,k=>{scene.fog.density=lerp(d0*4.5,arena.dens*(1+.22*phaseTint),k)},ease.out,{real:true})})}else swap();
     function swap(){envProc.visible=false;scene.add(root);arenaGLB=root;winLook.set(0,10.5,-18);
     // 火焰與點光源搬到模型裡的 FirePoint（離場中央較遠，照射距離放大）
-    if(fps.length)braziers.forEach((b,i)=>{const p=fps[i%fps.length];b.pos.set(p.x,p.y+.2,p.z);b.flame.sprite.position.set(p.x,p.y+.45,p.z);b.light.position.set(p.x,p.y+.7,p.z);b.light.distance=24;b.front=p.z>0});
+    if(fps.length)braziers.forEach((b,i)=>{const p=fps[i%fps.length];b.pos.set(p.x,p.y+.2,p.z);b.flame.sprite.position.set(p.x,p.y+.45,p.z);b.fire.position.set(p.x,p.y+.02,p.z);b.light.position.set(p.x,p.y+.7,p.z);b.light.distance=24;b.front=p.z>0});
     if(eng.quality==="low")lowArena()}});
 
   const flameC=new THREE.Color(0xff7a2a);let flameK=1,emberT=0,snow=false,snowT=0;
   eng.onUpdate((dt,rdt,t)=>{
-    for(const b of braziers){b.n+=dt*9;const f=.82+.12*Math.sin(b.n)+.1*Math.sin(b.n*2.7+1)+rand(-.05,.05);b.light.intensity=b.base*f*flameK;b.light.color.copy(flameC);b.flame.sprite.material.color.copy(flameC);b.flame.sprite.scale.set(1.3*f,1.9*f*(.9+flameK*.1),1)}
+    for(const b of braziers){b.n+=dt*9;const f=.82+.12*Math.sin(b.n)+.1*Math.sin(b.n*2.7+1)+rand(-.05,.05);b.light.intensity=b.base*f*flameK;b.light.color.copy(flameC);b.flame.sprite.material.color.copy(flameC);b.flame.sprite.scale.set(1.6*f,1.9*f*(.9+flameK*.1),1);
+      const F=b.fire,U=F.material.uniforms;U.uTime.value+=dt;U.uK.value=Math.max(.15,flameK);U.uColor.value.copy(flameC);F.scale.set(.85*(.9+.1*f),1.6*f*(.55+.45*flameK),1);F.rotation.y=Math.atan2(camera.position.x-F.position.x,camera.position.z-F.position.z)}
     emberT-=dt;if(emberT<=0){emberT=.07;const b=braziers[(Math.random()*braziers.length)|0];
       fx.emit({p:b.pos,n:1,color:[0xff8a2a,0xffc36a,0xff5a1a],speed:[.2,.7],up:rand(.8,1.6),size:[.05,.11],life:[1.4,3],gravity:-.25,drag:.25,radius:.25});
       if(Math.random()<.5)fx.emit({p:v3(rand(-7,7),rand(.2,3),rand(-7,5)),n:1,color:[0xff9a4a,0x8a8f9a],speed:[.05,.3],up:.15,size:[.04,.08],life:[2,4],alpha:.7})}

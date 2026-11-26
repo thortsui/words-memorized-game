@@ -11,6 +11,57 @@ const v3=(x,y,z)=>new THREE.Vector3(x,y,z);
 const HERO=v3(-1.45,0,.85),FOE=v3(1.5,0,-.65);
 const BASE_H={slime:1.12,bat:.9};
 
+// 共用的雜訊函式（GLSL）
+const NOISE=`float mhs(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float mns(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mhs(i),mhs(i+vec2(1,0)),f.x),mix(mhs(i+vec2(0,1)),mhs(i+vec2(1,1)),f.x),f.y);}
+float mfbm(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*mns(p);p*=2.07;a*=.5;}return v;}`;
+// 場景模型的地面只有頂點色（顏色很糊、一大片同一個綠）：在 shader 裡依世界座標加上深淺草塊、細碎草紋與泥土顆粒
+function groundDetail(m){m.onBeforeCompile=s=>{
+  s.vertexShader=s.vertexShader.replace("#include <common>","#include <common>\nvarying vec3 vWp;varying float vNy;").replace("#include <project_vertex>","#include <project_vertex>\nvWp=(modelMatrix*vec4(transformed,1.)).xyz;vNy=normalize(mat3(modelMatrix)*objectNormal).y;");
+  s.fragmentShader=s.fragmentShader.replace("#include <common>","#include <common>\nvarying vec3 vWp;varying float vNy;\n"+NOISE).replace("#include <color_fragment>",`#include <color_fragment>
+    if(vNy>.55&&vWp.y<4.){float n=mfbm(vWp.xz*.32),n2=mns(vWp.xz*2.3),fl=mhs(floor(vWp.xz*18.));
+      float grass=smoothstep(1.05,1.45,diffuseColor.g/(diffuseColor.r+.02)+(n-.5)*.5);
+      vec3 gk=vec3(.84+.3*n)*vec3(.97,1.02,.93)*(.94+.1*n2)*(.96+.07*fl);
+      vec3 dk=vec3(.9+.18*n2)*(.93+.12*fl);
+      float fade=smoothstep(60.,25.,length(vWp.xz));
+      diffuseColor.rgb*=mix(vec3(1.),mix(dk,gk,grass),fade);}`)};
+  m.customProgramCacheKey=()=>"groundDetail";m.needsUpdate=true}
+// 會隨風擺動的草葉（一個 InstancedMesh）：根部深、葉尖亮，法線朝上（和地面同樣受光，不會一根根閃）
+function grassField(root,THREE_,count,grad){const T=THREE_;
+  // 地面高度與顏色：把朝上的三角形投影到 0.5 公尺的格子上，記最低的高度（樹冠頂也朝上，取最低才是地面）
+  const C=.5,X0=-20,Z0=-26,NX=80,NZ=68,H=new Float32Array(NX*NZ).fill(1e9),R=new Float32Array(NX*NZ),G=new Float32Array(NX*NZ),B=new Float32Array(NX*NZ);
+  const a=new T.Vector3(),b=new T.Vector3(),c=new T.Vector3(),ca=new T.Color(),cb=new T.Color(),cc=new T.Color(),e1=new T.Vector3(),e2=new T.Vector3();
+  root.updateMatrixWorld(true);
+  root.traverse(o=>{if(!o.isMesh)return;const g=o.geometry,P=g.attributes.position,Cl=g.attributes.color,I=g.index,mw=o.matrixWorld;if(!P||!Cl)return;
+    const n=I?I.count:P.count;for(let t=0;t<n;t+=3){const ia=I?I.getX(t):t,ib=I?I.getX(t+1):t+1,ic=I?I.getX(t+2):t+2;
+      a.fromBufferAttribute(P,ia).applyMatrix4(mw);b.fromBufferAttribute(P,ib).applyMatrix4(mw);c.fromBufferAttribute(P,ic).applyMatrix4(mw);
+      if(a.y>3&&b.y>3&&c.y>3)continue;e1.subVectors(b,a);e2.subVectors(c,a);const ny=e1.z*e2.x-e1.x*e2.z,len=e1.clone().cross(e2).length();if(!(len>0)||Math.abs(ny)/len<.8)continue;
+      const mnx=Math.max(0,Math.ceil((Math.min(a.x,b.x,c.x)-X0)/C-.5)),mxx=Math.min(NX-1,Math.floor((Math.max(a.x,b.x,c.x)-X0)/C-.5)),mnz=Math.max(0,Math.ceil((Math.min(a.z,b.z,c.z)-Z0)/C-.5)),mxz=Math.min(NZ-1,Math.floor((Math.max(a.z,b.z,c.z)-Z0)/C-.5));
+      if(mnx>mxx||mnz>mxz)continue;const d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z);if(Math.abs(d)<1e-9)continue;
+      ca.fromBufferAttribute(Cl,ia);cb.fromBufferAttribute(Cl,ib);cc.fromBufferAttribute(Cl,ic);
+      for(let gx=mnx;gx<=mxx;gx++)for(let gz=mnz;gz<=mxz;gz++){const px=X0+(gx+.5)*C,pz=Z0+(gz+.5)*C,w1=((b.z-c.z)*(px-c.x)+(c.x-b.x)*(pz-c.z))/d,w2=((c.z-a.z)*(px-c.x)+(a.x-c.x)*(pz-c.z))/d,w3=1-w1-w2;
+        if(w1<-1e-4||w2<-1e-4||w3<-1e-4)continue;const y=a.y*w1+b.y*w2+c.y*w3,k=gz*NX+gx;if(y<H[k]){H[k]=y;R[k]=ca.r*w1+cb.r*w2+cc.r*w3;G[k]=ca.g*w1+cb.g*w2+cc.g*w3;B[k]=ca.b*w1+cb.b*w2+cc.b*w3}}}});
+  // 草葉：三段、越往上越窄
+  const geo=new T.BufferGeometry(),pos=[],col=[],nor=[],idx=[],SEG=3;
+  for(let i=0;i<=SEG;i++){const y=i/SEG,w=.5*(1-y)*(1-y*.15),bend=y*y*.25;pos.push(-w*.1,y,bend*.3,w*.1,y,bend*.3);const k=.78+.36*y;col.push(k,k,k,k,k,k);nor.push(0,1,0,0,1,0);if(i<SEG){const j=i*2;idx.push(j,j+1,j+2,j+1,j+3,j+2)}}
+  geo.setAttribute("position",new T.Float32BufferAttribute(pos,3));geo.setAttribute("color",new T.Float32BufferAttribute(col,3));geo.setAttribute("normal",new T.Float32BufferAttribute(nor,3));geo.setIndex(idx);
+  const mat=new T.MeshToonMaterial({vertexColors:true,side:T.DoubleSide,gradientMap:grad});const uT={value:0};
+  mat.onBeforeCompile=s=>{s.uniforms.uTime=uT;s.vertexShader=s.vertexShader.replace("#include <common>","#include <common>\nuniform float uTime;").replace("#include <begin_vertex>",`#include <begin_vertex>
+    vec3 ip=(instanceMatrix*vec4(0.,0.,0.,1.)).xyz;float hh=position.y*position.y;
+    float wv=sin(uTime*1.7+ip.x*.55+ip.z*.35)*.6+sin(uTime*2.9+ip.x*1.7-ip.z*.9)*.3+sin(uTime*.6+ip.x*.13)*.4;
+    transformed.x+=wv*hh*.28;transformed.z+=wv*hh*.1;`)};
+  mat.customProgramCacheKey=()=>"grassWind";
+  const im=new T.InstancedMesh(geo,mat,count),d=new T.Object3D(),cl=new T.Color();let n=0;
+  for(let tries=0;tries<count*6&&n<count;tries++){const x=X0+Math.random()*NX*C,z=Z0+Math.random()*NZ*C,gx=Math.floor((x-X0)/C),gz=Math.floor((z-Z0)/C),k=gz*NX+gx;
+    if(H[k]>1e8||H[k]>2.5)continue;if(G[k]/(R[k]+.02)<1.25)continue; // 泥土路上不長草
+    const e=(x/4.9)**2+((z-.1)/2.9)**2;if(e<1)continue; // 戰鬥區（主角與怪物站的地方）留空
+    const near=Math.min(1,(e-1)/1.2);if(Math.random()>.25+.75*near)continue;
+    const tuft=3+Math.floor(Math.random()*3),base=(.1+Math.random()*.14)*(.6+.4*near),tone=.92+Math.random()*.3;
+    for(let j=0;j<tuft&&n<count;j++){const a2=Math.random()*Math.PI*2,r2=Math.random()*.07;d.position.set(x+Math.cos(a2)*r2,H[k]-.02,z+Math.sin(a2)*r2);d.rotation.set(Math.cos(a2)*.35,Math.random()*Math.PI*2,Math.sin(a2)*.35);d.scale.set(.8+Math.random()*.5,base*(.7+Math.random()*.5),1);d.updateMatrix();im.setMatrixAt(n,d.matrix);
+      cl.setRGB(R[k],G[k],B[k]).multiplyScalar(tone*(.95+Math.random()*.1));cl.g*=1.05;im.setColorAt(n,cl);n++}}
+  im.count=n;if(im.instanceColor)im.instanceColor.needsUpdate=true;im.instanceMatrix.needsUpdate=true;im.computeBoundingSphere&&im.computeBoundingSphere();
+  return {mesh:im,tick:dt=>{uT.value+=dt}}}
+
 export function createMonsterScene(eng,fx,api){
   const {scene,camera}=eng,grad=eng.track(toonGradient()),load=createLoader();
   const toon=(color,o={})=>new THREE.MeshToonMaterial({color,gradientMap:grad,...o});
@@ -23,6 +74,8 @@ export function createMonsterScene(eng,fx,api){
     g.addColorStop(0,"#2f86e6");g.addColorStop(.45,"#6db9f5");g.addColorStop(.72,"#c4e8ff");g.addColorStop(1,"#eaf8ff");x.fillStyle=g;x.fillRect(0,0,4,256);
     const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;scene.background=t}
   scene.fog=new THREE.Fog(0xd4eeff,32,95);
+  // 後製：微微提高飽和與對比、很淡的暗角；泛光門檻高，只有特效（星星、魔法）會暈開
+  eng.usePost({bloom:{strength:.4,radius:.45,threshold:1.05},grade:{vig:.1,grain:0,sat:1.08,contrast:1.04,shadow:0xf0f4ff,high:0xfffaf0}});
   const hemi=new THREE.HemisphereLight(0xdff1ff,0x9bd77a,1.25),sun=new THREE.DirectionalLight(0xfff1d0,1.9);sun.position.set(-4,8,5);scene.add(hemi,sun);
   const L0={hemi:hemi.intensity,sun:sun.intensity};
 
@@ -61,17 +114,18 @@ export function createMonsterScene(eng,fx,api){
   let pollenT=0;eng.onUpdate(dt=>{pollenT-=dt;if(pollenT<=0){pollenT=.35;fx.emitN({p:v3(rand(-5,5),rand(.3,2.6),rand(-4,2.5)),n:1,color:[0xffffff,0xfff3a0,0xffd1e8],speed:[.1,.35],dir:[1,.15,0],spread:.5,size:[.05,.1],life:[2.5,4.5],kind:2,alpha:.8,deco:true})}});
 
   /* ---------- 場景模型 arena_meadow.glb（頂點色、無貼圖）：轉成卡通材質，載入失敗就維持上面的程式草原 ---------- */
-  let arena=null;
+  let arena=null,grass=null;
   // 先讓主角與第一隻怪物下載，場景模型排在後面（不要三個同時搶頻寬）
   const core=Promise.all([load.warm("hero_cute"),load.warm(api.foes[0]&&api.foes[0].model)]);
   const arenaP=core.then(()=>load("arena_meadow")).then(g=>{if(!g||eng.dead)return;const root=g.scene;
-    root.traverse(o=>{if(!o.isMesh)return;const old=o.material;o.material=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:grad,side:old.side});old.dispose();o.frustumCulled=true});
+    root.traverse(o=>{if(!o.isMesh)return;const old=o.material;o.material=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:grad,side:old.side});groundDetail(o.material);old.dispose();o.frustumCulled=true});
+    try{const gf=grassField(root,THREE,eng.dpr>=2?7000:9000,grad);root.add(gf.mesh);grass=gf;eng.onUpdate(dt=>{if(grass&&grass.mesh.visible)grass.tick(dt)})}catch(e){console.warn("[view3d] grass",e)}
     // 程式草原整組移出場景（只設 visible=false 的話，裡面一百多個物件每幀還是會被走訪、重算矩陣）；釋放交給 eng.track
     env.visible=false;scene.remove(env);eng.track({dispose:()=>eng.disposeObject(env)});scene.add(root);arena=root;scene.fog.near=60;scene.fog.far=330;camera.far=400;camera.updateProjectionMatrix();
     if(eng.quality==="low")lowArena()});
   // 低畫質：場景模型壓縮後只剩一個合併的網格（一次 draw call，沒有單獨的花可以藏），這裡只把它的矩陣凍結；
   // 省下來的主要是角色描邊（每個部位少畫一次）、粒子與每幀的矩陣更新，見 onQuality。
-  const lowArena=()=>{if(arena)arena.traverse(o=>{o.matrixAutoUpdate=false})};
+  const lowArena=()=>{if(grass)grass.mesh.visible=false;if(arena)arena.traverse(o=>{o.matrixAutoUpdate=false})};
 
   /* ---------- 鏡頭 ---------- */
   const rig={pos:v3(0,0,0),look:v3(0,0,0),zoom:1},CAM={},rigTok={n:0};let atBase=true;
