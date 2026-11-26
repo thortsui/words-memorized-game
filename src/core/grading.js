@@ -121,13 +121,10 @@ const GC={};
 export async function gtrans(t,sl,tl){sl=sl||"en";tl=tl||"zh-TW";const key=sl+tl+t;if(GC[key])return GC[key];const r=await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl="+sl+"&tl="+tl+"&dt=t&dt=bd&q="+encodeURIComponent(t));if(!r.ok)throw new Error("HTTP "+r.status);
   const j=await r.json(),main=(j[0]||[]).map(x=>x&&x[0]||"").join(""),dict=[];(j[1]||[]).forEach(e=>(e&&e[1]||[]).forEach(x=>dict.push(x)));return GC[key]={main,dict}}
 const tmo=(p,ms)=>Promise.race([p,new Promise((_,no)=>setTimeout(()=>no(new Error("timeout")),ms))]);
-// 中文填空：書上義項 → 共同字過半 → Google 翻譯 → 翻回英文含字幹
+// 中文填空：只認書上（掃描圖片上）給的中文——完全符合某個義項，或和某個義項共同字過半。
+// 不再用 Google 翻譯放寬：翻譯上說得通、但書上沒有的意思不算對（使用者要求，2026-11-26）
 export async function checkZhSmart(inp,w){const t=inp.replace(/[\s…\.。，,]/g,"");if(!t)return{ok:false};if(checkZh(t,w.zh))return{ok:true};
-  if(nearZh(t,zhSegs(w.zh)))return{ok:true,loose:"意思相近"};
-  try{const g=await tmo(gtrans(sayable(w.en)),3500);if(nearZh(t,[g.main,...g.dict]))return{ok:true,loose:"Google 翻譯也有這個意思"}}catch(e){}
-  // 只有一個字的輸入不走「翻回英文」這條路（「放」翻回去會有 let go，不能因此算對）
-  if(zlen(t)>=2)try{const r=await tmo(gtrans(t,"zh-TW","en"),3500),txt=(r.main+" "+r.dict.join(" ")).toLowerCase(),base=w.en.toLowerCase().replace(/[^a-z ]/g," ").trim().split(/\s+/).filter(x=>!/^(sb|sth|n|v|o|s|adj|ing|be|to|a|the)$/.test(x));
-    if(base.length&&base.every(b=>{const stem=b.slice(0,Math.max(3,b.length-2));return txt.includes(stem)}))return{ok:true,loose:"翻回英文就是這個字"}}catch(e){}
+  if(nearZh(t,zhSegs(w.zh)))return{ok:true,loose:"和書上的意思相近"};
   return{ok:false}}
 
 // 掃描核對用

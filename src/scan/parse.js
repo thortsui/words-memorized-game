@@ -53,6 +53,7 @@ export function parseHead(line){let l=line.replace(/^[\s*＊•·.□■◆▲�
   left=left.replace(/［[^］]*］/g," ").replace(/\[[^\]]*\]/g,m=>/^\[(?:C|U|C, ?U|U, ?C|I|T|pl\.?|sing\.?)\]$/.test(m)?m:" ").replace(/\/[^\/\s]*[^\x00-\x7f][^\/]*\//g," ");
   if(left.includes("[")&&!/\[(?:C|U|I|T)/.test(left))left=left.replace(new RegExp(`\\[.*?(?=\\s(?:${POSW})\\s?[.,]|$)`)," ");
   left=left.replace(/\s+/g," ").trim().replace(/[(\[]\s*$/,"").trim();
+  left=left.replace(/(\bn\s?[.,])\s*(?:\[\s*[CU]\s*[,，]\s*[CU]\s*\]|(?:sing|pl)\s?[.,]?)(?=\s|$)/g,"$1");   // 表格常見的 n. [U, C]／n. pl.／n. sing.
   if(!left)return null;
   let pos="";const pm=left.match(POS_END);
   if(pm){pos=fixPos(pm[1]);left=left.slice(0,pm.index).trim().replace(/\($/,"").trim()}
@@ -97,7 +98,8 @@ export const FLAG={
 export function classifyRows(rows,opt={}){const out=[],labels=(opt.units||[]).slice().sort((a,b)=>a.y-b.y);let cur=null,unit="",orphan=false;
   const R=rows.map(r=>({...r,use:null,ei:-1}));
   // 收進目前這一筆。列內左右間隙很大（超過四倍字高）的列，可能是把兩欄併在一起了 → 記疑點
-  const take=(r,use)=>{r.use=use;r.ei=out.length-1;cur.rows.push(r);if(r.y1!=null)cur.lastY1=r.y1;if(r.gap!=null&&r.h&&r.gap>4*r.h)cur.flags.add("wide")};
+  const cell=r=>r.gl!=null&&EN_OK.test(tidy(r.gl))&&!CJK.test(r.gl)&&!POS_END.test(tidy(r.gl))&&new RegExp(`^\\(?(?:${POSW})\\s?[.,]`).test(tidy(r.gr))&&!/[A-Za-z]{3}[^.\]]*$/.test(tidy(r.gr).replace(/^[^㐀-鿿]*/,""));
+  const take=(r,use)=>{r.use=use;r.ei=out.length-1;cur.rows.push(r);if(r.y1!=null)cur.lastY1=r.y1;if(r.gap!=null&&r.h&&r.gap>4*r.h&&!(use==="head"&&cell(r)))cur.flags.add("wide")};
   // 單元標籤：取這一列上方最近的標籤；同一高度有好幾個標籤（左右兩欄各一個）時，取左右位置對得上的那個
   const unitOf=r=>{if(!labels.length||r.y0==null)return unit;const c=labels.filter(x=>x.y<=r.y1);if(!c.length)return unit;const top=c[c.length-1].y,hh=(r.y1-r.y0)||1,band=c.filter(x=>x.y>=top-1.5*hh);
     if(band.length<2||r.x0==null)return band[band.length-1].unit;const ok=band.filter(x=>x.x0!=null&&x.x0<=r.x0+2*hh).sort((a,b)=>a.x0-b.x0);return(ok.length?ok[ok.length-1]:band.slice().sort((a,b)=>(a.x0||0)-(b.x0||0))[0]).unit};
@@ -164,18 +166,19 @@ const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s.length?s[s.length>>1]:
 export function splitColumns(boxes,W,depth=0){if(boxes.length<4||depth>2)return[boxes];const x0=Math.min(...boxes.map(b=>b.x0)),x1=Math.max(...boxes.map(b=>b.x1)),span=x1-x0;if(span<=0)return[boxes];
   const mh=med(boxes.map(b=>b.y1-b.y0)),minGap=Math.max(.008*(W||span),.6*mh),N=800;   // 空白帶至少要有 0.6 個字高那麼寬（字和字之間的空白大約 0.3 個字高）
   const find=bs=>{const cov=new Uint16Array(N);for(const b of bs){const a=Math.max(0,Math.floor((b.x0-x0)/span*N)),z=Math.min(N-1,Math.ceil((b.x1-x0)/span*N)-1);for(let i=a;i<=z;i++)cov[i]++}
-    let best=null,s=-1;const lo=Math.floor(N*.15),hi=Math.ceil(N*.85);
-    for(let i=lo;i<=hi;i++){if(cov[i]===0){if(s<0)s=i}else if(s>=0){if(!best||i-s>best[1]-best[0])best=[s,i];s=-1}}
-    if(s>=0&&(!best||hi+1-s>best[1]-best[0]))best=[s,hi+1];
-    return best&&(best[1]-best[0])/N*span>=minGap?x0+(best[0]+best[1])/2/N*span:null};
-  let cut=find(boxes);
-  if(cut==null){ // 頁首頁尾常有橫跨整頁的一行：去掉最上面和最下面 6% 的框再找一次
-    const ys=Math.min(...boxes.map(b=>b.y0)),ye=Math.max(...boxes.map(b=>b.y1)),m=(ye-ys)*.06;cut=find(boxes.filter(b=>b.y0>ys+m&&b.y1<ye-m))}
-  if(cut==null)return[boxes];
-  const L=[],Rr=[];for(const b of boxes)((b.x0+b.x1)/2<cut?L:Rr).push(b);
-  const hasHead=g=>groupRows(g).some(r=>{const t=tidy(r.text).replace(UNIT,"").trim(),h=parseHead(t);return h&&h.zh});
-  if(!L.length||!Rr.length||!hasHead(L)||!hasHead(Rr))return[boxes];
-  return[...splitColumns(L,W,depth+1),...splitColumns(Rr,W,depth+1)]}
+    const gaps=[];let s=-1;const lo=Math.floor(N*.15),hi=Math.ceil(N*.85);
+    for(let i=lo;i<=hi;i++){if(cov[i]===0){if(s<0)s=i}else if(s>=0){gaps.push([s,i]);s=-1}}
+    if(s>=0)gaps.push([s,hi+1]);
+    return gaps.filter(g=>(g[1]-g[0])/N*span>=minGap).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0])).map(g=>x0+(g[0]+g[1])/2/N*span)};
+  const heads=g=>groupRows(g).filter(r=>{const t=tidy(r.text).replace(UNIT,"").trim(),h=parseHead(t);return h&&h.zh}).length;
+  // 頁首頁尾常有橫跨整頁的一行：再去掉最上面和最下面 6% 的框找一次
+  const ys=Math.min(...boxes.map(b=>b.y0)),ye=Math.max(...boxes.map(b=>b.y1)),m=(ye-ys)*.06;
+  const cuts=[...find(boxes),...find(boxes.filter(b=>b.y0>ys+m&&b.y1<ye-m))];
+  // 每個候選都試切：兩邊都要有完整條目，取「兩邊條目數加起來最多」的那一刀（表格裡切在英文格和中文格之間，那一組的條目就全散了，分數比較低）
+  let best=null;for(const cut of [...new Set(cuts)].slice(0,12)){const L=[],Rr=[];for(const b of boxes)((b.x0+b.x1)/2<cut?L:Rr).push(b);if(!L.length||!Rr.length)continue;
+    const hl=heads(L),hr=heads(Rr);if(hl&&hr&&(!best||hl+hr>best.n))best={n:hl+hr,L,Rr}}
+  if(!best||best.n<heads(boxes))return[boxes];
+  return[...splitColumns(best.L,W,depth+1),...splitColumns(best.Rr,W,depth+1)]}
 
 // 同一欄裡，垂直方向重疊過半的框併成一列，列內由左到右。每列帶 ids（用到哪些框）、gap（列內最大的左右間隙）、h（框的高度中位數）
 export function groupRows(boxes){const bs=boxes.slice().sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)),rows=[];
@@ -184,8 +187,9 @@ export function groupRows(boxes){const bs=boxes.slice().sort((a,b)=>(a.y0+a.y1)-
     if(hit){hit.items.push(b);hit.y0=Math.min(hit.y0,b.y0);hit.y1=Math.max(hit.y1,b.y1);hit.x0=Math.min(hit.x0,b.x0);hit.x1=Math.max(hit.x1,b.x1)}
     else rows.push({items:[b],x0:b.x0,y0:b.y0,x1:b.x1,y1:b.y1})}
   rows.sort((a,b)=>a.y0-b.y0);
-  return rows.map(r=>{const it=r.items.sort((a,b)=>a.x0-b.x0);let gap=0;for(let i=1;i<it.length;i++)gap=Math.max(gap,it[i].x0-it[i-1].x1);
-    return{text:it.map(b=>b.text).join(" "),x0:r.x0,y0:r.y0,x1:r.x1,y1:r.y1,ids:it.map(b=>b.i).filter(i=>i!=null),gap,h:med(it.map(b=>b.y1-b.y0))}})}
+  return rows.map(r=>{const it=r.items.sort((a,b)=>a.x0-b.x0);let gap=0,gi=0;for(let i=1;i<it.length;i++){const g=it[i].x0-it[i-1].x1;if(g>gap){gap=g;gi=i}}
+    return{text:it.map(b=>b.text).join(" "),x0:r.x0,y0:r.y0,x1:r.x1,y1:r.y1,ids:it.map(b=>b.i).filter(i=>i!=null),gap,h:med(it.map(b=>b.y1-b.y0)),
+      ...(gi?{gl:it.slice(0,gi).map(b=>b.text).join(" "),gr:it.slice(gi).map(b=>b.text).join(" ")}:{})}})}
 
 /* ----- 字典式版面：左欄是（編號）單字＋音標，右欄是「▶ 詞性 中文 英文解釋」，下面是「• 例句」 -----
    課本的單字頁常見這種排法（衍生字在左欄各自一列；同一個字的第二個意思在右欄另起一個 ▶，左欄沒有字）。
@@ -214,7 +218,7 @@ function rowsOf(boxes){const bs=boxes.slice().sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1
 export function parseDict(bs,{W,H},cov){
   const hs=med(bs.map(b=>b.y1-b.y0))||20,isPos=b=>{const d=dictHead(b.text);return d&&(d.zh||!d.rest)};
   const cand=bs.filter(isPos);if(cand.length<3)return null;
-  const fit=lineFit(cand.map(b=>({x:b.x0,y:(b.y0+b.y1)/2})));if(Math.abs(fit.b)>.6)return null;
+  const fit=lineFit(cand.map(b=>({x:b.x0,y:(b.y0+b.y1)/2})));if(Math.abs(fit.b)>.6||cand.filter(b=>Math.abs(b.x0-(fit.a+fit.b*(b.y0+b.y1)/2))<=2*hs).length<.7*cand.length)return null;   // 詞性列的左緣要大致排成一條線（表格有好幾欄詞性就不是這種版面）
   const div=y=>fit.a+fit.b*y-.6*hs,L=[],R=[];for(const b of bs)((b.x0+b.x1)/2<div((b.y0+b.y1)/2)?L:R).push(b);
   const set=(ids,use,ei=-1)=>{for(const i of ids){cov[i].use=use;cov[i].ei=ei}};
   // 右欄：區塊（詞性＋中文開頭）與例句

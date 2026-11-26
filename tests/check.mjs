@@ -11,6 +11,7 @@ import { parseDict } from '../src/scan/engines/ppocr.js';
 import fs from 'node:fs';
 import { createMonsterBattle, comboMult, energyGain } from '../src/battle/monster.js';
 import { createSoulBattle, difficulty, gradeDodge } from '../src/battle/soul.js';
+import { typeLimitMs, recordTyping, typingWpm } from '../src/core/typing.js';
 import { MON, SKILLS, SOUL_BOSSES,SOUL_PERKS, SOUL } from '../src/battle/data.js';
 
 let n=0;const t=(name,fn)=>{fn();n++;console.log("ok  "+name)};
@@ -66,9 +67,10 @@ const LOVE={id:"x1",en:"love",pos:"v./n.",zh:"愛；喜愛",ex:"",blank:""};
 globalThis.fetch=async u=>{const q=decodeURIComponent(String(u).split("&q=")[1]||"");
   if(/sl=en/.test(u))return fakeG("愛",["喜歡","愛","愛好","熱愛"])();
   return fakeG(q==="好"?"good":q==="放"?"let go of":q==="喜好"?"love":"table",q==="放"?["put","let go of","release"]:[])()};
-const smart=[await checkZhSmart("好",LOVE),await checkZhSmart("喜好",LOVE),await checkZhSmart("愛",LOVE),await checkZhSmart("放",by("let go of sth/sb")),await checkZhSmart("外",by("appearance")),await checkZhSmart("桌子",LOVE)];
+let fetched=0;{const f=globalThis.fetch;globalThis.fetch=async(...a)=>{fetched++;return f(...a)}}
+const smart=[await checkZhSmart("好",LOVE),await checkZhSmart("喜好",LOVE),await checkZhSmart("愛",LOVE),await checkZhSmart("放",by("let go of sth/sb")),await checkZhSmart("外",by("appearance")),await checkZhSmart("桌子",LOVE),await checkZhSmart("熱戀",LOVE)];
 globalThis.fetch=realFetch;
-t("checkZhSmart：love 答「喜好」算對、答「好」不算；一個字不走 Google 那條路過關",()=>{assert.deepEqual(smart.map(r=>r.ok),[false,true,true,false,false,false])});
+t("checkZhSmart：只認書上的中文（「喜好」和「喜愛」共同字過半算對；Google 翻譯有、書上沒有的「熱戀」不算），完全不連 Google",()=>{assert.deepEqual(smart.map(r=>r.ok),[false,true,true,false,false,false,false]);assert.equal(fetched,0)});
 t("備份驗證：格式不完整就整份拒絕（丟出原因），不會回傳半套資料",()=>{const bad=j=>assert.throws(()=>normalizeState(j,{strict:true}),Error,JSON.stringify(j));
   bad({dicts:{x:{id:"x",name:"壞字典"}}});bad(null);bad([]);bad("abc");bad({});bad({dicts:[]});bad({dicts:{x:null}});bad({dicts:{x:{id:"x",words:[]}}});bad({dicts:{x:{name:"n",words:[]}}});
   bad({dicts:{x:{id:"x",name:"n",words:"no"}}});bad({dicts:{x:{id:"x",name:"n",words:[null]}}});bad({dicts:{x:{id:"x",name:"n",words:[{id:"a",zh:"沒有英文"}]}}});bad({dicts:{x:{id:"x",name:"n",words:[{id:"a",en:"a",zh:5}]}}});
@@ -175,6 +177,22 @@ t("魂系：玩家回合——答對自動連斬（剩 60% 以上＝完美 5 連
   E.state.atkLeft=4000;E.nextAttackQuestion();const hp0=E.state.hp;ev=E.answerAttack(false,2000);assert.deepEqual(types(ev),["miss","knockdown","playerHit"]);assert.equal(E.state.atkLeft,4000-2000-SOUL.missPenaltyMs-SOUL.knockMs);
   assert.equal(ev[2].kind,"knockdown");assert.equal(E.state.hp,hp0-ev[1].dmg);
   E.state.atkLeft=0;ev=E.command(0);assert.deepEqual(types(ev),["windowEnd","enemyTurn"]);assert.equal(E.state.phase,"enemy")});
+t("中翻英・填空的時限：思考 2 秒＋字數 ÷（平均打字速度 − 5 WPM）；量到的速度會更新平均",()=>{
+  const mem={};globalThis.localStorage={getItem:k=>k in mem?mem[k]:null,setItem:(k,v)=>{mem[k]=String(v)},removeItem:k=>{delete mem[k]}};
+  assert.equal(typingWpm(),35,"還沒量過用 35 WPM");
+  assert.equal(typeLimitMs("environment"),2000+Math.round(11*12000/30/100)*100,"11 個字元、30 WPM：2 秒＋4.4 秒");
+  assert.equal(typeLimitMs("cat",60),2000+Math.round(3*12000/55/100)*100);
+  recordTyping(12,2400);assert.equal(typingWpm(),60,"12 字元 2.4 秒＝60 WPM");recordTyping(12,4800);assert.equal(typingWpm(),45,"兩次平均");
+  recordTyping(2,100);assert.equal(typingWpm(),45,"太短的不記");delete globalThis.localStorage;
+  // 魂系：中翻英・填空的攻擊題時限換成打字時間，完美判定照比例
+  const E=createSoulBattle({pool,mode:"zh2enT",ambushRng:()=>1,rng:()=>0,typeLimit:()=>4000});E.start();E.state.mhp=999;const W=E.state.win;
+  const q=E.nextAttackQuestion();assert.equal(q.windowMs,4000);assert.equal(q.leftMs,4000);
+  const ev=E.answerAttack(true,1200,{autoChain:true});assert.equal(ev[0].perfect,true,"4 秒裡 1.2 秒答完＝剩 70%＝完美");assert.equal(ev[0].n,5);
+  assert.equal(E.state.atkLeft,W-Math.max(1200*W/4000,SOUL.minCostMs),"攻擊時間照比例扣");
+  const E2=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,typeLimit:()=>4000});E2.start();assert.equal(E2.nextAttackQuestion().windowMs,E2.state.win,"選擇題不換算");
+  // 打怪：連招蓄力題的時限＝打字時間＋思考時間（隨階段縮短）
+  const M=createMonsterBattle({pool,mode:"zh2enT",typeLimit:(w,k)=>3000+Math.round(2000*k)});M.start();M.state.chain={s:{name:"x",chain:["a","b"],times:[5,3]},stage:1};
+  assert.equal(M.nextQuestion().limitMs,3000+1200)});
 t("魂系：斬擊也要答題——優先複習答錯過的字，再來是答對但想比較久的；同一套連斬不重複；答錯或超時連斬中斷（不會被打倒）",()=>{
   const E=createSoulBattle({pool,mode:"en2zhT",ambushRng:()=>1,rng:()=>0});E.start();E.state.mhp=999;const B=E.state,W=pool.slice(0,6);
   // 這一局答過的字：W0 答錯 2 次、W1 答錯 1 次、W2 答對花 3.5 秒、W3 答對花 1.2 秒、W4 答對花 2.4 秒

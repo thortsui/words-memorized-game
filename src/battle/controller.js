@@ -8,6 +8,8 @@ import { sfx, bgmStart, bgmStop, bgmToggle, bgmOn } from '../core/audio.js';
 import { MON, SKILLS, MAXEN, PLAYER_HP, STORY, SOUL_STORY, SOUL_BOSSES, SOUL } from './data.js';
 import { createMonsterBattle, comboMult } from './monster.js';
 import { createSoulBattle } from './soul.js';
+import { typeLimitMs, recordTyping, TYPE_THINK_MS } from '../core/typing.js';
+import { enVariants } from '../core/grading.js';
 import { mount } from './view3d.js';
 import { wordRow } from '../pages/dicts.js';
 import { toSetup, exLine, startQuiz } from '../pages/practice.js';
@@ -24,7 +26,8 @@ const say=(t,cls)=>{const el=$("#msg");if(!el)return;el.className="msgbox "+(cls
 export function startBattle(ws,soul){if(!ws.length)return;ctx.Q=null;stopSpeech();
   const t=T=ctx.B={soul:!!soul,mode:setup.mode,pool:ws,bank:allWords(),phase:"busy",readP:Promise.resolve(),raf:0,tmo:0,seq:0};
   // window.__soulTest：自動化測試用（例如 {ambushRng} 強制觸發突襲），一般使用不會有
-  t.E=(soul?createSoulBattle:createMonsterBattle)({pool:ws,mode:setup.mode,...(soul&&window.__soulTest?window.__soulTest:{})});if(soul&&window.__soulTest&&window.__soulTest.expose)window.__soulE=t.E;
+  const typeLimit=(w,k=1)=>typeLimitMs(enVariants(w.en)[0]||w.en)-Math.round(TYPE_THINK_MS*(1-k));
+  t.E=(soul?createSoulBattle:createMonsterBattle)({pool:ws,mode:setup.mode,typeLimit,...(soul&&window.__soulTest?window.__soulTest:{})});if(soul&&window.__soulTest&&window.__soulTest.expose)window.__soulE=t.E;
   document.body.classList.add("inbattle");document.body.classList.toggle("soulmode",!!soul);window.scrollTo(0,0);vvOn();guardOn();
   app.innerHTML=`<div class="bwrap ${soul?"soul":""}"><div class="row btop"><button class="sm ghost" id="run" style="padding-left:0">← 逃跑</button><button class="sm ghost" id="bgmb">${bgmOn()?"♪ 音樂開":"♪ 音樂關"}</button><span class="small" style="margin-left:auto" id="bstat"></span></div>
   <div class="arenawrap"><div class="arena" id="arena"></div>
@@ -185,8 +188,10 @@ function qCard(t,w,m,o={}){let prompt="",body="";
   return `<div class="bqcard ${o.cls||""}" id="bqc"><div class="tline"><i id="tb"></i></div>${w._rep?'<div class="small" style="color:var(--bad);font-weight:700">剛剛答錯，再考一次</div>':""}${prompt}${body}<div id="bans"></div></div>`}
 // 接上作答：cb(ok, 選項索引, 作答內容, 近義說明)。填空英翻中要等 Google 判定，期間暫停計時。
 function hook(t,w,m,cb,onPause){const o=$("#bopts");if(o){o.classList.add("guard");setTimeout(()=>o.classList.remove("guard"),guardMs(t))}if(o)o.onclick=e=>{const b=e.target.closest("[data-o]");if(b&&t.phase==="q"){if(t.paused||performance.now()-t.qAt<guardMs(t))return;t.phase="busy";cb(t.opts[+b.dataset.o]===t.ans,+b.dataset.o,t.opts[+b.dataset.o])}};
-  const f=$("#btf");if(f){const ti=$("#bti");ti.focus();f.onsubmit=e=>{e.preventDefault();if(t.phase!=="q"||t.paused)return;const v=ti.value;if(!v.trim())return;t.phase="busy";ti.readOnly=true;
-    if(m==="en2zhT"){onPause&&onPause();say("判斷中…");checkZhSmart(v,w).then(r=>{if(alive(t))cb(r.ok,-1,v,r.loose)})}else cb(checkEn(v,w),-1,v)}}}
+  const f=$("#btf");if(f){const ti=$("#bti");ti.focus();let k0=0;ti.addEventListener("input",()=>{if(!k0)k0=performance.now()});
+    f.onsubmit=e=>{e.preventDefault();if(t.phase!=="q"||t.paused)return;const v=ti.value;if(!v.trim())return;t.phase="busy";ti.readOnly=true;
+    if(m==="en2zhT"){onPause&&onPause();say("判斷中…");checkZhSmart(v,w).then(r=>{if(alive(t))cb(r.ok,-1,v,r.loose)})}
+    else{const ok=checkEn(v,w);if(ok&&m==="zh2enT"&&k0)recordTyping(v.trim().length,performance.now()-k0);cb(ok,-1,v)}}}}
 function markOpts(t,idx){app.querySelectorAll("#bopts button").forEach((b,i)=>{b.disabled=true;if(t.opts[i]===t.ans)b.classList.add("right");else if(i===idx)b.classList.add("wrong")});const bi=$("#bti");if(bi){bi.readOnly=true;bi.blur()} /* 作答後收起軟鍵盤，版面回到完整高度 */const sb=app.querySelector("#btf button");if(sb){sb.disabled=true;sb.hidden=true}}
 function answerLine(w,ok,extra=""){const el=$("#bans");if(!el)return;el.innerHTML=`<div class="ansline ${ok?"ok":"no"}"><span class="w">${esc(w.en)}</span><span class="pos">${esc(w.pos)}</span> ${spkBtn(w.en)}<span class="zhm">${esc(w.zh)}</span>${extra}</div>`;
   const al=el.firstChild;al.classList.add("fresh");setTimeout(()=>al.classList.remove("fresh"),400)}
@@ -258,8 +263,8 @@ function sQ(t){if(!alive(t)||!$("#bq"))return;++t.seq;t.view.setTimeScale(1);clo
   const tm=timer(t,q.windowMs,q.leftMs,[$("#stb"),$("#tb")],async()=>{if(t.phase!=="q")return;t.phase="busy";markOpts(t,-9);answerLine(w,false,exSpk(w));const seq=t.seq;if(!await settle(t,seq,t.E.attackTimeout()))return;sGo(t)},
     left=>{const el=$("#sphase");if(el)el.textContent=`攻擊時間 ${(left/1000).toFixed(1)} 秒`});
   hook(t,w,m,async(ok,idx,given,loose)=>{const ms=tm.stop();mark(w,ok,given,t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
-    const evs=t.E.answerAttack(ok,ms),s=t.E.snapshot(),sk=evs.find(e=>e.type==="skill");
-    say(ok?`答對！${loose?"（"+loose+"）":""}${sk?(sk.perfect?"完美！":"")+sk.n+" 連斬":""}。剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`:`答錯了，多扣 ${SOUL.missPenaltyMs/1000} 秒！剩餘攻擊時間 ${(s.atkLeft/1000).toFixed(1)} 秒`,ok?"good":"bad");
+    const evs=t.E.answerAttack(ok,ms),s=t.E.snapshot(),sk=evs.find(e=>e.type==="skill"),sc=q.scale||1;
+    say(ok?`答對！${loose?"（"+loose+"）":""}${sk?(sk.perfect?"完美！":"")+sk.n+" 連斬":""}。剩餘攻擊時間 ${(s.atkLeft*sc/1000).toFixed(1)} 秒`:`答錯了，多扣 ${(SOUL.missPenaltyMs*sc/1000).toFixed(1)} 秒！剩餘攻擊時間 ${(s.atkLeft*sc/1000).toFixed(1)} 秒`,ok?"good":"bad");
     setAns(true);const seq=t.seq;
     // 連斬第 2 刀起要答斬擊題：先砍第一刀，接著出題
     if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,700);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}

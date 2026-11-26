@@ -43,7 +43,9 @@ export function alignEntries(a,b){const ka=a.map(x=>enKey(x.en)),kb=b.map(x=>enK
     // 一邊是另一邊再多出幾個字（OCR 把詞性或雜訊黏進英文）也算同一筆，排在距離小的後面
     const [sh,lo]=ka[i].length<=kb[j].length?[ka[i],kb[j]]:[kb[j],ka[i]];if(sh!==lo&&sh.length>=3&&lo.startsWith(sh+" ")&&lo.split(" ").length-sh.split(" ").length<=3){cand.push([.39,Math.abs(i/Math.max(1,a.length)-j/Math.max(1,b.length)),i,j]);continue}
     if(Math.abs(ka[i].length-kb[j].length)>len*.4)continue;
-    const d=ka[i]===kb[j]?0:editDistance(ka[i],kb[j]);if(d/len<=.4)cand.push([d/len,Math.abs(i/Math.max(1,a.length)-j/Math.max(1,b.length)),i,j])}
+    // 同一個字出現好幾次（不同詞性／意思）：中文、詞性也一樣的優先配對
+    const tie=ka[i]===kb[j]?(NORM.zh(a[i].zh||"")===NORM.zh(b[j].zh||"")?0:String(a[i].pos||"")===String(b[j].pos||"")?.0005:.001):0;
+    const d=ka[i]===kb[j]?0:editDistance(ka[i],kb[j]);if(d/len<=.4)cand.push([d/len+tie,Math.abs(i/Math.max(1,a.length)-j/Math.max(1,b.length)),i,j])}
   cand.sort((x,y)=>x[0]-y[0]||x[1]-y[1]);for(const [, ,i,j] of cand)if(ma[i]<0&&mb[j]<0){ma[i]=j;mb[j]=i}
   const zk=x=>NORM.zh(x.zh);
   for(let i=0;i<a.length;i++){if(ma[i]>=0||!zk(a[i]))continue;const j=b.findIndex((x,j)=>mb[j]<0&&zk(x)===zk(a[i]));if(j>=0){ma[i]=j;mb[j]=i}}

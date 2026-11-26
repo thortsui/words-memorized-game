@@ -10,6 +10,8 @@ import { parseHead, tidy } from '../scan/parse.js';
 import { ruleWarnings } from '../scan/rules.js';
 import { loadLexicon } from '../scan/wordlist.js';
 import { straighten } from '../scan/deskew.js';
+import { pdfPages } from '../scan/pdf.js';
+import { parseLayout } from '../scan/parse.js';
 
 // engA／engB：主引擎與複核引擎（"none"＝不複核）；adv：有沒有打開「進階」裡的 Claude
 let pages=[],cur=0,review=[],showOut=true,engA=lsGet("vc-ext","ppocr"),engB=lsGet("vc-ext2","ocr"),adv=lsGet("vc-adv","0")==="1";
@@ -18,7 +20,8 @@ let pages=[],cur=0,review=[],showOut=true,engA=lsGet("vc-ext","ppocr"),engB=lsGe
 export function solve(A,b){const n=b.length;for(let i=0;i<n;i++){let p=i;for(let r=i+1;r<n;r++)if(Math.abs(A[r][i])>Math.abs(A[p][i]))p=r;[A[i],A[p]]=[A[p],A[i]];[b[i],b[p]]=[b[p],b[i]];for(let r=i+1;r<n;r++){const f=A[r][i]/A[i][i];for(let c=i;c<n;c++)A[r][c]-=f*A[i][c];b[r]-=f*b[i]}}const x=Array(n);for(let i=n-1;i>=0;i--){let s=b[i];for(let c=i+1;c<n;c++)s-=A[i][c]*x[c];x[i]=s/A[i][i]}return x}
 export function homog(src,dst){const A=[],b=[];for(let i=0;i<4;i++){const[x,y]=src[i],[u,v]=dst[i];A.push([x,y,1,0,0,0,-u*x,-u*y]);b.push(u);A.push([0,0,0,x,y,1,-v*x,-v*y]);b.push(v)}return solve(A,b)}
 // 分段執行：每 40ms 讓出主執行緒一次，掃描大圖時畫面不會卡住
-async function scan(p){let t0=performance.now();const brk=async()=>{if(performance.now()-t0>40){await new Promise(r=>setTimeout(r,0));t0=performance.now()}};const q=p.q,d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+async function scan(p){if(p.pdf){const c=document.createElement("canvas");c.width=p.src.width;c.height=p.src.height;c.getContext("2d").drawImage(p.src,0,0);p.out=c;p._jpg=null;p.status="scanned";return}
+  let t0=performance.now();const brk=async()=>{if(performance.now()-t0>40){await new Promise(r=>setTimeout(r,0));t0=performance.now()}};const q=p.q,d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
   let W=Math.max(d(q[0],q[1]),d(q[3],q[2])),H=Math.max(d(q[0],q[3]),d(q[1],q[2]));const k=Math.min(1,2000/Math.max(W,H));W=Math.round(W*k);H=Math.round(H*k);
   const h=homog([[0,0],[W,0],[W,H],[0,H]],q),sc=p.src,sw=sc.width,sh=sc.height,sd=sc.getContext("2d").getImageData(0,0,sw,sh).data;
   const out=document.createElement("canvas");out.width=W;out.height=H;const ctx=out.getContext("2d"),im=ctx.createImageData(W,H),o=im.data;
@@ -38,7 +41,12 @@ async function scan(p){let t0=performance.now();const brk=async()=>{if(performan
   try{const st=await straighten(out);p.out=st.canvas;p.warp=st.info}catch(e){p.out=out}
   p._jpg=null;p.status="scanned"}
 
-async function addFiles(files){for(const f of files){if(!f.type.startsWith("image/"))continue;try{
+async function addFiles(files){for(const f of files){
+  // PDF：每一頁畫成圖；有文字層的（電子檔）把文字層一起留著，提取時當第一個引擎
+  if(f.type==="application/pdf"||/\.pdf$/i.test(f.name)){try{const pr=$("#prog");const ps=await pdfPages(f,t=>{if(pr)pr.textContent="讀取 "+t+"…"});
+      for(const x of ps){const c=x.canvas;pages.push({name:`${f.name} 第 ${x.n} 頁`,src:c,thumb:c.toDataURL("image/jpeg",.5),q:[[0,0],[c.width,0],[c.width,c.height],[0,c.height]],clean:false,pdf:true,pdfText:x.text,out:null,status:"new"})}}
+    catch(e){toast("PDF 讀不進來："+f.name+"（"+(e&&e.message||e)+"）")}continue}
+  if(!f.type.startsWith("image/"))continue;try{
   const bmp=await createImageBitmap(f,{imageOrientation:"from-image"}).catch(()=>createImageBitmap(f));const k=Math.min(1,2400/Math.max(bmp.width,bmp.height));
   const c=document.createElement("canvas");c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
   const m=.02;pages.push({name:f.name,src:c,thumb:c.toDataURL("image/jpeg",.5),q:[[c.width*m,c.height*m],[c.width*(1-m),c.height*m],[c.width*(1-m),c.height*(1-m)],[c.width*m,c.height*(1-m)]],clean:true,out:null,status:"new"})}catch(e){toast("有一張圖讀不進來："+f.name)}}
@@ -66,7 +74,7 @@ function markCached(){FREE.forEach(e=>{if(e.cached)e.cached().then(ok=>{const el
 
 export function renderUpload(){
   app.innerHTML=`<h1>掃描上傳</h1><p class="sub">拍下單字書頁 → 拖動四個角對齊紙張 → 掃描（拉平＋去陰影）→ 兩個辨識引擎各讀一次並互相核對 → 你對照原圖確認後存進字典。</p>
-  <label class="drop" id="drop"><input type="file" accept="image/*" multiple id="file" class="hide"><b>選擇或拖入照片</b><div class="small">可一次選多張，手機可直接拍照</div></label>
+  <label class="drop" id="drop"><input type="file" accept="image/*,application/pdf,.pdf" multiple id="file" class="hide"><b>選擇或拖入照片或 PDF</b><div class="small">可一次選多張，手機可直接拍照；PDF 每一頁都會讀</div></label>
   ${!review.length&&!pages.length&&readDraft()?`<div class="note" id="draft" style="margin-top:12px">上次有一份還沒存入字典的核對清單（${readDraft().review.length} 筆）。<div class="row" style="gap:8px;margin-top:8px"><button class="pri sm" id="d-load">還原，繼續核對</button><button class="sm ghost" id="d-drop">不要了，丟掉</button></div></div>`:""}
   ${pages.length?`<h2>頁面（${pages.length}）</h2><div class="thumbs" id="thumbs">${pages.map((p,i)=>`<button class="${i===cur?"on":""}" data-i="${i}" aria-label="第 ${i+1} 頁"><img src="${p.thumb}" alt=""><span class="st">${{new:"未掃描",scanned:"已掃描",done:"已提取",err:"失敗",busy:"處理中"}[p.status]}</span></button>`).join("")}</div>
   <div class="row" style="margin:12px 0"><button class="${showOut?"":"chip on"} sm" id="v-src">調整四角</button><button class="${showOut?"chip on":""} sm" id="v-out" ${pages[cur].out?"":"disabled"}>掃描結果</button>
@@ -112,19 +120,21 @@ async function extractAll(){fixEngines();const A=getEngine(engA),B=engB==="none"
   const btn=$("#extract"),prog=$("#prog");btn.disabled=true;let got=0,err="";const names={a:engName(engA),b:B?engName(engB):""};
   for(let i=0;i<pages.length;i++){const p=pages[i];if(p.status==="done")continue;const head=`第 ${i+1}/${pages.length} 頁：`;
     prog.textContent=head+"掃描中（拉平、去陰影）…";await new Promise(r=>setTimeout(r,20));if(!p.out)await scan(p);p.status="busy";
-    const st={a:"準備中…",b:"準備中…"},show=()=>{prog.textContent=head+`主引擎 ${names.a}：${st.a}`+(B?`｜複核 ${names.b}：${st.b}`:"")};show();
+    const PDFE=p.pdfText?{id:"pdf",label:"PDF 文字層",local:true,extract:async()=>{const e=parseLayout(p.pdfText,{W:p.out.width,H:p.out.height});e.lines=p.pdfText;return e}}:null;
+    const EA=PDFE||A,EB=PDFE?A:B;names.a=PDFE?"PDF 文字層":engName(engA);names.b=PDFE?engName(engA):(B?engName(engB):"");
+    const st={a:"準備中…",b:"準備中…"},show=()=>{prog.textContent=head+`主引擎 ${names.a}：${st.a}`+(EB?`｜複核 ${names.b}：${st.b}`:"")};show();
     const run=(E,k)=>E.extract(p.out,{onProgress:t=>{st[k]=t.replace(/^[^：]{1,12}：/,"");show()}}).then(r=>{st[k]="完成";show();const l=(r||[]).filter(x=>x&&x.en);l.lines=r&&r.lines;l.cover=r&&r.cover;return l},e=>{st[k]="失敗";show();throw e});
-    let [ra,rb]=await Promise.allSettled([run(A,"a"),B?run(B,"b"):Promise.reject(new Error("none"))]);
+    let [ra,rb]=await Promise.allSettled([run(EA,"a"),EB?run(EB,"b"):Promise.reject(new Error("none"))]);
     // 測試用掛鉤（只在開發模式存在，正式建置會整段拿掉）：window.__vcScanTamper(which:"a"|"b", entries, pageIndex) 回傳要改成的條目
     if(import.meta.env.DEV){const tam=globalThis.__vcScanTamper,keep=(r,v)=>{v.lines=r.value.lines;v.cover=r.value.cover;r.value=v};if(tam){if(ra.status==="fulfilled")keep(ra,tam("a",ra.value,i)||ra.value);if(rb.status==="fulfilled")keep(rb,tam("b",rb.value,i)||rb.value)}}
     const msg=r=>String(r.reason&&r.reason.message||r.reason||""),uni=(x,y)=>[...new Set([...(x&&x.flags||[]),...(y&&y.flags||[])])];
     if(ra.status==="fulfilled"&&rb.status==="fulfilled"){const a=ra.value,b=rb.value;
       // 位置優先用本機 OCR 引擎量到的（Claude 的位置是估的）
-      for(const it of consensus(a,b,{rawA:a.cover?a.cover.boxes:a.lines,rawB:b.cover?b.cover.boxes:b.lines,W:p.out.width,H:p.out.height})){const bb=it.a&&it.b?((A.local?it.a.bbox:null)||(B.local?it.b.bbox:null)||it.a.bbox||it.b.bbox):it.entry.bbox;
+      for(const it of consensus(a,b,{rawA:a.cover?a.cover.boxes:a.lines,rawB:b.cover?b.cover.boxes:b.lines,W:p.out.width,H:p.out.height})){const bb=it.a&&it.b?((EA.local?it.a.bbox:null)||(EB.local?it.b.bbox:null)||it.a.bbox||it.b.bbox):it.entry.bbox;
         review.push(mk({...it.entry,bbox:bb,flags:uni(it.a,it.b),unsure:!!((it.a&&it.a.unsure)||(it.b&&it.b.unsure))},p,{cs:it.status,cmp:it.fields?{a:it.a,b:it.b,fields:it.fields,bad:it.bad}:null,raw:it.raw||null,names}));got++}
       p.cov=leftovers(a.cover,b.cover);p.status="done"}
     else if(ra.status==="fulfilled"||rb.status==="fulfilled"){const okA=ra.status==="fulfilled",list=okA?ra.value:rb.value;
-      const why=!B?"沒有選複核引擎":okA?`複核引擎（${names.b}）這一頁失敗：${msg(rb)}`:`主引擎（${names.a}）這一頁失敗：${msg(ra)}`;
+      const why=!EB?"沒有選複核引擎":okA?`複核引擎（${names.b}）這一頁失敗：${msg(rb)}`:`主引擎（${names.a}）這一頁失敗：${msg(ra)}`;
       list.forEach(x=>{review.push(mk(x,p,{cs:"single",why,names:{a:okA?names.a:names.b,b:""}}));got++});p.cov=leftovers(list.cover,null);p.status="done"}
     else{p.status="err";err=msg(ra);if(/api.key|auth|401/i.test(err))break}
     if(p.cov){p.cov.W=p.out.width;p.cov.H=p.out.height;p.cov.left.forEach(l=>l.state="todo");p.names=names;p.expect=""}}
@@ -151,12 +161,13 @@ function drawPages(){document.querySelectorAll("canvas[data-map]").forEach(cv=>{
 
 /* ----- 規則檢查（詞表拼字、例句字形、版面疑點…）＋ Google 翻譯核對 ----- */
 const tmo=(p,ms)=>Promise.race([p,new Promise((_,no)=>setTimeout(()=>no(new Error("timeout")),ms))]);
-async function verifyOne(w){w.chk="busy";w.msg=[];w.g=null;paintV(w);
+async function verifyOne(w){w.chk="busy";w.msg=[];w.g=null;w.gnote="";paintV(w);
   const lex=await loadLexicon().catch(()=>null),warn=ruleWarnings(w,lex,{manual:w.cs==="manual"});let na=false;
   try{if(w.en){const g=await tmo(gtrans(sayable(w.en)),8000);w.g=[...new Set([g.main,...g.dict])].filter(Boolean).slice(0,8);
       if(!/[㐀-鿿]/.test(g.main)&&!g.dict.length)warn.push("Google 不認得這個英文，可能拼錯");
       else if(w.zh){const a=new Set(cjk(w.zh)),b=new Set(cjk(w.g.join(""))),common=[...a].filter(c=>b.has(c)).length;
-        if(a.size&&common===0)warn.push("中文和 Google 翻譯完全對不上");else if(a.size>=4&&common<2&&common/a.size<.2)warn.push("中文和 Google 翻譯差很多")}}
+        // 中文以書上（圖片）為準：和 Google 翻譯說法不同只當參考，不擋存入
+        if(a.size&&common===0)w.gnote="Google 翻譯的說法和書上不同（以書上為準，僅供參考）";else if(a.size>=4&&common<2&&common/a.size<.2)w.gnote="Google 翻譯的說法和書上差很多（以書上為準，僅供參考）"}}
   }catch(e){na=true;w.g=null}
   w.chk=warn.length?"warn":na?"na":"ok";w.msg=warn;paintV(w);paintSum()}
 // 最多 4 筆同時核對（結果寫在置頂摘要，不另外跳訊息蓋住卡片）
@@ -205,11 +216,11 @@ function diffHTML(w){if(w.cs!=="diff"||!w.cmp)return"";const c=w.cmp;
 // 原始文字不一致時，把兩個引擎在這一塊讀到的原文並排（只給看，不能點）
 function rawHTML(w){if(!w.raw||w.raw.same||!w.raw.diff)return"";const cell=s=>`<div class="dfv ro"><span class="who">${esc(s==="a"?w.names.a:w.names.b)}</span><span class="val">${segs(w.raw.diff[s])}</span></div>`;
   return`<details class="f6 wide df raw" ${w.cs==="agree"?"open":""}><summary class="small">這一塊的原始文字，兩個引擎讀的不完全一樣（標色的是不同的字；包含不存入的例句翻譯、音標、附註）</summary><div class="dfrow"><div class="dfk">原文</div>${cell("a")}${cell("b")}</div></details>`}
-function vHTML(w){const g=w.g&&w.g.length?`<div class="small">Google 翻譯：${esc(w.g.join("、"))}</div>`:"";
+function vHTML(w){const g=w.g&&w.g.length?`<div class="small">Google 翻譯：${esc(w.g.join("、"))}${w.gnote?"・"+esc(w.gnote):""}</div>`:"";
   if(pending(w))return'<span class="small">規則檢查與 Google 翻譯核對中…</span>';
   if(!w.keep)return'<div class="small">已取消勾選，不會存入。</div>';
   if(w.okd)return`<div class="small" style="color:var(--ok)">✓ 你已對照原圖確認這一筆</div>${g}<button class="sm" data-a="unokd" style="margin-top:6px">取消確認</button>`;
-  if(auto(w))return`<div class="small" style="color:var(--ok)">✓ ${w.cs==="manual"?"規則檢查通過，":"兩個引擎讀的完全一樣（欄位與原始文字），規則檢查也通過，"}與 Google 翻譯相符</div>${g}`;
+  if(auto(w))return`<div class="small" style="color:var(--ok)">✓ ${w.cs==="manual"?"規則檢查通過，":"兩個引擎讀的完全一樣（欄位與原始文字），規則檢查也通過，"}${w.gnote?"中文照書上的":"與 Google 翻譯相符"}</div>${g}`;
   const r=reasons(w),soft=w.chk!=="warn";
   return`<div class="why ${soft?"soft":""}">${soft?"需要你確認":"⚠ 可能有錯"}：<ul>${r.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>${g}
    <div class="row" style="gap:6px;margin-top:6px"><button class="sm pri" data-a="okd">我已對照原圖，確認這筆正確</button><button class="sm" data-a="recheck">重新檢查</button><button class="sm ghost" data-a="drop">不存這筆</button></div>`}

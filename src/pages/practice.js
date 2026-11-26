@@ -2,6 +2,7 @@
 import { $, app, esc, SC, lsSet, toast, KEY_HINT } from '../core/util.js';
 import { S, allDicts, setup, saveSetup, pool, mark, unlog, pushHist, allWords, ctx } from '../core/store.js';
 import { MODES, shuffle, clozeAns, clozePos, zhPrompt, opts, normEn, checkEn, checkZhSmart } from '../core/grading.js';
+import { recordTyping } from '../core/typing.js';
 import { sp, speak, readAll, gate, spkBtn, enVoices, stopSpeech, resetGoogleFail } from '../core/speech.js';
 import { bgmStop } from '../core/audio.js';
 import { wordRow } from './dicts.js';
@@ -61,7 +62,9 @@ function renderQ(){const w=Q.items[Q.i],m=Q.mode,tot=Q.n0;Q.done=false;Q.checkin
   $("#quit").onclick=toSetup;
   if(setup.auto&&(m==="en2zh"||m==="en2zhT"))speak(w.en,app.querySelector(".spk"));
   const o=$("#opts");if(o)o.onclick=e=>{const b=e.target.closest("[data-o]");if(b&&!Q.done)answer(Q.opts[+b.dataset.o]===Q.ans,+b.dataset.o,Q.opts[+b.dataset.o])};
-  const f=$("#tf");if(f){const ti=$("#ti");ti.focus();f.onsubmit=e=>{e.preventDefault();if(Q.done){const n=$("#nx");if(n&&!n.disabled)next();return}const v=ti.value;if(!v.trim())return;
+  const f=$("#tf");if(f){const ti=$("#ti");ti.focus();let k0=0;ti.addEventListener("input",()=>{if(!k0)k0=performance.now()});
+    f.onsubmit=e=>{e.preventDefault();if(Q.done){const n=$("#nx");if(n&&!n.disabled)next();return}const v=ti.value;if(!v.trim())return;
+    if(m==="zh2enT"&&k0&&checkEn(v,w))recordTyping(v.trim().length,performance.now()-k0);
     if(m==="en2zhT"){if(Q.checking)return;Q.checking=true;ti.readOnly=true;const sb=$("#tsub");if(sb)sb.textContent="判斷中…";const q=Q,wi=Q.i;
       checkZhSmart(v,w).catch(()=>({ok:false})).then(r=>{if(ctx.Q!==q||Q.i!==wi)return;Q.checking=false;answer(r.ok,-1,v,r.loose)});return}
     answer(checkEn(v,w),-1,v)};$("#idk").onclick=()=>{if(!Q.done&&!Q.checking)answer(false,-1,"")}}}

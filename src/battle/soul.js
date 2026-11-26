@@ -21,7 +21,8 @@ export function difficulty(recent){const r=recent.slice(-SOUL.paceWindow);
 export function gradeDodge(ok,ms,limitMs,perfectMs){if(!ok||ms>limitMs)return"hit";if(perfectMs>0&&ms<=perfectMs)return"parry";if(ms<=limitMs*SOUL.slowAt)return"dodge";return"graze"}
 
 // ambushRng：突襲判定用的亂數（預設同 rng；測試可單獨控制）
-export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEvent}){const arng=ambushRng||rng;
+// typeLimit(w)：中翻英・填空時這一題的作答時限（毫秒，依打字速度換算；見 core/typing.js）。有給就把攻擊時間換算成這一題的尺度
+export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEvent,typeLimit=null}){const arng=ambushRng||rng;
   const B={kind:"soul",mode,pool,queue:shuffle(pool),hp:PLAYER_HP,stamina:SOUL.staminaMax,atb:0,mi:0,mhp:SOUL_BOSSES[0].hp,bphase:0,
     combo:0,best:0,fast:99,right:0,n:0,wrong:[],kills:0,parries:0,atkLeft:0,recent:[],phase:"intro",w:null,over:null,enemy:null,
     flasks:SOUL.flaskStart,drinks:0,punish:false,ambushed:false,ambushN:0,ambushes:0,knocks:0,
@@ -142,7 +143,9 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
 
     /* ---- 玩家回合 ---- */
     // 攻擊時間用完回傳 null（接著呼叫 startEnemyTurn）
-    nextAttackQuestion(){if(B.atkLeft<=0)return null;const w=nextWord();B.w=w;B.phase="q";return{w,mode:B.mode,leftMs:B.atkLeft,windowMs:B.win}},
+    // 中翻英・填空：這一題的時限＝打字換算的時間（scale＝時限／攻擊窗口）。攻擊時間、完美判定都照比例換算，所以難度和選擇題一樣
+    nextAttackQuestion(){if(B.atkLeft<=0)return null;const w=nextWord();B.w=w;B.phase="q";B.qScale=B.mode==="zh2enT"&&typeLimit?Math.max(.2,typeLimit(w)/B.win):1;
+      return{w,mode:B.mode,leftMs:Math.round(B.atkLeft*B.qScale),windowMs:Math.round(B.win*B.qScale),scale:B.qScale}},
     /* ---- 練等 ---- */
     get perkOffer(){return B.phase==="perk"&&B.offer?B.offer.map(perkInfo):null},
     choosePerk(id){const out=[],ev=mk(out);if(B.phase!=="perk"||!B.offer||!B.offer.includes(id))return out;applyPerk(id);B.offer=null;ev("perk",{perk:perkInfo(id)});nextBoss(ev);return out},
@@ -160,7 +163,7 @@ export function createSoulBattle({pool,mode,rng=Math.random,ambushRng=null,onEve
       return out},
     // ms：這一題花掉的攻擊時間（朗讀、選單、動畫期間不計）
     // opt.noAmbush：測試用，關掉這一題的突襲判定；opt.noKnock：測試用，答錯不觸發破綻
-    answerAttack(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="q")return out;const w=B.w;
+    answerAttack(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="q")return out;const w=B.w;if(B.qScale&&B.qScale!==1)ms=ms/B.qScale; // 換回攻擊窗口的尺度
       // 每題至少消耗 minCostMs 的攻擊時間；答錯再多扣 missPenaltyMs（速度記錄仍用實際作答時間）
       B.atkLeft=Math.max(0,B.atkLeft-Math.max(ms,SOUL.minCostMs||0)-(ok?0:SOUL.missPenaltyMs||0));B.n++;record(ok,ms);
       if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);addStamina(SOUL.staminaHit);
