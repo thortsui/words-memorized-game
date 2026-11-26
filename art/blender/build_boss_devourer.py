@@ -392,7 +392,7 @@ def build_model():
     for j in range(5):
         tab[-1][j].z += rnd.uniform(-0.10, 0.08)
         tab[-2][j].z += rnd.uniform(-0.03, 0.03)
-    add(L.sheet("Tabard", tab, bones=[("Hips", 0), ("Tabard", 0.12)], blend=0.2, mat=M_cloth))
+    add(L.sheet("Tabard", tab, thick=0.008, bones=[("Hips", 0), ("Tabard", 0.12)], blend=0.2, mat=M_cloth))
     # 披風底布（暗色破布）
     rows, cols = 10, 16
     cape = []
@@ -401,7 +401,7 @@ def build_model():
         cape.append([cloak_pt(math.radians(-118 + 236 * j / cols), z, -0.035) for j in range(cols + 1)])
     for j in range(cols + 1):
         cape[-1][j].z += rnd.uniform(-0.05, 0.22)
-    add(L.sheet("CapeBase", cape, bones=cloak_w, mat=M_cloth))
+    add(L.sheet("CapeBase", cape, thick=0.01, bones=cloak_w, mat=M_cloth))
     # 書頁：一排排像瓦片一樣疊在披風上；同版面的書頁共用 UV
     PW, PH, NT = 0.25, 0.35, 12
     n_pages = 0

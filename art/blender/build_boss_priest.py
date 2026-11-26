@@ -155,6 +155,31 @@ def body_w(co, t=None):
     return w
 
 
+def sculpt_mask(ob, c, sc):
+    """把蛋形銀面具雕成五官：眉弓、深陷的眼窩、顴骨、凹頰、閉合的薄唇與下巴（只動朝前的半邊）。"""
+    def g(x, z, cx, cz, wx, wz):
+        return math.exp(-(((x - cx) / wx) ** 2 + ((z - cz) / wz) ** 2))
+    for v in ob.data.vertices:
+        q = Vector(((v.co.x - c.x) / sc[0], (v.co.y - c.y) / sc[1], (v.co.z - c.z) / sc[2]))
+        front = max(0.0, min(1.0, -q.y * 1.6))
+        if front <= 0:
+            continue
+        x, z = q.x, q.z
+        d = 0.0
+        d += 0.10 * math.exp(-((z - 0.30) / 0.09) ** 2) * max(0.0, 1 - (abs(x) / 0.85) ** 2)        # 眉弓
+        for sx in (-1, 1):
+            d -= 0.17 * g(x, z, sx * 0.47, 0.12, 0.20, 0.13)                                          # 眼窩
+            d += 0.06 * g(x, z, sx * 0.62, -0.18, 0.18, 0.12)                                         # 顴骨
+            d -= 0.07 * g(x, z, sx * 0.50, -0.45, 0.17, 0.16)                                         # 凹頰
+        d += 0.035 * g(x, z, 0, -0.58, 0.30, 0.05) - 0.05 * g(x, z, 0, -0.64, 0.33, 0.022)           # 上唇、唇縫
+        d += 0.03 * g(x, z, 0, -0.70, 0.26, 0.05)                                                     # 下唇
+        d += 0.06 * g(x, z, 0, -0.88, 0.30, 0.10)                                                     # 下巴
+        d -= 0.04 * g(x, z, 0, 0.55, 0.12, 0.25)                                                      # 眉心凹
+        k = 1 + d * front
+        v.co = Vector((c.x + q.x * sc[0] * k, c.y + q.y * sc[1] * k, c.z + q.z * sc[2] * k))
+    ob.data.update()
+
+
 def build_model():
     L.reset()
     rnd = random.Random(11)
@@ -236,12 +261,29 @@ def build_model():
     # --- 領圍與頭巾
     add(L.ellipsoid("Collar", (0, 0.0, 1.875), (0.15, 0.135, 0.055), bones="Chest", mat=M_mantle, segs=20, rings=8))
     add(L.loft("NeckWrap", [(0, 0, 1.86), (0, -0.005, 1.95)], [0.06, 0.055], segs=10, sub=2, caps=("open", "open"), bones=[("Chest", 0), ("Neck", 0.3)], blend=0.4, mat=M_robe))
-    add(L.ellipsoid("Hood", (0, 0.012, 2.02), (0.112, 0.125, 0.135), bones="Head", mat=M_mantle, segs=20, rings=12))
+    add(L.ellipsoid("Hood", (0, 0.012, 2.02), (0.112, 0.125, 0.135), bones="Head", mat=M_mantle, segs=24, rings=14))
+    # 罩住面具的兜帽外層：前方留出臉的開口，帽簷略往前垂、邊緣有厚度與皺摺
+    cowl = []
+    for i in range(13):
+        th = 0.10 + 1.95 * i / 12
+        row = []
+        for j in range(29):
+            a = math.radians(-148 + 296 * j / 28)
+            edge = 1 - min(1.0, (148 - abs(math.degrees(a))) / 30)     # 越靠近開口越 1
+            r = 1 + 0.06 * math.sin(7 * a + i * 0.8) * (i / 12) ** 1.5 + 0.10 * edge * math.sin(th) ** 2
+            x = math.sin(a) * math.sin(th) * 0.142 * r
+            y = 0.02 + math.cos(a) * math.sin(th) * 0.158 * r - 0.035 * edge * math.exp(-((th - 0.75) / 0.5) ** 2)
+            z = 2.02 + math.cos(th) * 0.17 + 0.02 * math.exp(-((th - 0.3) / 0.25) ** 2) * (1 - edge) - 0.05 * (i / 12) ** 2
+            row.append(Vector((x, y, z)))
+        cowl.append(row)
+    add(L.sheet("Cowl", cowl, thick=0.012, bones=[("Head", 0), ("Neck", 0.85)], blend=0.25, mat=M_mantle))
     hood_back = [[Vector((math.sin(a) * (0.115 + 0.03 * v), 0.03 + math.cos(a) * (0.12 + 0.03 * v), 2.06 - 0.24 * v)) for a in [math.radians(x) for x in range(-100, 101, 20)]] for v in [0, 0.33, 0.66, 1.0]]
     add(L.sheet("HoodDrape", hood_back, thick=0.012, bones=[("Head", 0), ("Neck", 0.5), ("Chest", 0.9)], blend=0.3, mat=M_mantle))
 
     # --- 無口銀面具（鼻脊、眉弓）與冰晶王冠
-    add(L.ellipsoid("Mask", (0, -0.075, 1.99), (0.083, 0.062, 0.125), rot=(-4, 0, 0), bones="Head", mat=M_silver, segs=20, rings=14))
+    mask = L.ellipsoid("Mask", (0, -0.075, 1.99), (0.083, 0.062, 0.125), rot=(-4, 0, 0), bones="Head", mat=M_silver, segs=40, rings=30)
+    sculpt_mask(mask, Vector((0, -0.075, 1.99)), (0.083, 0.062, 0.125))
+    add(mask)
     add(L.loft("Nose", [(0, -0.128, 2.04), (0, -0.139, 1.99), (0, -0.136, 1.945)], [(0.012, 0.01), (0.013, 0.012), (0.017, 0.008)], segs=6, sub=2, bones="Head", mat=M_silver))
     band = [[Vector((math.sin(a) * (0.117 + 0.006 * k), 0.012 - math.cos(a) * (0.13 + 0.006 * k), 2.085 + 0.055 * k)) for a in [2 * math.pi * j / 20 for j in range(20)]] for k in (0, 1)]
     add(L.sheet("CrownBand", band, thick=0.014, wrap=True, bones="Head", mat=M_silver), sharp=40)
@@ -303,9 +345,13 @@ def build_model():
     add(L.loft("Wrist.L", [Le.lerp(Lw, 0.5), Lw, Lw + Vector((0.012, -0.05, 0))], [0.03, 0.026, 0.03], segs=8, sub=2, bones=[("ForeArm.L", 0), ("Hand.L", 0.7)], blend=0.3, mat=M_skin))
     add(L.ellipsoid("Palm.L", (0.455, -0.285, GRIP), (0.03, 0.05, 0.05), rot=(0, 0, -20), bones="Hand.L", mat=M_skin, segs=10, rings=6))
     for k in range(4):
-        z = GRIP - 0.036 + 0.024 * k
-        pts = [Vector((SX + 0.034 * math.cos(math.radians(a)), SY + 0.034 * math.sin(math.radians(a)), z + 0.004 * i)) for i, a in enumerate((110, 40, -30, -100, -165))]
-        add(L.loft(f"FingerL{k}", pts, [0.0095, 0.009, 0.0085, 0.007, 0.003], segs=6, sub=2, caps=("round", "point"), bones=[("Hand.L", 0), ("Fingers.L", 0.2)], blend=0.2, mat=M_skin))
+        # 指節貼在一起、只繞杖身約 210°（指根→第一指節外凸→指尖收進掌心側），小指較短
+        z = GRIP - 0.034 + 0.0225 * k
+        ln = (1.0, 1.0, 0.95, 0.82)[k]
+        angs = [110 - 210 * ln * q / 4 for q in range(5)]
+        rr = [0.036, 0.040, 0.037, 0.034, 0.031]
+        pts = [Vector((SX + r_ * math.cos(math.radians(a)), SY + r_ * math.sin(math.radians(a)), z + 0.002 * i)) for i, (a, r_) in enumerate(zip(angs, rr))]
+        add(L.loft(f"FingerL{k}", pts, [0.0128, 0.0122, 0.0112, 0.0098, 0.0075], segs=8, sub=3, caps=("round", "round"), bones=[("Hand.L", 0), ("Fingers.L", 0.2)], blend=0.2, mat=M_skin))
     pts = [Vector((SX + 0.034 * math.cos(math.radians(a)), SY + 0.034 * math.sin(math.radians(a)), GRIP + 0.062 + 0.006 * i)) for i, a in enumerate((130, 190, 250))]
     add(L.loft("ThumbL", pts, [0.013, 0.011, 0.004], segs=6, sub=2, caps=("round", "point"), bones="Hand.L", mat=M_skin))
     # 右臂：垂下，細長手指張開
@@ -320,7 +366,7 @@ def build_model():
         ln = (0.085, 0.10, 0.095, 0.075)[k]
         mid = b + Vector((dx * 0.35, -0.02, -ln))
         tip = mid + Vector((dx * 0.2, -0.045, -ln * 0.85))
-        add(L.loft(f"FingerR{k}", [b, mid, mid.lerp(tip, 0.55) + Vector((0, -0.008, 0)), tip], [0.0125, 0.011, 0.009, 0.003], segs=6, sub=2, caps=("round", "point"),
+        add(L.loft(f"FingerR{k}", [b, mid, mid.lerp(tip, 0.55) + Vector((0, -0.008, 0)), tip], [0.0125, 0.0115, 0.0095, 0.004], segs=8, sub=3, caps=("round", "point"),
                    bones=[("Hand.R", 0), ("Fingers.R", 0.25)], blend=0.2, mat=M_skin))
     tb = palm + Vector((0.045, -0.012, 0.01))
     add(L.loft("ThumbR", [tb, tb + Vector((0.03, -0.03, -0.05)), tb + Vector((0.035, -0.055, -0.11))], [0.013, 0.011, 0.003], segs=6, sub=2, caps=("round", "point"), bones="Hand.R", mat=M_skin))

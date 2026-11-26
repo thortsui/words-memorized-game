@@ -349,7 +349,7 @@ def leg_armor(B, body, mat, rivet_mat=None, cuisse=True, wing=True, greave_ridge
     return obs
 
 
-def sabaton(B, body, mat, pointed=1.0, name="Sabaton", lames=True):
+def sabaton(B, body, mat, pointed=1.0, name="Sabaton", lames=True, sole_mat=None):
     U = body.U; RF = U * (0.55 + 0.45 * body.B)
     ank = body.j["FootL"]
     st = [(0.088, 0.028, 0.045), (0.060, 0.042, 0.090), (0.012, 0.048, 0.112), (-0.050, 0.051, 0.090), (-0.110, 0.053, 0.064),
@@ -362,7 +362,28 @@ def sabaton(B, body, mat, pointed=1.0, name="Sabaton", lames=True):
             radii.append((wd * RF * 1.05, h * RF * 0.5 * 1.04))
         pts.append(V(ank.x + 0.004 * U * max(k - 2, 0), ank.y + y * RF, h * RF * 0.5))
         radii.append((wd * RF, h * RF * 0.5))
-    return [B.tube(name, pts, radii, 14, mat, "FootL", flat=X, exp=2.2, sharp=40)]
+    obs = [B.tube(name, pts, radii, 14, mat, "FootL", flat=X, exp=2.2, sharp=40)]
+    # 細節：厚鞋底＋鞋跟（平底、方一點的截面）、腳背中脊、三道疊片的捲邊環、腳踝護片
+    ax_ = ank.x
+    sole = []; sr = []
+    for y, wd, h in ((0.095, 0.030, 0), (0.06, 0.044, 0), (0.0, 0.050, 0), (-0.06, 0.052, 0), (-0.12, 0.050, 0), (-0.17, 0.043, 0), (st[-1][0] - 0.006, 0.020, 0)):
+        sole.append(V(ax_, ank.y + y * RF, 0.011 * RF)); sr.append((wd * RF * 1.08, 0.012 * RF))
+    obs.append(B.tube(name + "Sole", sole, sr, 8, sole_mat or mat, "FootL", flat=X, exp=5.0, sharp=50))
+    obs.append(B.tube(name + "Heel", [V(ax_, ank.y + 0.10 * RF, 0.02 * RF), V(ax_, ank.y + 0.04 * RF, 0.02 * RF)],
+                      [(0.034 * RF, 0.022 * RF), (0.036 * RF, 0.022 * RF)], 8, sole_mat or mat, "FootL", flat=X, exp=4.0, sharp=50))
+    kp = []; kr = []
+    for k in range(2, len(st)):
+        y, wd, h = st[k]
+        kp.append(V(ax_ + 0.004 * U * max(k - 2, 0), ank.y + y * RF, h * RF * (0.985 if k < len(st) - 1 else 0.9)))
+        kr.append((0.007 * RF * (1 - 0.6 * (k - 2) / (len(st) - 2)), 0.006 * RF))
+    obs.append(B.tube(name + "Keel", kp, kr, 6, mat, "FootL", exp=2.0, up=Z))
+    if lames:
+        for k in (2, 3, 4):
+            y, wd, h = st[k]
+            c = V(ax_ + 0.004 * U * (k - 2), ank.y + (y + 0.018) * RF, h * RF * 0.5 * 1.04)
+            obs.append(B.tube(f"{name}Lame{k}", [c + Y * 0.004 * RF, c - Y * 0.006 * RF], [(wd * RF * 1.10, h * RF * 0.5 * 1.10), (wd * RF * 1.06, h * RF * 0.5 * 1.06)],
+                              16, mat, "FootL", flat=X, exp=2.2, cap=False, sharp=50))
+    return obs
 
 
 # ---------------------------------------------------------------- 布料
@@ -402,17 +423,19 @@ def cloth_panel(B, name, top, nrm, length, mat, w, nu=20, nv=14, flare=0.12, rag
     sd = side or X
 
     def fn(u, v):
-        i = min(int(round(u * nu)), nu)
-        L = length * (1 - rag * cut[i])
+        x = u * nu; i = min(int(x), nu - 1); f = x - i          # 細分後在原本的格點之間內插（破邊才不會變成方齒）
+        L = length * (1 - rag * lerp(cut[i], cut[i + 1], f))
         n = nrm(u)
-        uu = u + jit[i] * smooth(v * 1.5)
+        uu = u + lerp(jit[i], jit[i + 1], f) * smooth(v * 1.5)
         p = top(u) - Z * (L * v)
         wave = math.sin(2 * math.pi * fold_n * uu + ph) + 0.45 * math.sin(2 * math.pi * fold_n * 2.3 * uu + ph * 2)
         p = p + n * (flare * L * v ** 1.3 + fold_amp * wave * smooth(v * 3.0) * (0.5 + 0.5 * v) + sag * math.sin(math.pi * min(v * 1.2, 1)))
         p = p + sd * ((uu - 0.5) * spread * v ** 0.8)
         return p
     inside = [top(0.5) - nrm(0.5) * 0.5 - Z * length * k / 4 for k in range(5)]
-    return B.grid(name, nu, nv, fn, mat, w, inside, holes=lambda i, jv: (i, jv) in holeset, texel=texel, sharp=50)
+    ob = B.grid(name, nu, nv, fn, mat, w, inside, holes=lambda i, jv: (i, jv) in holeset, texel=texel, sharp=50)
+    ob["cloth"] = 0.0075 * (length / 1.0) ** 0.3   # 布料厚度（assemble 時加上）
+    return ob
 
 
 def mantle(B, body, mat, t0=0.74, t1=1.10, off=0.03, rag=0.03, seed=5, w=None, name="Mantle", drop=0.0, nu=40, nv=8,

@@ -77,6 +77,8 @@ under_torso(B, body, "robe", texel=0.9, off=0.004)
 under_arm(B, body, "mail")
 under_leg(B, body, "gambeson", texel=0.6)
 mail_skirt(B, body, "mail", body.tz(0.22), body.tz(-0.50), flare=0.03, rag=0.05, seed=4)
+# 鏽蝕胸甲（罩在罩袍外、披肩下）：讓軀幹有板甲的體積與稜線
+cuirass(B, body, "rust", off=0.010, globe=0.014, keel=0.009, t0=0.31, t_neck=0.86, t_arm=0.68, rivet_mat="rust")
 zb = body.tz(0.27)
 belt(B, body, zb, "leather", {"Spine": 0.5, "Hips": 0.5}, h=0.05, off=0.022)
 buckle(B, body, zb, 6, "rust", {"Spine": 0.5, "Hips": 0.5}, off=0.032)
@@ -84,7 +86,7 @@ strap_hang(B, body, zb - 0.01, 14, "leather", length=0.30, off=0.032)
 belt(B, body, body.tz(0.18), "leather", "Hips", h=0.036, off=0.03, tilt=0.04, tilt_dir=-80, name="Belt2")
 pouch(B, body, zb - 0.02, 70, "leather", off=0.03)
 # 斜背盾牌的皮帶
-belt(B, body, body.tz(0.62), "leather", "Spine2", h=0.04, off=0.02, tilt=0.20, tilt_dir=-90, name="Guige", nu=24)
+belt(B, body, body.tz(0.62), "leather", "Spine2", h=0.04, off=0.04, tilt=0.20, tilt_dir=-90, name="Guige", nu=24)
 B.both(tasset(B, body, "rust", body.tz(0.20), length=0.26, a0=28, a1=96, off=0.03, rivet_mat="rust"))
 
 # 罩袍前後片

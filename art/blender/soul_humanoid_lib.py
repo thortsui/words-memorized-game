@@ -191,10 +191,20 @@ class Builder:
         self.parts.append(ob)
         return ob
 
+    HIRES = True
+
     def grid(self, name, nu, nv, fn, mat, w, inside, closed_u=False, closed_v=False, cap0=False, cap1=False,
-             rim=0.0, sharp=35.0, texel=1.0, stack_uv=False, holes=None):
+             rim=0.0, sharp=35.0, texel=1.0, stack_uv=False, holes=None, vmul=1):
         """參數曲面網格。fn(u,v)->Vector，u、v 在 0~1。inside：位於曲面背面的參考點（或點列），用來決定法線朝外。
-        holes(i,j)->True 的面不建（布料破洞）。"""
+        holes(i,j)->True 的面不建（布料破洞）。
+        細分：繞一圈的曲面（closed_u）段數 10–13 時自動加倍（細小的手指、鎖鏈不加）（holes 依原本的格子對應），vmul 可另外加倍 v 方向。"""
+        fu = 2 if (closed_u and 10 <= nu < 14 and not stack_uv and Builder.HIRES) else 1
+        fv = vmul if Builder.HIRES else 1
+        if fu > 1 or fv > 1:
+            nu, nv = nu * fu, nv * fv
+            if holes:
+                h0 = holes
+                holes = lambda i, j: h0(i // fu, j // fv)
         bm = bmesh.new()
         uvl = bm.loops.layers.uv.new("atlas")
         nru = nu if closed_u else nu + 1
@@ -255,7 +265,10 @@ class Builder:
             bm.normal_update()
         if rim > 0:
             self._rim(bm, uvl, rim)
-        return self.add_mesh(name, bm, mat, w, sharp=sharp, texel=texel, stacked=stack_uv)
+        ob = self.add_mesh(name, bm, mat, w, sharp=sharp, texel=texel, stacked=stack_uv)
+        if rim > 0:
+            ob["rim"] = rim
+        return ob
 
     @staticmethod
     def _rim(bm, uvl, rim):
@@ -354,25 +367,34 @@ class Builder:
             d = Vector((math.sin(th) * math.cos(ph), math.sin(th) * math.sin(ph), math.cos(th)))
             r = dent(d, u, v) if dent else 1.0
             return c + (ex * (d.x * radii[0]) + ey * (d.y * radii[1]) + ez * (d.z * radii[2])) * r
+        if nv <= 8 and nu >= 16 and "vmul" not in kw:
+            kw["vmul"] = 2
         return self.grid(name, nu, nv, fn, mat, w, c, closed_u=True, **kw)
 
     def rivets(self, name, pts, mat, w, r=0.006):
-        """一批鉚釘（六角錐小圓頂），UV 疊在同一個小島上。pts：[(位置, 法線)]。"""
+        """一批鉚釘（六角圓頂，兩圈），UV 疊在同一個小島上。pts：[(位置, 法線)]。"""
         bm = bmesh.new()
         uvl = bm.loops.layers.uv.new("atlas")
+        N = 6
         for p, nrm in pts:
             nrm = nrm.normalized()
             e1 = nrm.orthogonal().normalized(); e2 = nrm.cross(e1)
-            ring = []
-            for k in range(6):
-                a = math.pi / 3 * k
-                ring.append(bm.verts.new(p + (e1 * math.cos(a) + e2 * math.sin(a)) * r - nrm * (r * 0.3)))
-            top = bm.verts.new(p + nrm * r * 0.75)
-            for k in range(6):
-                f = bm.faces.new((ring[k], ring[(k + 1) % 6], top))
-                a0, a1 = math.pi / 3 * k, math.pi / 3 * (k + 1)
-                uvs = ((math.cos(a0), math.sin(a0)), (math.cos(a1), math.sin(a1)), (0, 0))
-                for l, q in zip(f.loops, uvs):
+            ring = []; mid = []
+            for k in range(N):
+                a = 2 * math.pi / N * k
+                d = e1 * math.cos(a) + e2 * math.sin(a)
+                ring.append(bm.verts.new(p + d * r - nrm * (r * 0.3)))
+                mid.append(bm.verts.new(p + d * r * 0.72 + nrm * r * 0.45))
+            top = bm.verts.new(p + nrm * r * 0.72)
+            for k in range(N):
+                k1 = (k + 1) % N
+                a0, a1 = 2 * math.pi / N * k, 2 * math.pi / N * (k + 1)
+                c0, s0, c1, s1 = math.cos(a0), math.sin(a0), math.cos(a1), math.sin(a1)
+                f = bm.faces.new((ring[k], ring[k1], mid[k1], mid[k]))
+                for l, q in zip(f.loops, ((c0, s0), (c1, s1), (c1 * .7, s1 * .7), (c0 * .7, s0 * .7))):
+                    l[uvl].uv = (0.012 + q[0] * 0.01, 0.012 + q[1] * 0.01)
+                f = bm.faces.new((mid[k], mid[k1], top))
+                for l, q in zip(f.loops, ((c0 * .7, s0 * .7), (c1 * .7, s1 * .7), (0, 0))):
                     l[uvl].uv = (0.012 + q[0] * 0.01, 0.012 + q[1] * 0.01)
         return self.add_mesh(name, bm, mat, w, sharp=80, stacked=True)
 

@@ -292,9 +292,48 @@ def _save(im, path):
     im.save()
 
 
+def _apply_mod(ob, md):
+    with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob], selected_editable_objects=[ob]):
+        bpy.ops.object.modifier_apply(modifier=md.name)
+
+
+def _resmooth(ob, sharp_deg):
+    import bmesh as _bm
+    bm = _bm.new(); bm.from_mesh(ob.data)
+    lim = math.radians(sharp_deg)
+    for e in bm.edges:
+        e.smooth = len(e.link_faces) == 2 and e.calc_face_angle(0.0) < lim
+    for f in bm.faces:
+        f.smooth = True
+    bm.to_mesh(ob.data); bm.free()
+
+
+def polish(B):
+    """細節處理：甲片邊緣倒角（兩段，讓稜線吃到高光）、布料加厚度（不再是零厚度的紙片）。"""
+    nb = nc = 0
+    for ob in B.parts:
+        rim = ob.get("rim")
+        th = ob.get("cloth")
+        if th:
+            md = ob.modifiers.new("Thick", "SOLIDIFY")
+            md.thickness = th; md.offset = -1.0; md.use_rim = True; md.use_even_offset = False; md.thickness_clamp = 1.0
+            _apply_mod(ob, md); _resmooth(ob, 60); nc += 1
+        elif rim:
+            md = ob.modifiers.new("Bevel", "BEVEL")
+            md.width = min(rim * 0.45, 0.004); md.segments = 1; md.limit_method = "ANGLE"
+            md.angle_limit = math.radians(40); md.profile = 0.6
+            try:
+                md.miter_outer = "MITER_ARC"
+            except Exception:
+                pass
+            _apply_mod(ob, md); _resmooth(ob, 70); nb += 1
+    print("POLISH bevel", nb, "cloth", nc, flush=True)
+
+
 def assemble(B, model, size=(1024, 1024), bake=True, samples=24, quick=False):
     """把分件依材質組別合併、展 UV、烘焙，回傳合併後的單一網格物件。"""
     sc = bpy.context.scene
+    polish(B)
     os.makedirs(BAKED, exist_ok=True)
     groups = {}
     for ob in B.parts:
