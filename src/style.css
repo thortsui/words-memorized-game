@@ -491,3 +491,8 @@ body:has(#pauseov) #bq,body.inbattle:has(#modal:not(.hide)) #bq{filter:blur(12px
 .bwrap.soul .flaskq{box-shadow:0 0 0 1px #a8643a,0 0 14px rgb(200 120 60/.35)}
 .bwrap.soul .chainq.k-ambush{box-shadow:0 0 0 2px #ff3a20,0 0 26px rgb(255 40 20/.7)}
 .pflask{color:#e8b070;white-space:nowrap}
+
+/* 魂系：練等 3 選 1（直式一欄、橫式三欄）、突擊題的金框 */
+.cmds.perks{grid-template-columns:1fr;gap:6px}.cmds.perks button{min-height:56px;border-color:#c9a24a}.cmds.perks button b{font-size:15px;color:#f0d890}.cmds.perks button .c{font-size:12px;color:var(--ink);white-space:normal}
+@media(orientation:landscape) and (max-height:520px){.cmds.perks{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.bwrap.soul .chainq.k-assault{box-shadow:0 0 0 2px #d9b24a,0 0 26px rgb(217 178 74/.6)}

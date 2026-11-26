@@ -441,6 +441,20 @@ export function createSoulScene(eng,fx,api){
     async quickSlash(p){await startMove(p)},
     async skill(p){if(p.big)fx.banner(p.name,"soul",1);await startMove(p)},
     async counter(p){await startMove(p)},
+    // 弱點擊破：Boss 踉蹌、金色閃光，接著主角一套連斬（gale，5 段）
+    async weakBreak(p){const b=boss;fx.banner("弱點擊破","soul",1);sfx("parry",{v:.8});
+      if(b){b.glow(0xffd75a,1.5);eng.to(b,{glowK:phaseTint?.7:0},1.2);if(b.has("Stagger"))b.play("Stagger",{speed:1.3});fx.burstRing(b.center(v3(),.6),{color:0xffd75a,r1:1.6})}
+      eng.hitStop(90);eng.shake(.04,.25,{freq:14});await startMove(p)},
+    // 突擊：看穿攻勢——Boss 的攻擊被打斷、踉蹌，換主角連續進攻
+    async assault(p){stopThreat();moves.abort();aiHalt();side="player";heroBusy=false;hero.root.position.y=0;const b=boss;
+      fx.banner("突擊","soul",1);fx.pulseVig("white",.45,.3);sfx("parry",{v:.9});eng.hitStop(110);
+      if(b){bossRecover(.1);b.glow(0xffd75a,1.4);eng.to(b,{glowK:phaseTint?.7:0},1);if(b.has("Stagger"))b.play("Stagger",{speed:1.1,hold:true})}
+      csReset(.4);hero.play("Idle");await eng.wait(.45)},
+    async assaultEnd(){const b=boss;if(b)b.play(idleName());await eng.wait(.15)},
+    // 練等：主角腳下金環、頭上冒出強化名稱
+    async perkOffer(){if(hero.has("Victory"))hero.play("Victory",{hold:true});await eng.wait(.2)},
+    async perk(p){const hp=hero.root.position;fx.ring(hp,{color:0xffd75a,r1:1.6,dur:.6,opacity:.7});fx.emit({p:hp,n:22,color:[0xffd75a,0xffffff],speed:[.1,.5],up:1.8,size:[.05,.12],life:[.6,1.1],radius:.5,radiusY:.05});
+      fx.text(hero.center(v3(),1.12),p.perk.name,"soul heal",{dur:1.1,rise:28});hero.play("Idle",{fade:.4});await eng.wait(.5)},
     /* ---------- 藥壺 ----------
        沒有 Drink 片段：用 Guard 片段停在舉手擋在身前的那一格，再用程式把上半身後仰、手上亮起藥壺光（舉到臉前喝）。
        喝藥時 Boss 會趁機壓近（強制進入逼近模式）。 */
