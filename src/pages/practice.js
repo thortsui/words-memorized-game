@@ -10,14 +10,14 @@ import { startBattle } from '../battle/controller.js';
 
 sp.onVoices=()=>{if(ctx.view==="practice"&&!ctx.Q&&!ctx.B&&$("#vsel"))renderSetup()};
 
-export function renderSetup(){const D=allDicts();if(!D[setup.dict]&&setup.dict!=="__all")setup.dict=Object.keys(D)[0]||"__all";const n=pool().length;
+export function renderSetup(){const D=allDicts();if(!D[setup.dict]&&setup.dict!=="__all")setup.dict=Object.keys(D)[0]||"__all";const card=setup.game==="card",n=(card?pool({mode:"en2zh"}):pool()).length;
   const chip=(k,v,l)=>`<button class="chip ${setup[k]===v?"on":""}" data-k="${k}" data-v="${esc(JSON.stringify(v))}">${l}</button>`;
   const eng=sp.eng;
   app.innerHTML=`<h1>練習</h1><p class="sub">選字典與題型，開始刷題。答錯的會記進錯題本。</p>
   <div class="cut">${SC}<div class="tab"><span>SETUP</span></div><div class="body">
   <label><span class="small">字典</span><select id="dsel"><option value="__all">全部字典</option>${Object.values(D).map(d=>`<option value="${esc(d.id)}" ${d.id===setup.dict?"selected":""}>${esc(d.name)}（${d.words.length}）</option>`).join("")}</select></label>
-  <h2 style="font-size:16px;margin:18px 0 8px">玩法</h2><div class="chips">${chip("game",false,"一般練習")}${chip("game",true,"打怪模式")}${chip("game","soul","魂系模式")}</div>${setup.game==="soul"?'<p class="small" style="margin:6px 0 0">黑暗奇幻的 Boss 戰，所有動作都由答題驅動。你的回合有 10 秒攻擊時間（讀音與出招時暫停），每答對一題累積 1 格 ATB，可用 1 格斬擊、2 格連斬，或存滿 3 格放大招。Boss 出手時會出限時閃避題：<b>很快答對＝彈反並反擊</b>，一般速度答對＝翻滾閃避（消耗耐力），太慢只能擦傷，答錯或超時就會中招。Boss 會連擊（段與段之間不停）、延遲出手（選項先鎖住，太急會慢半拍）、突進（不能彈反），第二階段還有擋不住的必殺；你攻擊時拖太久也可能被突襲打斷。HP 低時可以喝藥壺（也要答對才喝得下去）。遊戲會依你最近的答題速度自動調整難度：你答得越快，Boss 出手越多、時限越短。</p>':setup.game?'<p class="small" style="margin:6px 0 0">劍與魔法的世界：按「下一題」才開始計時；答對獲得 1～10 點能量（越快越多，最多存 40），再選劍技或魔法出手（普通斬擊免費，其他從 10 點起跳），或保留能量放大招。連招（3／5／7 題）不耗能量，連續答對指定題數（時間更短）才會一次發動，傷害最高；答錯會被怪物攻擊、連招中斷。打倒 5 隻怪物就破關！</p>':""}
-  <h2 style="font-size:16px;margin:18px 0 8px">題型</h2><div class="chips">${MODES.map(m=>chip("mode",m[0],m[1])).join("")}</div>
+  <h2 style="font-size:16px;margin:18px 0 8px">玩法</h2><div class="chips">${chip("game",false,"一般練習")}${chip("game","card","單字閃卡")}${chip("game",true,"打怪模式")}${chip("game","soul","魂系模式")}</div>${setup.game==="card"?'<p class="small" style="margin:6px 0 0">上面英文、下面中文，底下是例句（沒有例句就不顯示）。點一下卡片換下一張；鍵盤空白鍵／→ 下一張、← 上一張。不計分、不記錯題。</p>':""}${setup.game==="soul"?'<p class="small" style="margin:6px 0 0">黑暗奇幻的 Boss 戰，所有動作都由答題驅動。你的回合有 5～7 秒攻擊時間（中翻英・填空依你的打字速度換算），答對就自動連斬：越快答完段數越多（3～5 連斬），第 2 刀起每一刀要再答一題複習題（先考答錯過的字）。Boss 會 3～5 連擊，每一擊都是限時閃避題（2～5 秒）：<b>很快答對＝彈反並反擊</b>，一般速度＝翻滾閃避，太慢只能擦傷，答錯或超時就會中招；連續快速閃避會觸發突擊。答錯會當場被打倒。打倒 Boss 可以從 3 個技能挑 1 個（這一局有效）。每題答完都要按「下一題」，中間可以先記答案。</p>':setup.game===true?'<p class="small" style="margin:6px 0 0">劍與魔法的世界：按「下一題」才開始計時；答對獲得 1～10 點能量（越快越多，最多存 40），再選劍技或魔法出手（普通斬擊免費，其他從 10 點起跳），或保留能量放大招。連招（3／5／7 題）不耗能量，連續答對指定題數（時間更短）才會一次發動，傷害最高；答錯會被怪物攻擊、連招中斷。打倒 5 隻怪物就破關！</p>':""}
+  ${card?"":`<h2 style="font-size:16px;margin:18px 0 8px">題型</h2><div class="chips">${MODES.map(m=>chip("mode",m[0],m[1])).join("")}</div>`}
   <h2 style="font-size:16px;margin:18px 0 8px">範圍</h2><div class="chips">${chip("scope","all","單字＋片語")}${chip("scope","w","只有單字")}${chip("scope","p","只有片語")}${chip("wrong",true,"只練錯題")}${chip("wrong",false,"全部題目")}</div>
   <h2 style="font-size:16px;margin:18px 0 8px">題數</h2><div class="chips">${chip("n",10,"10 題")}${chip("n",20,"20 題")}${chip("n",0,"全部")}</div>
   <h2 style="font-size:16px;margin:18px 0 8px">例句模式 <span class="small" style="font-weight:400">開啟後題目下方顯示英文例句（不附中文）</span></h2><div class="chips">${chip("exmode",false,"關閉")}${chip("exmode",true,"開啟")}</div>
@@ -25,14 +25,37 @@ export function renderSetup(){const D=allDicts();if(!D[setup.dict]&&setup.dict!=
   <h2 style="font-size:16px;margin:18px 0 8px">聲音</h2><div class="chips">${[["auto","自動（推薦，最穩定）"],["device","只用裝置語音"],["google","Google 翻譯語音優先"]].map(([v,l])=>`<button class="chip ${eng===v?"on":""}" data-eng="${v}">${l}</button>`).join("")}<button class="chip" data-say="Emma appreciated her neighbor taking care of her dog.">試聽</button></div>
   <div class="row ${eng!=="google"?"":"hide"}" style="margin-top:8px"><select id="vsel" style="flex:1 1 220px;width:auto">${enVoices().length?enVoices().map(v=>`<option value="${esc(v.name)}" ${(sp.voiceName?v.name===sp.voiceName:sp.voice&&v.name===sp.voice.name)?"selected":""}>${esc(v.name)}（${esc(v.lang)}）</option>`).join(""):'<option value="">預設英文聲音</option>'}</select></div>
   <p class="small" style="margin:6px 0 0">${eng==="auto"?"先用瀏覽器內建語音（Chrome 的「Google US English」與「Google 國語」，穩定且不會被擋）；內建語音沒反應時才改用 Google 翻譯語音。":eng==="google"?"Google 翻譯語音不是正式服務，常被限流；連不上時會自動改用裝置語音。":"iPhone／Mac 可到 設定 → 輔助使用 → 朗讀內容 → 聲音 → 英文，下載「Ava（進階）」或 Siri 聲音，這裡就會出現，聲音最自然。"}</p>
-  <div class="row" style="margin-top:22px"><button class="pri" id="start" ${n?"":"disabled"} style="flex:1 1 220px">${setup.game==="soul"?"開始魂系戰鬥！":setup.game?"開始戰鬥！":"開始"}（可出 ${n} 題）</button></div>
+  <div class="row" style="margin-top:22px"><button class="pri" id="start" ${n?"":"disabled"} style="flex:1 1 220px">${card?`開始看卡片（${setup.n&&setup.n<n?`抽 ${setup.n} 張，共 ${n} 張`:`共 ${n} 張`}）`:`${setup.game==="soul"?"開始魂系戰鬥！":setup.game?"開始戰鬥！":"開始"}（可出 ${n} 題）`}</button></div>
   ${n?"":`<p class="small">${setup.wrong?"這個範圍目前沒有錯題，太好了！":setup.mode==="cloze"?"這個範圍沒有可用的例句克漏字。":"這個範圍沒有條目。"}</p>`}</div></div>`;
   $("#dsel").onchange=e=>{setup.dict=e.target.value;saveSetup();renderSetup()};
   app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{setup[b.dataset.k]=JSON.parse(b.dataset.v);saveSetup();renderSetup()});
   app.querySelectorAll("[data-eng]").forEach(b=>b.onclick=()=>{sp.eng=b.dataset.eng;resetGoogleFail();lsSet("vc-eng3",sp.eng);renderSetup()});
   $("#vsel").onchange=e=>{sp.voiceName=e.target.value;lsSet("vc-voice",sp.voiceName)};
   $("#slow").onclick=()=>{sp.rate=sp.rate<.8?.9:.65;lsSet("vc-rate",sp.rate);renderSetup()};
-  $("#start").onclick=()=>setup.game?startBattle(pool(),setup.game==="soul"):startQuiz(pool())}
+  $("#start").onclick=()=>card?startCards(pool({mode:"en2zh"})):setup.game?startBattle(pool(),setup.game==="soul"):startQuiz(pool())}
+
+/* ----- 單字閃卡：上面英文、下面中文、底下例句；點一下換下一張 ----- */
+let cardKey=null;
+export function startCards(ws){if(!ws.length)return;const items=shuffle(ws).slice(0,setup.n||ws.length),st=ctx.Q={cards:true};let i=0;
+  const alive=()=>ctx.Q===st&&ctx.view==="practice",off=()=>{if(cardKey){document.removeEventListener("keydown",cardKey);cardKey=null}};
+  const go=d=>{if(!alive())return;i=Math.max(0,Math.min(items.length,i+d));stopSpeech();draw()};
+  function draw(){window.scrollTo(0,0);
+    if(i>=items.length){app.innerHTML=`<div class="cut">${SC}<div class="tab"><span>DONE</span></div><div class="body" style="text-align:center"><p class="big" style="margin:8px 0">看完了 ${items.length} 張</p>
+      <div class="row" style="justify-content:center;gap:10px;margin-top:14px"><button class="pri" id="again">再看一次（重新洗牌）</button><button id="back">回設定</button></div></div></div>`;
+      $("#again").onclick=()=>startCards(ws);$("#back").onclick=()=>{off();toSetup()};return}
+    const w=items[i];
+    app.innerHTML=`<div class="row"><button class="sm ghost" id="quit" style="padding-left:0">← 結束閃卡</button><span class="small" style="margin-left:auto">${i+1} / ${items.length}</span></div>
+    <div class="fcard" id="fc" role="button" tabindex="0" aria-label="下一張">
+      <div class="fc-en"><span class="en">${esc(w.en)}</span>${spkBtn(w.en)}</div>${w.pos?`<div class="small fc-pos">${esc(w.pos)}</div>`:""}
+      <div class="fc-zh">${esc(w.zh)}</div>
+      ${w.ex?`<div class="fc-ex"><span class="ex en">${esc(w.ex)}</span>${spkBtn(w.ex,"朗讀例句")}</div>`:""}
+      <div class="small fc-hint">點一下換下一張</div></div>
+    <div class="row" style="gap:10px;margin-top:12px"><button id="prev" ${i?"":"disabled"}>← 上一張</button><button class="pri" id="nxt" style="flex:1">${i+1<items.length?"下一張 →":"看完了"}</button></div>`;
+    $("#fc").onclick=()=>go(1);$("#nxt").onclick=()=>go(1);$("#prev").onclick=()=>go(-1);$("#quit").onclick=()=>{off();toSetup()};
+    if(setup.auto)speak(w.en,app.querySelector(".fc-en .spk"))}
+  off();cardKey=e=>{if(!alive()){off();return}if(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+    if(e.key===" "||e.key==="Enter"||e.key==="ArrowRight"){e.preventDefault();go(1)}else if(e.key==="ArrowLeft"){e.preventDefault();go(-1)}};
+  document.addEventListener("keydown",cardKey);draw()}
 
 export function exLine(w,hideAns){if(!setup.exmode||!w.ex)return"";const a=clozeAns(w),i=clozePos(w.ex,a);
   if(i<0)return hideAns?"":`<div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:12px"><div class="ex en" style="font-size:17px;color:var(--ink)">${esc(w.ex)}</div>${spkBtn(w.ex,"朗讀例句")}</div>`;

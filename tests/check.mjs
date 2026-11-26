@@ -71,6 +71,7 @@ let fetched=0;{const f=globalThis.fetch;globalThis.fetch=async(...a)=>{fetched++
 const smart=[await checkZhSmart("好",LOVE),await checkZhSmart("喜好",LOVE),await checkZhSmart("愛",LOVE),await checkZhSmart("放",by("let go of sth/sb")),await checkZhSmart("外",by("appearance")),await checkZhSmart("桌子",LOVE),await checkZhSmart("熱戀",LOVE)];
 globalThis.fetch=realFetch;
 t("checkZhSmart：只認書上的中文（「喜好」和「喜愛」共同字過半算對；Google 翻譯有、書上沒有的「熱戀」不算），完全不連 Google",()=>{assert.deepEqual(smart.map(r=>r.ok),[false,true,true,false,false,false,false]);assert.equal(fetched,0)});
+t("單字閃卡：設定存檔留得住「card」（重新整理不會變成打怪模式）",()=>{assert.equal(normalizeSetup({game:"card"}).game,"card");assert.equal(normalizeSetup({game:"soul"}).game,"soul");assert.equal(normalizeSetup({game:true}).game,true)});
 t("備份驗證：格式不完整就整份拒絕（丟出原因），不會回傳半套資料",()=>{const bad=j=>assert.throws(()=>normalizeState(j,{strict:true}),Error,JSON.stringify(j));
   bad({dicts:{x:{id:"x",name:"壞字典"}}});bad(null);bad([]);bad("abc");bad({});bad({dicts:[]});bad({dicts:{x:null}});bad({dicts:{x:{id:"x",words:[]}}});bad({dicts:{x:{name:"n",words:[]}}});
   bad({dicts:{x:{id:"x",name:"n",words:"no"}}});bad({dicts:{x:{id:"x",name:"n",words:[null]}}});bad({dicts:{x:{id:"x",name:"n",words:[{id:"a",zh:"沒有英文"}]}}});bad({dicts:{x:{id:"x",name:"n",words:[{id:"a",en:"a",zh:5}]}}});

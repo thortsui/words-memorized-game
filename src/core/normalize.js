@@ -44,4 +44,4 @@ export function normalizeSetup(j){const s={...SETUP_DEFAULT};if(!isObj(j))return
   if(["en2zh","zh2en","en2zhT","zh2enT","cloze"].includes(j.mode))s.mode=j.mode;
   if(["all","w","p"].includes(j.scope))s.scope=j.scope;
   if([0,10,20].includes(j.n))s.n=j.n;
-  s.wrong=!!j.wrong;if(typeof j.auto==="boolean")s.auto=j.auto;s.exmode=!!j.exmode;s.game=j.game==="soul"?"soul":!!j.game;return s}
+  s.wrong=!!j.wrong;if(typeof j.auto==="boolean")s.auto=j.auto;s.exmode=!!j.exmode;s.game=j.game==="soul"||j.game==="card"?j.game:!!j.game;return s}
