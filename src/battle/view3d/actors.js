@@ -17,7 +17,10 @@ import { ease, lerp } from './engine.js';
 // 已接上 Meshopt 解碼器；WebP 貼圖（EXT_texture_webp）GLTFLoader 本身就支援。之後換成壓縮過的 GLB 不必改程式。
 const MEM=new Map(),VER=MODEL_FILES.ver||{},CACHE="vc-models-v1";
 const gltfLoader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-async function fetchGLB(name,st){const url=import.meta.env.BASE_URL+"models/"+name+".glb",key=url+"?v="+(VER[name+".glb"]||"0");
+// claude.ai Artifact 版不提供 .glb 檔型，建置時設 VITE_GLB_B64=1 會改抓 base64 文字檔（<名>.glb.b64.txt）再解回二進位
+const B64=!!import.meta.env.VITE_GLB_B64;
+function unB64(buf){const t=new TextDecoder().decode(buf).replace(/\s+/g,""),b=atob(t),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer}
+async function fetchGLB(name,st){const url=import.meta.env.BASE_URL+"models/"+name+".glb"+(B64?".b64.txt":""),key=url+"?v="+(VER[name+".glb"]||"0");
   let cache=null;try{if(typeof caches!=="undefined")cache=await caches.open(CACHE)}catch(e){}
   if(cache){const hit=await cache.match(key).catch(()=>null);if(hit){st.cached=true;return hit.arrayBuffer()}}
   const res=await fetch(url);if(!res.ok)throw new Error("HTTP "+res.status);
@@ -25,6 +28,7 @@ async function fetchGLB(name,st){const url=import.meta.env.BASE_URL+"models/"+na
   if(res.body&&total){const rd=res.body.getReader(),chunks=[];let n=0;for(;;){const{done,value}=await rd.read();if(done)break;chunks.push(value);n+=value.length;st.loaded=n}
     const u=new Uint8Array(n);let o=0;for(const c of chunks){u.set(c,o);o+=c.length}buf=u.buffer}
   else buf=await res.arrayBuffer();
+  if(B64)buf=unB64(buf);
   if(cache){try{await cache.put(key,new Response(buf.slice(0),{headers:{"content-type":"model/gltf-binary"}}));
       for(const r of await cache.keys())if(r.url!==new URL(key,location.href).href&&r.url.split("?")[0].endsWith("/"+name+".glb"))cache.delete(r)}catch(e){}} // 清掉同一個檔的舊版本
   return buf}

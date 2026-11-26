@@ -23,3 +23,5 @@ tests/playtest/site/*
 art/screenshots/fix1/
 art/blender/export_raw/
 tests/smoke-*.png
+
+dist-claude/
