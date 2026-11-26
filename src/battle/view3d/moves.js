@@ -18,7 +18,28 @@ export function createMoves(ctx){
   let st=null; // 目前這一招的狀態：{move, circle, orb, sword, air, melee}
   const foeC=(k=.5)=>ctx.foe().center(v3(),k);
   const heroHand=()=>{const c=hero.center(v3(),.62),f=v3(Math.sin(hero.root.rotation.y),0,Math.cos(hero.root.rotation.y));return c.addScaledVector(f,hero.h*.42)};
-  const melee=m=>m==="slash"||m==="gale"||m==="quick"||m==="counter";
+  const melee=m=>m==="slash"||m==="gale"||m==="quick"||m==="counter"||m==="chain";
+  /* 魂系自動連斬：3／4／5 段各三組動作，事件帶 variant（0–2）隨機挑一組。
+     c0–c2＝Combo 片段的第 1–3 揮、s＝斬擊、sf＝反手斬擊、h＝重斬、spin＝迴旋斬、leap＝躍起下劈、thrust＝突刺（往前踏一步） */
+  const CHAIN={
+    2:[["s","h"],["c0","c2"],["sf","thrust"]],
+    3:[["c0","c1","c2"],["s","sf","h"],["spin","thrust","leap"]],
+    4:[["c0","c1","c2","h"],["s","sf","thrust","leap"],["spin","c1","sf","h"]],
+    5:[["c0","c1","c2","s","leap"],["s","sf","thrust","c2","h"],["spin","c0","c1","sf","leap"]]};
+  // 劍砍到金屬：白金火花＋小閃光；重擊（最後一段）火花加倍、多一圈衝擊環
+  const metal=(c,big)=>{fx.emit({p:c,n:big?60:32,color:[0xfff4d0,0xffffff,0xffb050,0xff8a2a],speed:[2.5,big?12:9],size:[.05,.13],life:[.2,.55],gravity:9,drag:1.1});
+    fx.flash(c,{color:0xfff0d0,size:big?1.6:.9,dur:big?.2:.12,opacity:.9});if(big)fx.burstRing(c,{color:0xffe0a0,r1:1.4,dur:.3})};
+  async function chainStep(code,i,p){const P=hero.pose;
+    if(code[0]==="c"){const k=+code[1],ht=hero.comboTimes("Combo",3),t0=k?ht[k-1]+.03:0,sp=1.2;
+      if(hero.has&&hero.has("Combo")&&hero.playSeg("Combo",t0,ht[k],sp)){await eng.wait(Math.max(.1,(ht[k]-t0)/sp));return}
+      hero.play("Slash",{speed:1.4});await eng.wait(hero.impactTime("Slash",1.4));return}
+    if(code==="s"||code==="sf"){hero.play("Slash",{speed:1.35,fade:.05});if(code==="sf")eng.to(P.rotation,{y:-.5},.12,ease.out).then(()=>eng.to(P.rotation,{y:0},.25,ease.out));await eng.wait(hero.impactTime("Slash",1.35));return}
+    if(code==="h"){hero.play("HeavySlash",{speed:1.25,fade:.05});await eng.wait(hero.impactTime("HeavySlash",1.25));return}
+    if(code==="thrust"){hero.play("Slash",{speed:1.5,fade:.05});const T=hero.impactTime("Slash",1.5);P.position.z=0;await eng.tween(T,k=>{P.position.z=.45*ease.out(k)});eng.to(P.position,{z:0},.3,ease.out);return}
+    if(code==="spin"){hero.play("HeavySlash",{speed:1.3,fade:.05});const T=hero.impactTime("HeavySlash",1.3);await eng.tween(T,k=>{P.rotation.y=Math.PI*2*ease.out(k)});P.rotation.y=0;return}
+    if(code==="leap"){hero.play("HeavySlash",{speed:1.1,fade:.05});const T=hero.impactTime("HeavySlash",1.1);await eng.tween(T,k=>{P.position.y=Math.sin(k*Math.PI*.95)*.9});P.position.y=0;
+      const g=hero.root.position;fx.ring(v3(g.x,0,g.z),{color:0xffe0a0,r1:2.4,dur:.4});fx.emitN({p:v3(g.x,.1,g.z),n:16,color:[0x6b7078,0x8a8f98],speed:[1,3],flat:.3,up:.6,size:[.3,.6],life:[.4,.8],alpha:.4,drag:2,grow:.8});return}
+    hero.play("Slash");await eng.wait(hero.impactTime("Slash"))}
 
   async function start(p){const move=p.move||p.skillId||"slash";st={move,n:0};const h=hero.h;
     if(melee(move)){st.melee=true;ctx.cam("melee");await ctx.approach(move==="counter"?.16:move==="quick"?.2:.3);return}
@@ -49,14 +70,23 @@ export function createMoves(ctx){
     else await eng.wait(.3)}
 
   async function hit(p){if(!st)st={move:p.move||"slash",n:0,melee:true};const S=st,move=st.move,i=p.index||0,h=hero.h,f=ctx.foe();if(!f)return ctx.impact(p,{power:1});const c=foeC();
-    if(melee(move)){
+    if(move==="chain"){const n=p.n||p.total||3,set=(CHAIN[n]||CHAIN[3])[(p.variant||0)%3],code=set[Math.min(i,set.length-1)];
+      await chainStep(code,i,p);
+      const ang={c0:.6,c1:-.7,c2:1.6,s:.4,sf:-.9,h:-1.3,spin:0,leap:-1.5,thrust:.1}[code]??rand(-.9,.9);
+      fx.slash(c,{color:pal.slash,size:Math.min(2.2,f.h*(p.last?1.3:.95)+.2),ang,flip:code==="sf"||code==="c1",sweep:code==="spin"?2.6:1.4});
+      if(code==="spin")fx.slash(c,{color:0xffffff,size:Math.min(2,f.h*.9+.2),ang:Math.PI,sweep:2.6,flip:true});
+      metal(c,!!p.last);
+      await ctx.impact(p,{power:p.last?1.5:.8,ono:p.last?(code==="leap"?"破！！":"斬！！"):["鏘","唰","鏘"][i%3],color:pal.slash});
+      }
+    else if(melee(move)){
       // 連斬：整段 Combo 只播一次，各段傷害對在片段裡實際揮到的那幾格（秒數表在 actors.js 的 IMPACT）
       if(move==="gale"){if(i===0){st.times=hero.comboTimes("Combo",p.total);st.t0=eng.time;hero.play("Combo")}
         const at=st.times[Math.min(i,st.times.length-1)]+(i>=st.times.length?.22*(i-st.times.length+1):0);await eng.wait(Math.max(0,st.t0+at-eng.time))}
       else{const sp=move==="quick"||move==="counter"?1.35:1;hero.play("Slash",{speed:sp});await eng.wait(hero.impactTime("Slash",sp))}
       const ang=move==="gale"?[.6,-.7,1.6][i%3]:rand(.3,.9);
       fx.slash(c,{color:pal.slash,size:Math.min(1.9,f.h*(p.last&&move==="gale"?1.25:.95)+.2),ang,flip:i%2===1});
-      await ctx.impact(p,{power:move==="gale"?(p.last?1.3:.8):move==="counter"?1.4:1,ono:move==="gale"?(p.last?"斬！！":"唰"):"斬！",color:pal.slash});
+      metal(c,move==="counter"||!!p.last);if(move==="counter")fx.slash(c,{color:0xffffff,size:Math.min(2,f.h*.9+.3),ang:-ang,sweep:1.8,flip:true});
+      await ctx.impact(p,{power:move==="gale"?(p.last?1.3:.8):move==="counter"?1.4:1,ono:move==="gale"?(p.last?"斬！！":"唰"):move==="counter"?"反擊！":"斬！",color:pal.slash});
       }
     else if(move==="fire"){if(!st.orb)return ctx.impact(p,{power:2,color:pal.fire});const o=st.orb.sprite,from=o.position.clone();hero.play("Slash");
       const near=c.clone().addScaledVector(v3().subVectors(from,c).setY(0).normalize(),Math.min(.6,f.h*.15));

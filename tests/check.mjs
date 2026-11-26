@@ -139,17 +139,18 @@ t("打怪：回血招式（治癒之光）—能量不足／HP 滿不能用、�
 
 /* ---------- 魂系模式 ---------- */
 t("魂系：閃避判定依答題速度分級",()=>{assert.equal(gradeDodge(true,900,4000,1500),"parry");assert.equal(gradeDodge(true,2000,4000,1500),"dodge");assert.equal(gradeDodge(true,3500,4000,1500),"graze");assert.equal(gradeDodge(true,4001,4000,1500),"hit");assert.equal(gradeDodge(false,500,4000,1500),"hit")});
-t("魂系：動態難度隨答題速度變化",()=>{assert.equal(difficulty([]).d,0);const fast=difficulty(Array(8).fill({ok:true,ms:1200})),slow=difficulty(Array(8).fill({ok:true,ms:5500})),bad=difficulty(Array(8).fill({ok:false,ms:1000}));
+t("魂系：動態難度隨答題速度變化",()=>{assert.equal(difficulty([]).d,0);const fast=difficulty(Array(8).fill({ok:true,ms:900})),slow=difficulty(Array(8).fill({ok:true,ms:5500})),bad=difficulty(Array(8).fill({ok:false,ms:1000}));
   assert.equal(fast.d,1);assert.ok(Math.abs(fast.limitMul-(1-SOUL.limitSwing))<1e-9);assert.equal(fast.extra,1);assert.equal(fast.perfectMs,SOUL.perfectMs-SOUL.perfectSwing-SOUL.perfectTight);assert.equal(fast.dmgMul,1+SOUL.dmgBonus);assert.ok(Math.abs(fast.foeMul-(1+SOUL.foeDmgSwing))<1e-9);
   // 答得慢：時限放寬，但 Boss 不會少出手（亂點會被判成「很慢」，不能讓它佔便宜）
   assert.equal(slow.d,-1);assert.ok(Math.abs(slow.limitMul-(1+SOUL.limitSwing))<1e-9);assert.equal(slow.extra,0);assert.equal(slow.perfectMs,SOUL.perfectMs+SOUL.perfectSwing);assert.equal(slow.dmgMul,1);assert.ok(Math.abs(slow.foeMul-(1-SOUL.foeEase))<1e-9,"答對但很慢：Boss 傷害減輕");assert.equal(difficulty(Array(8).fill({ok:false,ms:500})).foeMul,1,"亂點（答錯）不減傷");assert.equal(bad.d,-1);
   // 彈反門檻只在 d 超過 tightAt 之後才額外收緊；d＝tightAt 時還是 1.5−0.3d
   const mid=difficulty(Array(8).fill({ok:true,ms:(SOUL.paceCenter-SOUL.tightAt*SOUL.paceSpan)*1000}));assert.ok(Math.abs(mid.d-SOUL.tightAt)<1e-9);assert.equal(mid.perfectMs,Math.round(SOUL.perfectMs-SOUL.perfectSwing*SOUL.tightAt));
   assert.equal(difficulty([]).foeMul,1)});
-const fixLim=(E,L=4000)=>{const c=E.state.enemy.cur;c.limitMs=L;c.perfectMs=c.noParry?0:Math.min(SOUL.perfectMs,L*.5)};
-t("魂系：目前的數值（攻擊時間 5–7 秒、閃避 2–5 秒、連擊 3–5 段、擊倒回 35、守門騎士 HP 55）",()=>{assert.deepEqual(SOUL.windowRange,[5000,7000]);assert.deepEqual(SOUL.dodgeClamp,[2000,5000]);assert.equal(SOUL.healOnKill,35);assert.equal(SOUL_BOSSES[0].hp,55);
+const killNow=E=>{E.state.mhp=1;E.state.phase="pturn";E.state.atkLeft=Math.max(E.state.atkLeft,3000);E.nextAttackQuestion();return E.answerAttack(true,500,{noAmbush:true})};
+const fixLim=(E,L=4000)=>{const c=E.state.enemy.cur;c.limitMs=L;c.perfectMs=c.noParry?0:Math.round(L*(1-SOUL.perfectAt))};
+t("魂系：目前的數值（攻擊時間 5–7 秒、閃避 2–5 秒、連擊 3–5 段、擊倒回 35、守門騎士 HP 45）",()=>{assert.deepEqual(SOUL.windowRange,[5000,7000]);assert.deepEqual(SOUL.dodgeClamp,[2000,5000]);assert.equal(SOUL.healOnKill,35);assert.equal(SOUL_BOSSES[0].hp,45);
   for(const b of SOUL_BOSSES)for(const r of b.combo)assert.ok(r[0]>=3&&r[1]<=5,b.id+" 連擊 3–5 段");
-  assert.ok(SOUL.windowRange[0]-2*SOUL.minCostMs>=SOUL.minCostMs,"最短 5 秒也答得到第 3 題（弱點擊破要連續 3 題）");
+  assert.ok(SOUL.windowRange[0]-2*SOUL.minCostMs>0,"最短 5 秒也答得到第 3 題（弱點擊破要連續 3 題）");
   // 高手（0.45–0.85 秒）在 d=1 時的彈反門檻落在這個區間裡：一部分會變成翻滾
   const pm=difficulty(Array(8).fill({ok:true,ms:600})).perfectMs;assert.ok(pm>450&&pm<850,"perfectMs="+pm)});
 t("魂系：Boss 傷害跟著動態難度加重（只看 d，答得快才會痛）",()=>{const b=SOUL_BOSSES[0];
@@ -158,18 +159,20 @@ t("魂系：Boss 傷害跟著動態難度加重（只看 d，答得快才會痛�
   assert.equal(run([]),b.atk);assert.ok(run(Array(8).fill({ok:true,ms:5500}))<b.atk,"答對但慢：減傷");
   // 最後一題超時也會被記進 recent，所以用當下的難度反推預期值
   const fastRecent=Array(8).fill({ok:true,ms:900}),d=difficulty(fastRecent).foeMul;assert.ok(d>1.3);assert.equal(run(fastRecent),Math.round(b.atk*d))});
-t("魂系：玩家回合累積 ATB、迅擊、出招、時間用完換敵人",()=>{const E=createSoulBattle({pool,mode:"en2zhT",ambushRng:()=>1,rng:()=>0});assert.deepEqual(types(E.start()),["bossEnter","playerTurn"]);
-  const W=E.state.win;assert.equal(W,SOUL.windowRange[0]);let q=E.nextAttackQuestion();assert.equal(q.leftMs,W);assert.equal(q.windowMs,W);let ev=E.answerAttack(true,3000);assert.deepEqual(types(ev),["atb"]);assert.equal(E.state.atb,1);assert.equal(E.state.atkLeft,W-3000);assert.equal(E.state.phase,"cmd");
-  assert.deepEqual(types(E.command(0)),[]);assert.equal(E.state.phase,"pturn");
-  // 答得再快，每題也至少消耗 minCostMs 的攻擊時間
-  E.nextAttackQuestion();ev=E.answerAttack(true,1000);assert.deepEqual(types(ev),["atb","quickSlash","hit"]);assert.equal(ev[2].dmg,Math.round(SOUL.quickDmg*comboMult(2)));assert.equal(E.state.atb,2);assert.equal(E.state.atkLeft,W-3000-SOUL.minCostMs);
-  ev=E.command(2);assert.deepEqual(types(ev).slice(0,4),["skill","hit","hit","hit"]);assert.equal(E.state.atb,0);assert.equal(E.state.phase,"cmd");assert.deepEqual(E.command(1),[]);
-  // 答錯多扣 missPenaltyMs
-  E.command(0);E.state.atkLeft=4000;E.nextAttackQuestion();const hp0=E.state.hp;ev=E.answerAttack(false,2000);assert.deepEqual(types(ev),["miss","knockdown","playerHit"]);assert.equal(E.state.atkLeft,4000-2000-SOUL.missPenaltyMs-SOUL.knockMs);
-  // 答錯露出破綻：Boss 衝上來打倒主角（不能閃不能擋）
-  assert.equal(ev[2].kind,"knockdown");assert.equal(E.state.hp,hp0-ev[1].dmg);assert.ok(ev[1].dmg>=Math.round(SOUL_BOSSES[0].atk*SOUL.knockMul));
-  E.state.atkLeft=0;
-  ev=E.command(0);assert.deepEqual(types(ev),["windowEnd","enemyTurn"]);assert.equal(E.state.phase,"enemy")});
+t("魂系：玩家回合——答對自動連斬（剩 60% 以上＝完美 5 連斬、30% 以上 4 連斬、其他 3 連斬）、動作三組隨機、答錯被打倒、時間用完換敵人",()=>{const E=createSoulBattle({pool,mode:"en2zhT",ambushRng:()=>1,rng:()=>0});assert.deepEqual(types(E.start()),["bossEnter","playerTurn"]);
+  E.state.mhp=999;const W=E.state.win;assert.equal(W,SOUL.windowRange[0]);let q=E.nextAttackQuestion();assert.equal(q.leftMs,W);assert.equal(q.windowMs,W);
+  // W=5 秒：1.5 秒（剩 70%）＝完美 5 連斬
+  let ev=E.answerAttack(true,1500);assert.deepEqual(types(ev).slice(0,6),["skill","hit","hit","hit","hit","hit"]);assert.equal(ev[0].move,"chain");assert.equal(ev[0].n,5);assert.equal(ev[0].perfect,true);assert.ok(ev[0].variant>=0&&ev[0].variant<3);assert.equal(E.state.phase,"cmd");
+  assert.equal(E.state.atkLeft,W-Math.max(1500,SOUL.minCostMs));assert.deepEqual(types(E.command(0)),[]);assert.equal(E.state.phase,"pturn");assert.deepEqual(E.command(1),[],"不能選招");
+  // 3 秒（剩 40%）＝4 連斬；4 秒（剩 20%）＝3 連斬
+  E.state.atkLeft=9000;E.nextAttackQuestion();ev=E.answerAttack(true,3000);assert.equal(ev[0].n,4);assert.equal(ev[0].perfect,false);E.command(0);
+  E.nextAttackQuestion();ev=E.answerAttack(true,4000);assert.equal(ev[0].n,3);E.command(0);
+  // 動作三組都會出現
+  const vs=new Set();for(let i=0;i<60;i++){const X=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1});X.start();X.nextAttackQuestion();vs.add(X.answerAttack(true,800)[0].variant)}assert.equal(vs.size,3);
+  // 答錯多扣 missPenaltyMs，而且露出破綻被打倒（不能閃不能擋）
+  E.state.atkLeft=4000;E.nextAttackQuestion();const hp0=E.state.hp;ev=E.answerAttack(false,2000);assert.deepEqual(types(ev),["miss","knockdown","playerHit"]);assert.equal(E.state.atkLeft,4000-2000-SOUL.missPenaltyMs-SOUL.knockMs);
+  assert.equal(ev[2].kind,"knockdown");assert.equal(E.state.hp,hp0-ev[1].dmg);
+  E.state.atkLeft=0;ev=E.command(0);assert.deepEqual(types(ev),["windowEnd","enemyTurn"]);assert.equal(E.state.phase,"enemy")});
 t("魂系：彈反／閃避／擦傷／格擋／中招與耐力",()=>{const b=SOUL_BOSSES[0],mkE=()=>{const E=createSoulBattle({pool,mode:"zh2enT",ambushRng:()=>1,rng:()=>0});E.start();E.nextAttackQuestion();E.answerAttack(false,10000,{noKnock:true});E.command(0);return E};
   let E=mkE(),d=E.nextDodge();assert.equal(d.mode,"zh2en");assert.equal(d.limitMs,SOUL.dodgeClamp[0]);fixLim(E);assert.equal(types(d.events)[0],"telegraph");
   let ev=E.answerDodge(true,1000);assert.deepEqual(types(ev),["parry","counter","hit"]);assert.equal(E.state.atb,1);assert.equal(E.state.hp,100);assert.equal(E.nextDodge(),null);assert.deepEqual(types(E.startPlayerTurn()),["playerTurn"]);
@@ -182,21 +185,18 @@ t("魂系：彈反／閃避／擦傷／格擋／中招與耐力",()=>{const b=SO
   E=mkE();E.state.stamina=SOUL.blockCost-1;E.nextDodge();fixLim(E);ev=E.answerDodge(false,1200);assert.deepEqual(types(ev),["foeHit","playerHit"]);assert.equal(ev[1].dmg,b.atk);assert.equal(E.state.hp,100-b.atk);assert.equal(E.state.stamina,SOUL.blockCost-1);
   // 答對但耐力不足以翻滾：勉強格擋
   E=mkE();E.state.stamina=5;E.nextDodge();fixLim(E);ev=E.answerDodge(true,2500);assert.deepEqual(types(ev),["guard","playerHit"]);assert.equal(ev[1].dmg,Math.max(1,Math.round(b.atk*SOUL.guardRate)));assert.equal(E.state.stamina,0)});
-t("魂系：Boss 階段轉換、擊倒後換下一隻（回復 HP、ATB 歸零）、全破",()=>{const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E.start();E.state.atb=3;E.state.phase="cmd";
-  let ev=E.command(2);assert.ok(types(ev).includes("bossPhase")); // 守門騎士 HP 60：連斬（36）打到半血以下、但不會倒
-  assert.equal(E.state.bphase,1);assert.ok(E.state.mhp>0&&E.state.mhp<=SOUL_BOSSES[0].hp*SOUL_BOSSES[0].phases[0].at);
-  E.state.atb=3;E.state.hp=30;E.state.mhp=5;E.state.phase="cmd";ev=E.command(1);assert.deepEqual(types(ev),["skill","hit","faint","heal","perkOffer"]);assert.equal(E.state.phase,"perk");assert.equal(E.state.hp,30+SOUL.healOnKill);
+t("魂系：Boss 階段轉換、擊倒後練等、換下一隻（回復 HP）、全破",()=>{const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E.start();
+  E.state.mhp=Math.ceil(SOUL_BOSSES[0].hp*SOUL_BOSSES[0].phases[0].at)+5;E.nextAttackQuestion();let ev=E.answerAttack(true,800);assert.ok(types(ev).includes("bossPhase"));assert.equal(E.state.bphase,1);
+  E.command(0);E.state.hp=30;ev=killNow(E);assert.deepEqual(types(ev).slice(-3),["faint","heal","perkOffer"]);assert.equal(E.state.phase,"perk");assert.equal(E.state.hp,30+SOUL.healOnKill);
   // 練等：3 選 1，選了才換下一隻
   assert.equal(ev.at(-1).options.length,3);assert.equal(E.perkOffer.length,3);assert.deepEqual(E.choosePerk("nope"),[]);
-  ev=E.choosePerk(E.state.offer[0]);assert.deepEqual(types(ev),["perk","bossEnter","playerTurn"]);assert.equal(E.state.mi,1);assert.equal(E.state.bphase,0);assert.equal(E.state.phase,"pturn");
-  assert.equal(E.state.atb,0);assert.equal(E.state.perks.length,1);
-  let guard=0;while(E.state.phase!=="end"&&guard++<400){if(E.state.phase==="perk"){E.choosePerk(E.state.offer[0]);continue}E.state.atb=3;E.state.phase="cmd";ev=E.command(3)}
+  ev=E.choosePerk(E.state.offer[0]);assert.deepEqual(types(ev),["perk","bossEnter","playerTurn"]);assert.equal(E.state.mi,1);assert.equal(E.state.bphase,0);assert.equal(E.state.phase,"pturn");assert.equal(E.state.perks.length,1);
+  let guard=0;while(E.state.phase!=="end"&&guard++<400){if(E.state.phase==="perk"){E.choosePerk(E.state.offer[0]);continue}ev=killNow(E)}
   assert.equal(E.result().perks.length,SOUL_BOSSES.length-1);
   assert.equal(E.result().win,true);assert.equal(E.result().kills,SOUL_BOSSES.length);assert.equal(ev.at(-1).type,"win")});
-t("魂系：高手也一定會遇到敵人回合（每回合最多 4 題、換 Boss 時 ATB 歸零）",()=>{const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>.5});E.start();let n=0;
-  // 每題 0.5 秒全對、能出大招就出：第 2 隻 Boss 不可能在第一個玩家回合內倒下
+t("魂系：高手也一定會遇到敵人回合（第 2 隻 Boss 不會在第一個玩家回合倒下）",()=>{const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>.5});E.start();let n=0;
   E.state.mi=1;E.state.mhp=SOUL_BOSSES[1].hp;E.state.combo=20;
-  while(E.state.phase!=="end"&&E.state.phase!=="enemy"&&n++<50){const p=E.state.phase;if(p==="pturn"){const q=E.nextAttackQuestion();if(!q)E.startEnemyTurn();else E.answerAttack(true,500)}else if(p==="cmd"){const c=E.commands().filter(c=>c.ready).pop();E.command(c?c.k:0)}}
+  while(E.state.phase!=="end"&&E.state.phase!=="enemy"&&n++<50){const p=E.state.phase;if(p==="pturn"){const q=E.nextAttackQuestion();if(!q)E.startEnemyTurn();else E.answerAttack(true,500)}else if(p==="cmd")E.command(0)}
   assert.equal(E.state.phase,"enemy");assert.equal(E.state.mi,1);assert.ok(E.state.n<=Math.ceil(E.state.win/SOUL.minCostMs))});
 t("魂系：startPlayerTurn 重複呼叫不會開兩次回合（按鈕連點防護）",()=>{const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E.start();E.nextAttackQuestion();E.answerAttack(false,10000,{noKnock:true});E.command(0);
   E.nextDodge();E.answerDodge(true,2500);assert.equal(E.nextDodge(),null);const sta=E.state.stamina;
@@ -230,7 +230,7 @@ t("魂系：連擊——每段一題、時限與彈反門檻逐段縮短、段�
 t("魂系：延遲攻擊——題目先出、選項鎖住；鎖住時亂點會被加時間",()=>{const b=SOUL_BOSSES[0];
   let E=soulAt([{kind:"delayed",segs:1,name:"延遲"}]),d=E.nextDodge();assert.ok(d.lockMs>=SOUL.delayLockMs[0]&&d.lockMs<=SOUL.delayLockMs[1]);assert.equal(d.limitMs,SOUL.dodgeClamp[0]);assert.equal(d.events[0].lockMs,d.lockMs);
   // 解鎖後 1 秒答對：彈反門檻照常（從解鎖算起）
-  let ev=E.answerDodge(true,1000);assert.equal(ev[0].type,"parry");
+  let ev=E.answerDodge(true,700);assert.equal(ev[0].type,"parry");
   // 同樣 1 秒，但鎖住時亂點了 2 下：+0.8 秒，掉出彈反門檻變翻滾
   E=soulAt([{kind:"delayed",segs:1,name:"延遲"}]);d=E.nextDodge();fixLim(E);ev=E.answerDodge(true,1000,{early:2});assert.equal(ev[0].type,"dodge");assert.equal(ev[0].ms,1000+2*SOUL.flinchMs);assert.equal(ev[0].early,2);
   // 最多算 2 下
@@ -271,45 +271,40 @@ t("魂系：藥壺——HP 夠低才能喝、答對回復、答錯灑掉次數�
   E.state.atkLeft=0;ev=E.command(0);const et=ev.find(e=>e.type==="enemyTurn");assert.ok(et&&et.punish);assert.equal(E.state.enemy.plan[0].kind,"dash");
   // 喝光了就不能再喝；打倒 Boss 補一壺、不超過上限
   E=soulCmd({hp:30,flasks:0});assert.equal(E.commands().find(c=>c.flask).ready,false);
-  E=soulCmd({flasks:0,atb:3,mhp:5});E.command(3);assert.equal(E.state.phase,"perk");assert.equal(E.state.flasks,SOUL.flaskOnKill);
-  E=soulCmd({flasks:SOUL.flaskMax,atb:3,mhp:5});ev=E.command(3);assert.equal(E.state.flasks,SOUL.flaskMax);assert.ok(!types(ev).includes("flaskRefill"))});
-t("魂系：突襲——答題中被打斷（題目作廢）、立刻一題短時限閃避、答完回到攻擊回合、每回合最多 ambushPerTurn 次",()=>{const b=SOUL_BOSSES[0];
-  let E=soulCmd({},()=>0);E.command(0);E.nextAttackQuestion();const w=E.state.w,atb=E.state.atb;let ev=E.answerAttack(true,1000);
-  assert.deepEqual(types(ev),["ambush"]);assert.equal(ev[0].from,"answer");assert.equal(E.state.atb,atb,"作廢的題目不加 ATB");assert.equal(E.state.queue[0].id,w.id);assert.equal(E.state.phase,"enemy");
+  E=soulCmd({flasks:0});killNow(E);assert.equal(E.state.phase,"perk");assert.equal(E.state.flasks,SOUL.flaskOnKill);
+  E=soulCmd({flasks:SOUL.flaskMax});ev=killNow(E);assert.equal(E.state.flasks,SOUL.flaskMax);assert.ok(!types(ev).includes("flaskRefill"))});
+t("魂系：突襲——連斬打到一半被打斷（只結算砍到的段數）、立刻一題閃避、答完回到攻擊回合、每回合最多 ambushPerTurn 次",()=>{
+  const seq=a=>{let i=0;return()=>a[Math.min(i++,a.length-1)]};
+  // ambushRng 序列：第 1 個值判定突襲、第 2 個值決定砍到第幾段（0.5×5 段＝2 段）
+  let E=soulCmd({mhp:999},seq([0,.5]));E.command(0);E.nextAttackQuestion();const mhp=E.state.mhp;let ev=E.answerAttack(true,1000);
+  assert.deepEqual(types(ev),["skill","hit","hit","ambush"]);assert.equal(ev[0].interrupted,true);assert.equal(ev[3].landed,2);assert.equal(ev[3].total,5);assert.ok(E.state.mhp<mhp);assert.equal(E.state.phase,"enemy");
+  // 第一段之前就被打斷：沒有傷害
+  E=soulCmd({mhp:999},seq([0,0]));E.command(0);E.nextAttackQuestion();const m2=E.state.mhp;ev=E.answerAttack(true,1000);assert.deepEqual(types(ev),["skill","ambush"]);assert.equal(ev[0].hitCount,0);assert.equal(E.state.mhp,m2);
+  E=soulCmd({mhp:999},()=>0);E.command(0);E.nextAttackQuestion();E.answerAttack(true,1000);
   const d=E.nextDodge();assert.equal(d.kind,"ambush");assert.equal(d.ambush,true);assert.ok(d.limitMs>=SOUL.dodgeRange.ambush[0]&&d.limitMs<=SOUL.dodgeRange.ambush[1]);assert.ok(d.perfectMs>0,"突襲可以彈反");
   ev=E.answerDodge(true,300);assert.deepEqual(types(ev).slice(0,2),["parry","counter"]);assert.ok(types(ev).includes("ambushEnd"));assert.equal(E.state.phase,"pturn");assert.ok(E.state.atkLeft>0);
-  // 同一回合還能再被打斷，直到 ambushPerTurn 次
-  for(let k=1;k<SOUL.ambushPerTurn;k++){E.nextAttackQuestion();ev=E.answerAttack(true,1000);assert.ok(types(ev).includes("ambush"),"第 "+(k+1)+" 次突襲");E.nextDodge();E.answerDodge(true,300);if(E.state.phase!=="pturn")E.state.phase="pturn"}
-  assert.equal(E.state.ambushed,true);E.state.atkLeft=SOUL.windowMs;E.nextAttackQuestion();ev=E.answerAttack(true,1000);assert.ok(!types(ev).includes("ambush"),"超過上限就不會再被打斷");
+  for(let k=1;k<SOUL.ambushPerTurn;k++){E.state.atkLeft=8000;E.nextAttackQuestion();ev=E.answerAttack(true,1000);assert.ok(types(ev).includes("ambush"),"第 "+(k+1)+" 次突襲");E.nextDodge();E.answerDodge(true,300);if(E.state.phase!=="pturn")E.state.phase="pturn"}
+  assert.equal(E.state.ambushed,true);E.state.atkLeft=8000;E.nextAttackQuestion();ev=E.answerAttack(true,1000);assert.ok(!types(ev).includes("ambush"),"超過上限就不會再被打斷");
+  // 答錯不會被突襲（是破綻）
+  E=soulCmd({mhp:999},()=>0);E.command(0);E.nextAttackQuestion();ev=E.answerAttack(false,1000);assert.ok(!types(ev).includes("ambush"));assert.ok(types(ev).includes("knockdown"));
   // 攻擊時間已經用完才被打斷：閃完直接進敵人回合
-  E=soulCmd({},()=>0);E.command(0);E.state.atkLeft=500;E.nextAttackQuestion();E.answerAttack(true,3000);E.nextDodge();ev=E.answerDodge(true,2500);assert.ok(types(ev).includes("enemyTurn"));
+  E=soulCmd({mhp:999},()=>0);E.command(0);E.state.atkLeft=500;E.nextAttackQuestion();E.answerAttack(true,3000);E.nextDodge();ev=E.answerDodge(true,2500);assert.ok(types(ev).includes("enemyTurn"));
   // 新的玩家回合重新可以被打斷
-  E=soulCmd({},()=>0);E.command(0);E.nextAttackQuestion();E.answerAttack(true,1000);E.nextDodge();E.answerDodge(false,500);assert.equal(E.state.ambushN,1);E.state.atkLeft=0;E.startEnemyTurn();
-  while(E.state.phase==="enemy"&&E.nextDodge())E.answerDodge(true,300);if(E.state.phase==="assault"){E.nextAssault();E.answerAssault(false,500)}else E.startPlayerTurn();assert.equal(E.state.phase,"pturn");assert.equal(E.state.ambushed,false);assert.equal(E.state.ambushN,0)});
-t("魂系：突襲打斷招式——只結算已命中的段數、沒打到的按比例返還 ATB；大招不會被打斷",()=>{
-  // ambushRng 序列：第 1 個值判定是否突襲、第 2 個值決定打到第幾段（0.5×3 段＝打到 1 段）
-  const seq=a=>{let i=0;return()=>a[Math.min(i++,a.length-1)]};
-  let E=soulCmd({atb:2},seq([0,.5]));const mhp=E.state.mhp;let ev=E.command(2,{ms:500});
-  assert.deepEqual(types(ev),["skill","hit","ambush"]);assert.equal(ev[0].interrupted,true);assert.equal(ev[0].hitCount,1);assert.equal(ev[2].landed,1);assert.equal(ev[2].refund,1);
-  assert.equal(E.state.atb,3-2+1,"ATB 3（指令列前答對一題）出 2 格連斬、只打到 3 段中的 1 段：返還 floor(2×2/3)=1 格");assert.ok(E.state.mhp<mhp);
-  // 斬擊在命中前被打斷：沒有傷害、1 格全還
-  E=soulCmd({atb:1},seq([0,0]));const m2=E.state.mhp;ev=E.command(1);assert.deepEqual(types(ev),["skill","ambush"]);assert.equal(ev[0].hitCount,0);assert.equal(E.state.mhp,m2);assert.equal(E.state.atb,2,"斬擊 1 格全額返還");
-  // 大招：機率再高也不會被打斷
-  E=soulCmd({atb:3},()=>0);ev=E.command(3,{ms:9000});assert.ok(!types(ev).includes("ambush"));
+  E=soulCmd({mhp:999},()=>0);E.command(0);E.nextAttackQuestion();E.answerAttack(true,1000);E.nextDodge();E.answerDodge(false,500);assert.equal(E.state.ambushN,1);E.state.atkLeft=0;E.startEnemyTurn();
+  while(E.state.phase==="enemy"&&E.nextDodge())E.answerDodge(true,300);if(E.state.phase==="assault"){E.nextAssault();E.answerAssault(false,500)}else E.startPlayerTurn();assert.equal(E.state.phase,"pturn");assert.equal(E.state.ambushed,false);assert.equal(E.state.ambushN,0);
   // 機率隨拖延時間、Boss 序號、第二階段上升，有上限
   const pOf=(o,ms)=>{let hit=0;for(let i=0;i<4000;i++){const E=soulCmd(o,Math.random);E.command(0);E.nextAttackQuestion();if(types(E.answerAttack(true,ms)).includes("ambush"))hit++}return hit/4000};
   const fast=pOf({},700),slow=pOf({},5000),late=pOf({mi:4,mhp:50,bphase:1},700);assert.ok(fast>=.06&&fast<.2,"快答：約一成 "+fast);assert.ok(slow>fast+.05,"拖得久比較容易被打斷");assert.ok(late>fast,"後面的 Boss、第二階段比較容易");assert.ok(pOf({mi:4,bphase:1},30000)<=SOUL.ambushMax+.03)});
-
 t("魂系：攻擊時間每回合 5–7 秒、閃避時限每擊 2–5 秒不固定",()=>{
   const wins=new Set(),lims=[];for(let i=0;i<200;i++){const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1});E.start();wins.add(E.state.win);assert.ok(E.state.win>=5000&&E.state.win<=7000);
     E.nextAttackQuestion();E.attackTimeout();const d=E.nextDodge();lims.push(d.limitMs);assert.ok(d.limitMs>=2000&&d.limitMs<=5000,"limit "+d.limitMs)}
   assert.ok(wins.size>20,"攻擊時間會變");assert.ok(Math.max(...lims)-Math.min(...lims)>1500,"閃避時限會變")});
-t("魂系：弱點擊破——同一回合連續 3 題都在攻擊時間 25% 內答對，追加一套連斬（每回合一次）",()=>{
-  const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E.start();const W=E.state.win,fast=Math.floor(W*SOUL.weakAt);let ev;
+t("魂系：弱點擊破——同一回合連續 3 題都是完美（剩 60% 以上的時間），追加一套連斬（每回合一次）",()=>{
+  const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E.start();E.state.mhp=999;E.state.atkLeft=99999;const W=E.state.win,fast=Math.floor(W*(1-SOUL.perfectAt));let ev;
   for(let i=0;i<SOUL.weakN;i++){E.nextAttackQuestion();ev=E.answerAttack(true,fast);if(i<SOUL.weakN-1){assert.ok(!types(ev).includes("weakBreak"));E.command(0)}}
   const wb=ev.find(e=>e.type==="weakBreak");assert.ok(wb,"第 3 題觸發");assert.equal(wb.hitCount,SOUL.weakHits.length);assert.equal(E.state.weaks,1);
   // 慢一題就斷掉
-  const E2=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E2.start();E2.state.atkLeft=99999;
+  const E2=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E2.start();E2.state.mhp=999;E2.state.atkLeft=99999;
   for(const ms of [fast,fast+1000,fast,fast]){E2.nextAttackQuestion();ev=E2.answerAttack(true,ms);E2.command(0)}assert.equal(E2.state.weaks,0)});
 t("魂系：突擊——連續 3 次快閃避打斷 Boss 剩下的攻擊，換玩家連答 3 題（2–5 秒）；答錯就結束",()=>{
   let E=soulAt([{kind:"combo",segs:5,name:"五連"}]);let ev;
@@ -322,7 +317,7 @@ t("魂系：突擊——連續 3 次快閃避打斷 Boss 剩下的攻擊，換�
   E=soulAt([{kind:"combo",segs:4,name:"四連"}]);let d=E.nextDodge();E.answerDodge(true,Math.floor(d.limitMs*SOUL.assaultFast));d=E.nextDodge();E.answerDodge(true,d.limitMs-1);
   d=E.nextDodge();E.answerDodge(true,100);d=E.nextDodge();ev=E.answerDodge(true,100);assert.ok(!types(ev).includes("assault"));assert.equal(E.state.dstreak,2)});
 t("魂系：練等——15 種強化、3 選 1、層數上限、效果",()=>{assert.equal(SOUL_PERKS.length,15);assert.equal(new Set(SOUL_PERKS.map(p=>p.id)).size,15);
-  const kill=E=>{E.state.atb=3;E.state.mhp=1;E.state.phase="cmd";return E.command(3)};
+  const kill=killNow;
   const mk=()=>{const E=createSoulBattle({pool,mode:"en2zh",ambushRng:()=>1,rng:()=>0});E.start();return E};
   let E=mk();let ev=kill(E);const off=ev.find(e=>e.type==="perkOffer").options;assert.equal(off.length,3);assert.equal(new Set(off.map(o=>o.id)).size,3);
   // 效果：生命強化、時間延長、回復藥水、閃避延長

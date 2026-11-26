@@ -577,11 +577,12 @@ export function createSoulScene(eng,fx,api){
     // 勉強格擋／硬擋：火花四濺、主角被推著向後滑；傷害由接下來的 playerHit 表現
     async guard(){stopThreat();const b=boss;if(!b)return;const t=strikeDelay();
       eng.wait(Math.max(0,t-hero.impactTime("Guard"))).then(()=>hero.play("Guard"));
-      const at=await bossStrike();sparks(at,26,[0xff9a3a,0xffd9a0],7);fx.burstRing(at,{color:0xff9a3a,r1:1,dur:.25});fx.text(v3(at.x,at.y+.6,at.z),"格擋","soul",{dur:.8,rise:20,dx:0})},
+      const at=await bossStrike();sparks(at,60,[0xff9a3a,0xffd9a0,0xffffff],10);sparks(at,20,[0xffffff,0xfff2c0],5,v3(0,1,0));fx.burstRing(at,{color:0xff9a3a,r1:1.5,dur:.3});fx.flash(at,{color:0xffd9a0,size:1.4,dur:.18,opacity:.9});
+      eng.shake(.05,.25,{freq:22});eng.hitStop(90);fx.text(v3(at.x,at.y+.6,at.z),"鏘！格擋","soul",{dur:.8,rise:20,dx:0})},
     // 擦傷：翻滾慢了半拍，被刀鋒帶到
     async graze(){stopThreat();const b=boss;if(!b)return;const t=strikeDelay();
       eng.wait(Math.max(0,t-.12)).then(()=>roll(.45,.9));
-      const at=await bossStrike();fx.slash(at,{color:0xff4a3a,size:1,ang:.7,dur:.22});sparks(at,10,[0xff6a4a,0xffffff],5)},
+      const at=await bossStrike();fx.slash(at,{color:0xff4a3a,size:1,ang:.7,dur:.22});sparks(at,24,[0xff6a4a,0xffffff,0xffd9a0],7);fx.flash(at,{color:0xff8a6a,size:.9,dur:.14,opacity:.7})},
     // 中招：Boss 的攻擊結結實實打中；傷害由接下來的 playerHit 表現
     async foeHit(p){stopThreat();const b=boss;if(!b)return;if(p.timeout)hero.play("Guard",{speed:1.6});const at=await bossStrike(1.05);fx.slash(at,{color:0xff3a2a,size:p.kind==="danger"?2.2:1.5,ang:-.5,dur:.26,sweep:1.6});
       if(p.kind==="danger"){fx.ring(hero.root.position,{color:0xff3a2a,r1:4,dur:.5});fx.pillar(hero.root.position,{color:0xff3a2a,r:.8,h:8,dur:.5})}},

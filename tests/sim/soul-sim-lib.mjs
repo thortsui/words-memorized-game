@@ -34,7 +34,7 @@ export function one(pl, opt = {}) {
   const st = { q: 0, eturns: 0, eturnsPerBoss: [0, 0, 0, 0, 0], attacks: 0, minSta: 100, guard: 0, parry: 0, dodge: 0, graze: 0, hit: 0, dSum: 0, dN: 0, sec: TM.firstEnter, kinds: {}, chainHits: 0, dangerHit: 0, flinch: 0, hpLost: 0, drinks: 0, spills: 0, ambush: 0, ambushHit: 0, punish: 0, knock: 0, weak: 0, assaultN: 0 };
   let guardLoop = 0, lastKills = 0, lastPhase = 0;
   const after = () => { if (B.kills > lastKills) { st.sec += TM.enter * (B.kills - lastKills); lastKills = B.kills; lastPhase = 0 } if (B.bphase > lastPhase) { st.sec += TM.phase * (B.bphase - lastPhase); lastPhase = B.bphase } };
-  const count = evs => { for (const e of evs) { if (e.type === 'drink') st.drinks++; if (e.type === 'spill') st.spills++; if (e.type === 'ambush') { st.ambush++; st.sec += TM.ambush } if (e.type === 'flaskPunish') st.punish++; if (e.type === 'knockdown') { st.knock++; st.sec += TM.knock || 1.2 } if (e.type === 'weakBreak') { st.weak++; st.sec += 2.7 } if (e.type === 'assault') { st.assaultN++; st.sec += 1 } } };
+  const count = evs => { for (const e of evs) { if (e.type === 'drink') st.drinks++; if (e.type === 'spill') st.spills++; if (e.type === 'ambush') { st.ambush++; st.sec += TM.ambush } if (e.type === 'flaskPunish') st.punish++; if (e.type === 'knockdown') { st.knock++; st.sec += TM.knock || 1.2 } if (e.type === 'weakBreak') { st.weak++; st.sec += 2.7 } if (e.type === 'skill' && !e.assault) st.sec += (e.hitCount || 0) * .35 + .6; if (e.type === 'assault') { st.assaultN++; st.sec += 1 } } };
   // 一題閃避（敵人回合與突襲共用）
   const dodgeOne = d => { st.attacks++; st.q++; st.kinds[d.kind] = (st.kinds[d.kind] || 0) + 1;
     st.sec += d.seg > 0 || d.kind === 'ambush' ? TM.teleChain : TM.tele;
@@ -59,7 +59,7 @@ export function one(pl, opt = {}) {
       const evs = E.answerAttack(ok, t); after(); count(evs);
       st.sec += ok ? TM.atb : TM.wrongHold; if (evs.some(e => e.type === 'quickSlash')) st.sec += TM.quick }
     else if (ph === 'cmd') { const ready = E.commands().some(c => c.ready); const hes = ready ? (pl.menu ?? 700) * (.6 + Math.random() * .8) : 0; if (ready) st.sec += hes / 1000;
-      const k = wantDrink(pl, E) ? 4 : pl.cmd(E); const evs = E.command(k, { ms: hes }); after(); count(evs);
+      const k = wantDrink(pl, E) ? 4 : 0; const evs = E.command(k, { ms: hes }); after(); count(evs);
       if (k === 1 || k === 2 || k === 3) st.sec += k === 1 ? TM.slash : k === 2 ? TM.gale : TM.big; if (k === 4) st.sec += TM.drink }
     else if (ph === 'flask') { const q = E.flaskQuestion(); const t = pl.think(); const ok = Math.random() < pl.acc; st.q++;
       if (t >= q.leftMs) { st.sec += q.leftMs / 1000; count(E.answerFlask(false, q.leftMs, { timeout: true })) } else { st.sec += t / 1000; count(E.answerFlask(ok, t)) } after() }

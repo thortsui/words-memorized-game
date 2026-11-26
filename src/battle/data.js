@@ -33,15 +33,20 @@ export const STORY=["這裡是劍與魔法的大陸——艾爾文斯。","千�
 export const SOUL={
   windowMs:6000,       // 舊欄位（顯示用預設值）；實際每回合從 windowRange 抽
   windowRange:[5000,7000], // 玩家回合的攻擊時間每回合 5–7 秒不固定（只在題目顯示中倒數）
-  minCostMs:1500,      // 每一題至少消耗這麼多攻擊時間（答得再快，一回合也只有 4–5 題）
+  minCostMs:2000,      // 每一題至少消耗這麼多攻擊時間（答得再快，一回合也只有 3 題）
   missPenaltyMs:1000,  // 攻擊回合答錯，多扣的攻擊時間
   // ---- 弱點擊破：同一個攻擊回合連續 weakN 題都在「攻擊時間的 25% 內」答對（＝剩 75% 以上就完成），立刻追加一套短時間連斬 ----
-  weakAt:.25, weakN:3, weakHits:[3,3,3,3,6], weakAtb:0,
+  weakAt:.4, weakN:3, weakHits:[3,3,3,3,6], weakAtb:0,
+  // ---- 玩家攻擊（2026-11-26 改）：不能選招，每答對一題自動出連斬，段數看答題速度 ----
+  // 「完美」＝還剩 perfectAt 以上的時間就答完（ms ≤ (1−perfectAt)×時限）。攻擊題的時限＝這回合的攻擊時間
+  perfectAt:.6,
+  chainAt:[.6,.3],     // 剩 60% 以上＝5 連斬、剩 30% 以上＝4 連斬、其他＝3 連斬
+  chainHits:{3:[5,5,7],4:[4,4,5,7],5:[4,4,4,4,6]},
   // ---- 閃避時限：每一擊 2–5 秒不固定（依招式種類抽範圍，再乘階段與動態難度，最後夾在 dodgeClamp 內） ----
   dodgeRange:{base:[2000,5000],dash:[2000,3000],danger:[2000,3500],ambush:[2000,4000]},
   dodgeClamp:[2000,5000],
   // ---- 突擊：連續 assaultN 次「快閃避」（答對且用不到時限的 assaultFast）＝看穿攻勢，打斷 Boss 剩下的攻擊，換你連續攻擊 assaultQs 題 ----
-  assaultN:3, assaultFast:.5, assaultQs:3, assaultRange:[2000,5000], assaultDmg:[7,7,13],
+  assaultN:3, assaultFast:.4, assaultQs:3, assaultRange:[2000,5000], assaultDmg:[7,7,13],
   healOnKill:35,       // 打倒 Boss 回復的 HP（有藥壺之後從 40 降到 15；突襲／破綻變多之後拉回 30）
   atbMax:3,
   staminaMax:100,
@@ -61,13 +66,13 @@ export const SOUL={
   counterDmg:10,
   minLimitMs:1500,
   // 動態難度：看最近 N 題的平均作答秒數（答錯算 wrongAs 秒）
-  paceWindow:8, paceMin:3, paceCenter:3, paceSpan:1.6, wrongAs:6,
+  paceWindow:8, paceMin:3, paceCenter:2.8, paceSpan:1.6, wrongAs:6,
   limitSwing:.35,      // 時限最多縮短／放寬 35%
   perfectSwing:300,    // 彈反判定最多 ±0.3 秒
   tightAt:.8, perfectTight:420, // d 超過 tightAt 後彈反門檻再收緊，d=1 時多收 0.42 秒（1.5−0.3−0.42＝0.78 秒）：高手也會有一兩成落到翻滾
-  foeDmgSwing:.9,      // Boss 傷害 ×(1＋foeDmgSwing×max(0,d))：只跟動態難度掛勾的壓力（連擊／藥壺／突襲改版後用模擬定在 0.75，熟練約 90%）
+  foeDmgSwing:1.2,     // Boss 傷害 ×(1＋foeDmgSwing×max(0,d))：只跟動態難度掛勾的壓力（連擊／藥壺／突襲改版後用模擬定在 0.75，熟練約 90%）
   dmgBonus:0,          // 高難度時的玩家傷害加成（已取消：答得快本來就打得多）
-  foeEase:.6,          // 答得慢（d<0）時 Boss 傷害 ×(1−foeEase×|d|)：只幫跟不上的人，熟練以上不受影響
+  foeEase:.8,          // 答得慢（d<0）時 Boss 傷害 ×(1−foeEase×|d|)：只幫跟不上的人，熟練以上不受影響
   extraAt:.6,          // d 超過這個值，Boss 多出手一次（extraSeg：改成連擊多一段，沒有連擊才多一記單擊）
   extraSeg:true,
   easeDown:false,      // true＝d 低於 −extraAt 時少出手一次（已關閉：亂點會被判成「很慢」而佔到便宜）
@@ -119,23 +124,23 @@ export const SOUL_BIG=[
 // kit：各階段的招式比重 {single 單擊, combo 連擊, delayed 延遲, dash 突進}；combo：各階段連擊段數 [最少, 最多]；names：各招式名
 // attacks＝每個敵人回合出幾「招」（連擊一招算多題）
 export const SOUL_BOSSES=[
- {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:55,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
+ {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:45,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
   names:{combo:"鏽戟三連刺",delayed:"沉重高舉斬",dash:"盾牌衝撞"},
   kit:[{single:.6,dash:.2,delayed:.2},{single:.3,combo:.4,dash:.15,delayed:.15}],combo:[[3,3],[3,4]],
   phases:[{at:.5,name:"根鬚暴走",atkMul:1.15,extra:0,limitMul:.95,move:"根鬚纏擊",danger:.35}]},
- {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:140,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
+ {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:110,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
   names:{combo:"狂亂爪擊",delayed:"懸停俯衝",dash:"石翼突襲"},
   kit:[{single:.35,combo:.3,dash:.2,delayed:.15},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[3,4],[3,5]],
   phases:[{at:.5,name:"石翼狂嘯",atkMul:1.15,extra:1,limitMul:.95,move:"碎石吐息",danger:.5}]},
- {id:"priest",name:"霜冠祭司",lv:16,hp:165,atk:13,move:"霜槍突刺",attacks:1,limitMs:4000,model:"boss_priest",arena:"frozen_chapel",
+ {id:"priest",name:"霜冠祭司",lv:16,hp:130,atk:13,move:"霜槍突刺",attacks:1,limitMs:4000,model:"boss_priest",arena:"frozen_chapel",
   names:{combo:"霜槍連刺",delayed:"寒冰蓄勢",dash:"冰面滑襲"},
   kit:[{single:.3,combo:.35,dash:.15,delayed:.2},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[3,4],[4,5]],
   phases:[{at:.5,name:"永凍禱詞",atkMul:1.2,extra:0,limitMul:.9,move:"冰棺降臨",danger:.5}]},
- {id:"executioner",name:"暗影行刑者",lv:22,hp:195,atk:14,move:"斷頭斧斬",attacks:1,limitMs:4000,model:"boss_executioner",arena:"execution_yard",
+ {id:"executioner",name:"暗影行刑者",lv:22,hp:155,atk:14,move:"斷頭斧斬",attacks:1,limitMs:4000,model:"boss_executioner",arena:"execution_yard",
   names:{combo:"處刑連斬",delayed:"高舉斷罪",dash:"影步突進"},
   kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[3,5],[4,5]],
   phases:[{at:.5,name:"處刑之舞",atkMul:1.2,extra:1,limitMul:.9,move:"影分身處刑",danger:.6}]},
- {id:"devourer",name:"噬語魔王",lv:30,hp:255,atk:15,move:"噬語巨劍",attacks:2,limitMs:3600,model:"boss_devourer",arena:"throne_of_words",boss:true,
+ {id:"devourer",name:"噬語魔王",lv:30,hp:205,atk:15,move:"噬語巨劍",attacks:2,limitMs:3600,model:"boss_devourer",arena:"throne_of_words",boss:true,
   names:{combo:"吞字連斬",delayed:"沉默之劍",dash:"虛空突刺"},
   kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[3,5],[4,5],[4,5]],
   phases:[{at:.66,name:"吞噬詞語",atkMul:1.15,extra:0,limitMul:.95,move:"詞語風暴",danger:.5},{at:.33,name:"終焉咒言",atkMul:1.3,extra:1,limitMul:.9,move:"終焉之言",danger:1}]}];
@@ -149,11 +154,11 @@ export const SOUL_PERKS=[
  {id:"stamina",name:"耐力強化",d:"耐力上限 +25，每回合多回 8 耐力",max:2},
  {id:"guard",name:"鐵壁",d:"硬擋、格擋承受的傷害再減 40%",max:1},
  {id:"blade",name:"利刃",d:"所有攻擊傷害 +15%",max:3},
- {id:"quick",name:"迅擊精通",d:"迅擊判定 +0.5 秒，迅擊傷害 ×2",max:1},
- {id:"parry",name:"彈反大師",d:"彈反判定 +0.2 秒",max:2},
+ {id:"quick",name:"連斬精通",d:"連斬段數的判定各放寬 10%（更容易打出 5 連斬）",max:2},
+ {id:"parry",name:"彈反大師",d:"彈反判定放寬 10% 時間",max:2},
  {id:"counter",name:"反擊強化",d:"彈反後的反擊、彈刀傷害 +60%",max:2},
  {id:"alert",name:"警覺",d:"被突襲的機率 −40%",max:1},
  {id:"steady",name:"穩如泰山",d:"破綻被打倒的傷害減半、不再多扣時間",max:1},
- {id:"weak",name:"弱點看破",d:"弱點擊破的判定從 25% 放寬到 40% 時間",max:1},
+ {id:"weak",name:"弱點看破",d:"弱點擊破只要連續 2 題完美",max:1},
  {id:"assault",name:"突擊強化",d:"快閃避 2 次就能突擊，突擊多 1 題",max:1}];
 export const SOUL_STORY=["詞語之火熄滅之後，王國只剩下灰與低語。","被奪走名字的騎士們，仍守著早已無人通過的門。","你是最後一名記得單字的人。","每答出一個字，劍就多一分重量；每遲疑一瞬，死亡就近一步。","穿過廢墟，討伐噬語魔王。"];
