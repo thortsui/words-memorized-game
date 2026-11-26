@@ -207,7 +207,8 @@ t("魂系：斬擊也要答題——優先複習答錯過的字，再來是答�
   E.command(0);B.atkLeft=8000;E.nextAttackQuestion();E.answerAttack(true,800);const q=E.nextSlash();assert.equal(q.mode,"en2zh");
   const hp=B.hp;let ev=E.answerSlash(false,600);assert.deepEqual(types(ev),["miss","slashEnd"]);assert.equal(ev[1].broken,true);assert.equal(ev[1].landed,1);assert.equal(B.hp,hp);assert.equal(B.phase,"cmd");
   assert.equal(B.hist[q.w.id].miss,true);assert.ok(B.queue.slice(0,4).some(x=>x.id===q.w.id));
-  E.command(0);E.nextAttackQuestion();E.answerAttack(true,800);assert.equal(E.nextSlash().w.id,q.w.id,"剛答錯的字下一套連斬優先出");
+  // （答錯的字被排回佇列前面，下一題攻擊題可能剛好抽到它；那時它是「這一題」，斬擊題本來就不會重複出。先把它挪到後面）
+  B.queue.sort((x,y)=>(x.id===q.w.id)-(y.id===q.w.id));E.command(0);E.nextAttackQuestion();E.answerAttack(true,800);assert.equal(E.nextSlash().w.id,q.w.id,"剛答錯的字下一套連斬優先出");
   // 超時也算中斷
   ev=E.answerSlash(false,9999,{timeout:true});assert.ok(types(ev).includes("slashEnd"));
   // 這一局還沒答過別的字：出新字

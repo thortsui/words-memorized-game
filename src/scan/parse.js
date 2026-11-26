@@ -196,10 +196,11 @@ export function groupRows(boxes){const bs=boxes.slice().sort((a,b)=>(a.y0+a.y1)-
    作法：找出「詞性＋中文」開頭的文字框 → 它們的左緣連成分隔線（手機照片的分隔線是斜的，用直線 x＝a＋b·y 擬合）
    → 分成左右兩欄 → 左欄挑出印刷的單字（手寫筆記只收和這一號單字同字根的）→ 依高度把單字和右欄的區塊依序配對。 */
 const DPOS="adj|adv|prep|conj|pron|phr|vt|vi|yt|yi|n|v";
-const DHEAD=new RegExp("^(?:[^A-Za-z0-9㐀-鿿\\[(]{0,3}|[PDpb]\\s)?\\s*((?:"+DPOS+")\\s?[.,](?:\\s?(?:sing|pl)\\s?[.,]?)?(?:\\s?[\\[f(][A-Za-z, ]{1,6}[\\]J)]?)?)\\s*([㐀-鿿（(][㐀-鿿（）()；;，、…\\s]*)?(.*)$");
+const DHEAD=new RegExp("^(?:[^A-Za-z0-9㐀-鿿\\[(]{0,3}|[PDpb]\\s)?\\s*((?:"+DPOS+")\\s?[.,]?(?:\\s?(?:sing|pl)\\s?[.,]?)?(?:\\s?[\\[f(][A-Za-z, ]{1,6}[\\]J)]?)?)\\s*([㐀-鿿（(][㐀-鿿（）()；;，、…\\s]*)?(.*)$");
 const IPA=/[\[\]əɪʊæɑɔŋʃʒθðˈˌ`ıɛʌ]/;
 // 「▶ n. [U] 回收 a process of …」→ {pos:"n.", zh:"回收", rest:"a process of …"}
-export function dictHead(t){const m=tidy(t).match(DHEAD);if(!m)return null;const zh=(m[2]||"").replace(/\s+/g,"").replace(/;/g,"；").replace(/\(/g,"（").replace(/\)/g,"）").replace(/[；（]$/,"");
+// 沒有句點的詞性（tesseract 常漏）：後面一定要接中文才算
+export function dictHead(t){const m=tidy(t).match(DHEAD);if(!m)return null;if(!/[.,]/.test(m[1])&&!m[2])return null;const zh=(m[2]||"").replace(/\s+/g,"").replace(/;/g,"；").replace(/\(/g,"（").replace(/\)/g,"）").replace(/[；（]$/,"");
   const pos=fixPos(m[1].replace(/^y/,"v").replace(/\s?(sing|pl)\s?[.,]?/,"").replace(/\s?[\[f(][A-Za-z, ]*[\]J)]?$/,""));return{pos,zh,rest:(m[3]||"").trim()}}
 // 左欄的一段文字 → 候選單字 {w, num}（num：前面有編號）；音標、看不出是字的回傳 null
 export function dictWord(t){const x=tidy(t).replace(/\[[^\]]*\]?/g," ").trim();if(!x||CJK.test(x)||/^[^\d]*[əɪʊæɑɔŋʃʒθðˈˌ`ıɛʌ]/.test(x))return null;
@@ -231,7 +232,8 @@ export function parseDict(bs,{W,H},cov){
     if(!cb){set(ids,"hf");continue}                                  // 第一個區塊之前：頁首、標題、手寫
     const take=use=>{cb.rows.push({ids,use});cb.y1=Math.max(cb.y1,r.y1);cb.x1=Math.max(cb.x1,x1)};
     if(!cb.zh&&CJK.test(t)&&!/[A-Za-z]{3}/.test(t)){cb.zh=t.replace(/\s+/g,"");take("zh");continue}   // 詞性和中文分成兩列讀到
-    const e=t.replace(/^[•·*●◆■\-–]\s*/,"").replace(/^[eo]\s+(?=[A-Z])/,"").trim(),bul=e!==t;
+    // 例句前的圓點：OCR 常讀成 ‧ + « ~ “ 之類，或一個小寫 e／o
+    const e=t.replace(/^[‧+«»~“"'|/\\]{1,2}\s*(?=["'(]?[A-Z])/,"").replace(/^[•·*●◆■\-–]\s*/,"").replace(/^[eo]\s+(?=[A-Z])/,"").trim(),bul=e!==t;
     if(!cb.ex){if(bul||/^["'(]?[A-Z]/.test(e)){cb.ex=e;cb.exDone=TERM.test(e);take("ex")}else take("note");continue}   // 例句之前小寫開頭的是英文解釋的下一列
     if(!cb.exDone&&!bul){cb.ex=/[A-Za-z]-$/.test(cb.ex)&&/^[a-z]/.test(e)?cb.ex.slice(0,-1)+e:cb.ex+" "+e;cb.exDone=TERM.test(cb.ex);take("ex");continue}
     cb.exDone=true;take("tr")}                                         // 第二個例句以後：算這一筆的，但不收

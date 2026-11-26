@@ -123,8 +123,11 @@ async function extractAll(){fixEngines();const A=getEngine(engA),B=engB==="none"
     const PDFE=p.pdfText?{id:"pdf",label:"PDF 文字層",local:true,extract:async()=>{const e=parseLayout(p.pdfText,{W:p.out.width,H:p.out.height});e.lines=p.pdfText;return e}}:null;
     const EA=PDFE||A,EB=PDFE?A:B;names.a=PDFE?"PDF 文字層":engName(engA);names.b=PDFE?engName(engA):(B?engName(engB):"");
     const st={a:"準備中…",b:"準備中…"},show=()=>{prog.textContent=head+`主引擎 ${names.a}：${st.a}`+(EB?`｜複核 ${names.b}：${st.b}`:"")};show();
-    const run=(E,k)=>E.extract(p.out,{onProgress:t=>{st[k]=t.replace(/^[^：]{1,12}：/,"");show()}}).then(r=>{st[k]="完成";show();const l=(r||[]).filter(x=>x&&x.en);l.lines=r&&r.lines;l.cover=r&&r.cover;return l},e=>{st[k]="失敗";show();throw e});
-    let [ra,rb]=await Promise.allSettled([run(EA,"a"),EB?run(EB,"b"):Promise.reject(new Error("none"))]);
+    const run=(E,k,strips,expect)=>E.extract(p.out,{strips,expect,onProgress:t=>{st[k]=t.replace(/^[^：]{1,12}：/,"");show()}}).then(r=>{st[k]="完成";show();const l=(r||[]).filter(x=>x&&x.en);l.lines=r&&r.lines;l.cover=r&&r.cover;return l},e=>{st[k]="失敗";show();throw e});
+    let ra,rb;
+    if(EA.id==="ppocr"&&EB&&EB.id==="ocr"){ra=(await Promise.allSettled([run(EA,"a")]))[0];const strips=ra.status==="fulfilled"&&ra.value.lines?ra.value.lines.map(b=>({x0:b.x0,y0:b.y0,x1:b.x1,y1:b.y1})):null;
+      rb=(await Promise.allSettled([run(EB,"b",strips,ra.status==="fulfilled"?ra.value.length:0)]))[0]}
+    else [ra,rb]=await Promise.allSettled([run(EA,"a"),EB?run(EB,"b"):Promise.reject(new Error("none"))]);
     // 測試用掛鉤（只在開發模式存在，正式建置會整段拿掉）：window.__vcScanTamper(which:"a"|"b", entries, pageIndex) 回傳要改成的條目
     if(import.meta.env.DEV){const tam=globalThis.__vcScanTamper,keep=(r,v)=>{v.lines=r.value.lines;v.cover=r.value.cover;r.value=v};if(tam){if(ra.status==="fulfilled")keep(ra,tam("a",ra.value,i)||ra.value);if(rb.status==="fulfilled")keep(rb,tam("b",rb.value,i)||rb.value)}}
     const msg=r=>String(r.reason&&r.reason.message||r.reason||""),uni=(x,y)=>[...new Set([...(x&&x.flags||[]),...(y&&y.flags||[])])];
