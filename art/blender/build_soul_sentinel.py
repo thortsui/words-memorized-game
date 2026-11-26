@@ -18,9 +18,10 @@ NOANIM = "--noanim" in argv
 ONLY = argv[argv.index("--only") + 1].split(",") if "--only" in argv else None
 MODEL = "boss_sentinel"
 ROOT = os.path.dirname(os.path.dirname(HERE))
-OUT_GLB = os.path.join(ROOT, "public", "models", MODEL + ".glb")
+OUT_GLB = os.path.join(HERE, "export_raw", MODEL + ".glb")   # 未壓縮原檔；遊戲用的壓縮版由 run_soul.sh 以 gltf-transform 產生
 OUT_BLEND = os.path.join(HERE, "source", MODEL + ".blend")
 TILES = os.path.join(HERE, "preview", "_tiles", MODEL)
+NOVIEWS = "--noviews" in argv
 
 reset_scene()
 body = Body(H=2.3, bulk=0.84, wf=0.90, head=0.255, hz=0.545, arm_len=1.06, limb=0.95)
@@ -354,6 +355,8 @@ WP = {
     "die1": lambda p: one(p, (-0.52, -0.05, 1.20), (-0.3, -0.5, 0.6), (0, -1, 0), (0.42, -0.16, 1.22)),
     "kneel": lambda p: one(p, (-0.36, -0.26, 0.42), (0.25, -0.94, -0.03), (1, 0, 0), (0.30, -0.14, 0.42), hintR=(-0.8, 0.5, -0.2), hintL=(0.8, 0.5, -0.2)),
     "kneel2": lambda p: one(p, (-0.38, -0.30, 0.30), (0.28, -0.95, 0.0), (1, 0, 0), (0.30, -0.18, 0.34), hintR=(-0.8, 0.5, -0.2), hintL=(0.8, 0.5, -0.2)),
+    "t_pull": lambda p: two(p, (-0.22, -0.34, 1.02), (0.04, 0.22, 1.08), (1, 0, 0)),
+    "t_thrust": lambda p: two(p, (-0.06, -1.00, 1.20), (0.02, -0.46, 1.14), (1, 0, 0)),
     "fall": lambda p: one(p, (-0.44, -1.00, 0.08), (-0.2, -0.97, 0.0), (1, 0, 0), (0.36, -0.86, 0.07), hintR=(-0.9, 0.2, 0.3), hintL=(0.9, 0.2, 0.3)),
 }
 
@@ -363,9 +366,13 @@ if not NOANIM:
 
 if not ONLY:
     BK.export_glb(arm, mesh, OUT_GLB)
+    BK.write_meta(rig, MODEL, os.path.join(HERE, "export_raw"))
     bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
 print("TRIS_FINAL", BK.tri_count(mesh), flush=True)
-cam = BK.render_views(arm, body.H, TILES)
+if NOVIEWS:
+    cam = BK.setup_preview(body.H)
+else:
+    cam = BK.render_views(arm, body.H, TILES)
 if not NOANIM:
-    BK.render_actions(arm, body.H, TILES, cam, only=ONLY)
+    BK.render_actions(arm, body.H, TILES, cam, n=10, only=ONLY)
 print("DONE", MODEL, flush=True)

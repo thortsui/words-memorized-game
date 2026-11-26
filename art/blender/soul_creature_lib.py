@@ -81,6 +81,14 @@ def _sst(x):
     return x * x * (3 - 2 * x)
 
 
+# 抵達某關鍵格那一段的緩動（與人形動作相同的寫法）：in＝加速抵達（爆發）、out＝減速抵達（跟隨）、io＝平滑
+EASE = {"lin": lambda s: s, "in": lambda s: s * s, "in3": lambda s: s ** 3, "out": lambda s: 1 - (1 - s) ** 2,
+        "out3": lambda s: 1 - (1 - s) ** 3, "io": _sst}
+# Blender 關鍵格內插（設在「前一格」上）
+BL_EASE = {"lin": ("LINEAR", None), "in": ("QUAD", "EASE_IN"), "in3": ("CUBIC", "EASE_IN"), "out": ("QUAD", "EASE_OUT"),
+           "out3": ("CUBIC", "EASE_OUT"), "io": ("SINE", "EASE_IN_OUT")}
+
+
 def assign(ob, bones, tvals=None, blend=0.15):
     """bones: 'Bone' | [(bone, t起點), ...]（沿 t 混合）| callable(co, t)->{bone:w}。"""
     n = len(ob.data.vertices)
@@ -897,6 +905,9 @@ class Animator:
         self.legs = []
         self.plants = []
         self.always = always
+        self.meta = {}
+        self.ground_r = {"*": 0.04}
+        self.ground_skip = set()
 
     def add_leg(self, upper, lower, feet, key):
         """腿部 IK（烘成 FK 關鍵格）：腳踝預設釘在靜止位置，可用 key（例如 'Foot.L:ik'）給
@@ -921,7 +932,7 @@ class Animator:
         rest = {b.name: b.matrix_local.copy() for b in arm.data.bones}
         arm.animation_data.action = act
         out = {pl["bone"]: [] for pl in self.plants}
-        for f in range(1, last + 1):
+        for f in range(0, last + 1):
             bpy.context.scene.frame_set(f)
             for pl in self.plants:
                 bn = pl["bone"]
@@ -952,7 +963,7 @@ class Animator:
                 act.fcurves.remove(fc)
             for i in range(4):
                 fc = act.fcurves.new(path, index=i, action_group=bn)
-                for f, q in enumerate(qs, 1):
+                for f, q in enumerate(qs, 0):
                     fc.keyframe_points.insert(f, q[i], options={"FAST"}).interpolation = "LINEAR"
                 fc.update()
         arm.animation_data.action = None
@@ -963,9 +974,12 @@ class Animator:
         pts = [(fr, tuple(v) + (0,) * (4 - len(v))) for fr, v in pts]
         if f <= pts[0][0]:
             return pts[0][1]
-        for (f0, v0), (f1, v1) in zip(pts, pts[1:]):
+        for i, ((f0, v0), (f1, v1)) in enumerate(zip(pts, pts[1:])):
             if f <= f1:
-                t = _sst((f - f0) / max(f1 - f0, 1e-6))
+                s = min(1.0, max(0.0, (f - f0) / max(f1 - f0, 1e-6)))
+                lin = len(keys[i]) > 2 and keys[i][2] == "L"
+                md = keys[i + 1][2] if len(keys[i + 1]) > 2 else None
+                t = s if lin else EASE.get(md, _sst)(s)
                 return tuple(a + (c - a) * t for a, c in zip(v0, v1))
         return pts[-1][1]
 
@@ -975,7 +989,7 @@ class Animator:
         arm.animation_data.action = act
         curves = {}
         prevq = {}
-        for f in range(1, last + 1):
+        for f in range(0, last + 1):
             bpy.context.scene.frame_set(f)
             for lg in self.legs:
                 par = arm.pose.bones[lg["parent"]].matrix.copy()
@@ -1031,29 +1045,27 @@ class Animator:
         M = self.M[bone]
         return (M.inverted() @ R @ M).to_quaternion()
 
-    def action(self, name, keys, lag=None):
-        """keys: [(frame, pose_dict[, 'L'])]；'L' = 從這格到下一格用線性（爆發感）。lag: {bone: 延遲格數}。"""
-        lag = lag or {}
-        act = bpy.data.actions.new(name)
+    def _keyed_curves(self, act, keys, lag, last, loop, ikb):
         chans = set(self.base)
         for k in keys:
             chans |= set(k[1])
-        # 每個動作都替所有骨頭打鍵，避免沒打鍵的骨頭殘留上一個動作的姿勢
         chans |= set(self.M) | set(self.always)
-        ikb = {b for lg in self.legs for b in [lg["upper"], lg["lower"]] + lg["feet"]}
         chans = {c for c in chans if not c.endswith(":ik") and not c.endswith(":plant") and c not in ikb}
-        last = keys[-1][0]
         for ch in sorted(chans):
             isloc = ch.endswith(":loc")
             bn = ch[:-4] if isloc else ch
             if bn not in self.M:
-                raise KeyError(f"{name}: 沒有骨頭 {bn}")
+                raise KeyError(f"{act.name}: 沒有骨頭 {bn}")
             d = lag.get(bn, 0)
             path = f'pose.bones["{bn}"].' + ("location" if isloc else "rotation_quaternion")
             fcs = [act.fcurves.new(path, index=i, action_group=bn) for i in range(3 if isloc else 4)]
             prev = None
+            kps = [[] for _ in fcs]
             for k in keys:
-                f = min(k[0] + d, last - 1) if 1 < k[0] < last else k[0]
+                if loop:
+                    f = k[0] + d
+                else:
+                    f = min(k[0] + d, last - 1) if 0 < k[0] < last else k[0]
                 v = k[1].get(ch, self.base.get(ch, (0, 0, 0)))
                 if isloc:
                     val = self.M[bn].inverted() @ Vector(v)
@@ -1066,17 +1078,132 @@ class Animator:
                     kp = fc.keyframe_points.insert(f, val[i], options={"FAST"})
                     kp.interpolation = "LINEAR" if (len(k) > 2 and k[2] == "L") else "BEZIER"
                     kp.handle_left_type = kp.handle_right_type = "AUTO_CLAMPED"
+                    kps[i].append(k)
+            # 抵達緩動：設在前一個關鍵格（keyframe_points 依格號排序）
+            for i, fc in enumerate(fcs):
+                pts = list(fc.keyframe_points)
+                ks = kps[i]
+                if len(pts) != len(ks):
+                    continue
+                for j in range(len(pts) - 1):
+                    k0, k1 = ks[j], ks[j + 1]
+                    md = k1[2] if len(k1) > 2 else None
+                    if md in BL_EASE and not (len(k0) > 2 and k0[2] == "L"):
+                        it, ea = BL_EASE[md]
+                        pts[j].interpolation = it
+                        if ea:
+                            pts[j].easing = ea
             for fc in fcs:
+                if loop:
+                    # 循環：先用 Cycles 修飾讓延遲（lag）的鍵繞回開頭、切線也循環，再烘成 0..last 的逐格鍵，
+                    # 確保片段長度正好一個週期、首尾同值（匯出時不會多出延遲的尾巴）
+                    fc.modifiers.new("CYCLES")
+                    fc.update()
+                    vals = [fc.evaluate(f) for f in range(0, last + 1)]
+                    vals[-1] = vals[0]
+                    fc.modifiers.remove(fc.modifiers[0])
+                    fc.keyframe_points.clear()
+                    fc.keyframe_points.add(last + 1)
+                    co = np.empty((last + 1) * 2)
+                    co[0::2] = np.arange(last + 1)
+                    co[1::2] = vals
+                    fc.keyframe_points.foreach_set("co", co)
+                    fc.keyframe_points.foreach_set("interpolation", [1] * (last + 1))
                 fc.update()
+
+    def _measure(self, act, last, pts):
+        """逐格量出骨頭位置：pts = [(骨名, 'head'|'tail')]，回傳 {pt: [Vector...]}。"""
+        arm = self.arm
+        arm.animation_data.action = act
+        out = {p: [] for p in pts}
+        for f in range(0, last + 1):
+            bpy.context.scene.frame_set(f)
+            for p in pts:
+                pb = arm.pose.bones[p[0]]
+                out[p].append(arm.matrix_world @ (pb.head if p[1] == "head" else pb.tail))
+        arm.animation_data.action = None
+        return out
+
+    def action(self, name, keys, lag=None, loop=False, hits=None, ground=True):
+        """keys: [(frame, pose_dict[, mode])]；mode 'L' = 從這格到下一格用線性；
+        in/in3/out/out3/io = 抵達這格那一段的緩動。片段一律從第 0 格開始。lag: {bone: 延遲格數}（骨頭逐節延遲＝overlap）。
+        hits: [(標記格, 骨名)]，在標記附近找該骨尾端速度峰值當命中格。ground：身體低於地面就抬高骨盆。"""
+        lag = lag or {}
+        off = keys[0][0]
+        keys = [(k[0] - off,) + tuple(k[1:]) for k in keys]
+        act = bpy.data.actions.new(name)
+        ikb = {b for lg in self.legs for b in [lg["upper"], lg["lower"]] + lg["feet"]}
+        last = keys[-1][0]
+        self._keyed_curves(act, keys, lag, last, loop, ikb)
         if self.plants:
             self._solve_plants(act, keys, last)
         if self.legs:
             self._solve_legs(act, keys, last)
+        lowers = [lg["lower"] for lg in self.legs]
+        if ground:
+            skip = set(ikb) - set(lowers)
+            gb = [b.name for b in self.arm.data.bones if b.name not in skip and b.name != "Root" and b.name not in self.ground_skip]
+            pts = [(b, "head") for b in gb] + [(b, "tail") for b in gb if b not in lowers]
+            P = self._measure(act, last, pts)
+            lift = np.zeros(last + 1)
+            worst = {}
+            for p, arr in P.items():
+                r = self.ground_r.get(p[0], self.ground_r.get("*", 0.04))
+                for f, v in enumerate(arr):
+                    if r - v.z > lift[f]:
+                        lift[f] = r - v.z
+                        worst[f] = p
+            if lift.max() > 0.005:
+                n = len(lift)
+                dl = np.array([lift[max(0, i - 2):i + 3].max() for i in range(n)])
+                kk = np.exp(-0.5 * (np.arange(-4, 5) / 1.6) ** 2)
+                kk /= kk.sum()
+                lift = np.maximum(np.convolve(np.pad(dl, 4, mode="edge"), kk, mode="valid"), lift)
+                if loop:
+                    lift[-1] = lift[0]
+                path = 'pose.bones["Hips"].location'
+                old = sorted([c for c in act.fcurves if c.data_path == path], key=lambda c: c.array_index)
+                vals = np.array([[c.evaluate(f) for f in range(n)] for c in old]) if len(old) == 3 else np.zeros((3, n))
+                for c in old:
+                    act.fcurves.remove(c)
+                dz = self.M["Hips"].inverted() @ Vector((0, 0, 1))
+                for i in range(3):
+                    fc = act.fcurves.new(path, index=i, action_group="Hips")
+                    fc.keyframe_points.add(n)
+                    co = np.empty(n * 2)
+                    co[0::2] = np.arange(n)
+                    co[1::2] = vals[i] + lift * dz[i]
+                    fc.keyframe_points.foreach_set("co", co)
+                    fc.keyframe_points.foreach_set("interpolation", [1] * n)
+                    fc.update()
+                drop = set(ikb) | {pl["bone"] for pl in self.plants}
+                for c in [c for c in act.fcurves if any(c.data_path == f'pose.bones["{b}"].rotation_quaternion' for b in drop)]:
+                    act.fcurves.remove(c)
+                if self.plants:
+                    self._solve_plants(act, keys, last)
+                if self.legs:
+                    self._solve_legs(act, keys, last)
+                fw = int(np.argmax(lift))
+                print(f"  ground {name}: 骨盆抬高最多 {lift.max() * 100:.1f}cm（第 {fw} 格，{worst.get(fw)}）", flush=True)
+        hit_t = []
+        if hits:
+            P = self._measure(act, last, [(b, "tail") for _, b in hits])
+            for m, b in hits:
+                m = m - off
+                arr = P[(b, "tail")]
+                best, bf = -1.0, m
+                for f in range(max(1, m - 2), min(last - 1, m + 3) + 1):
+                    v = (arr[f + 1] - arr[f - 1]).length
+                    if v > best:
+                        best, bf = v, f
+                hit_t.append(round(bf / 30.0, 3))
+        self.meta[name] = dict(dur=round(last / 30.0, 3), loop=bool(loop), **({"hits": hit_t} if hits else {}))
         tr = self.arm.animation_data.nla_tracks.new()
         tr.name = name
-        tr.strips.new(name, 1, act)
+        tr.strips.new(name, 0, act)
         tr.mute = True
         self.actions[name] = (act, last)
+        print(f"ACTION {name}: 0-{last} ({last / 30:.2f}s) hits={hit_t}", flush=True)
         return act
 
     def show(self, name, frame):
@@ -1100,7 +1227,7 @@ def export_glb(path, arm, mesh, frame_step=1):
     for pb in arm.pose.bones:
         pb.rotation_quaternion = (1, 0, 0, 0)
         pb.location = (0, 0, 0)
-    bpy.context.scene.frame_set(1)
+    bpy.context.scene.frame_set(0)
     activate(arm, [mesh])
     bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_animations=True,
                               export_animation_mode="NLA_TRACKS", export_yup=True, export_skins=True,
@@ -1202,8 +1329,49 @@ def render_actions(cam, anim, out_dir, prefix, height, frames=5, extra=1.0, res=
             os.remove(os.path.join(out_dir, f))
     aim(cam, center or (0, 0, height * 0.48), height * 3.0 * extra, az, 10, rig=False)
     for name, (act, last) in anim.actions.items():
-        fl = (frames_map or {}).get(name) or [round(1 + (last - 1) * i / (frames - 1)) for i in range(frames)]
+        fl = (frames_map or {}).get(name) or [round(last * i / (frames - 1)) for i in range(frames)]
         for i, f in enumerate(fl):
             anim.show(name, f)
             render(os.path.join(out_dir, f"{prefix}__{name}__{i}_{f:03d}.png"), res)
     anim.show(None, 1)
+
+
+def gait(p, stride, lift, swing=0.38, d=(0.0, -1.0), pitch=12.0):
+    """步態（原地循環）：p 為 0~1 相位；支撐期腳往移動反方向滑，擺動期抬腳前送。回傳 'Foot:ik' 用的 (dx, dy, dz, 俯仰度)。"""
+    p %= 1.0
+    if p < swing:
+        t = p / swing
+        x = -stride / 2 + stride * t * t * (3 - 2 * t)
+        z = lift * math.sin(math.pi * t) ** 0.8
+        pit = pitch * math.sin(math.pi * t) - 0.5 * pitch * math.sin(2 * math.pi * t)
+    else:
+        t = (p - swing) / (1 - swing)
+        x = stride / 2 - stride * t
+        z = 0.0
+        pit = 0.0
+    return (d[0] * x, d[1] * x, z, pit)
+
+
+def mirror(d):
+    """把姿勢左右鏡像：.L/.R 互換、旋轉的 Y/Z 反號、位移 X 反號。"""
+    out = {}
+    for k, v in d.items():
+        nk = k.replace(".L", ".#").replace(".R", ".L").replace(".#", ".R")
+        if k.endswith(":loc"):
+            out[nk] = (-v[0], v[1], v[2])
+        elif k.endswith(":ik"):
+            out[nk] = (-v[0],) + tuple(v[1:])
+        elif k.endswith(":plant") or isinstance(v, (int, float)):
+            out[nk] = v
+        else:
+            out[nk] = (v[0], -v[1], -v[2]) + tuple(v[3:])
+    return out
+
+
+def write_meta(anim, model, out_dir):
+    import json
+    os.makedirs(out_dir, exist_ok=True)
+    p = os.path.join(out_dir, model + ".clipmeta.json")
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(anim.meta, f, ensure_ascii=False, indent=1)
+    print("META", p, flush=True)

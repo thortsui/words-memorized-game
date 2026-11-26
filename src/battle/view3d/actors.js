@@ -74,6 +74,21 @@ function addOutline(obj,worldH,scale){const list=[];obj.traverse(o=>{if(!o.isMes
     if(o.isSkinnedMesh){c=new THREE.SkinnedMesh(o.geometry,mat);c.bind(o.skeleton,o.bindMatrix)}else c=new THREE.Mesh(o.geometry,mat);
     c.position.copy(o.position);c.quaternion.copy(o.quaternion);c.scale.copy(o.scale);c.userData.isOutline=true;c.frustumCulled=o.frustumCulled;o.parent.add(c)}}
 
+/* ---------- 片段資訊 clipmeta.json（Blender 匯出時一起產生；檔案不存在時 glob 是空的，退回下面的 IMPACT 表） ----------
+   接受的格式：{ "<模型代號>": { "<片段名>": { "dur": 秒, "hits": [秒,…], "steps": [秒,…] } } }，
+   也接受外面多包一層 {models:{…}}、或模型底下多一層 {clips:{…}}；hits 也可以寫 hit（單一數字）。
+   實際片長和 dur 不同（例如重新烘焙過）時，hits 依比例縮放。 */
+const META_RAW=Object.values(import.meta.glob('./clipmeta.json',{eager:true,import:'default'}))[0]||null;
+const META=(()=>{let m=META_RAW;if(!m||typeof m!=="object")return{};if(m.models&&typeof m.models==="object")m=m.models;const out={};
+  for(const [model,v] of Object.entries(m)){if(!v||typeof v!=="object")continue;const clips=v.clips&&typeof v.clips==="object"?v.clips:v;out[model]={};
+    for(const [clip,c] of Object.entries(clips)){if(!c||typeof c!=="object")continue;const hits=Array.isArray(c.hits)?c.hits.filter(x=>typeof x==="number"&&x>=0):typeof c.hit==="number"?[c.hit]:[];
+      out[model][clip]={dur:typeof c.dur==="number"&&c.dur>0?c.dur:null,hits:hits.sort((a,b)=>a-b),steps:Array.isArray(c.steps)?c.steps.filter(x=>typeof x==="number"):null}}}
+  return out})();
+export const hasClipMeta=()=>Object.keys(META).length>0;
+// 某模型某片段的命中秒數（已依實際片長縮放）；沒有資料回傳 null
+function metaHits(model,clip,actual){const c=META[model]&&META[model][clip];if(!c||!c.hits.length)return null;const k=c.dur&&actual&&Math.abs(actual/c.dur-1)>.02?actual/c.dur:1;return c.hits.map(h=>Math.min(h*k,actual||h*k))}
+function metaSteps(model,clip,actual){const c=META[model]&&META[model][clip];if(!c||!c.steps||!c.steps.length)return null;const k=c.dur&&actual?actual/c.dur:1;return c.steps.map(h=>h*k)}
+
 /* ---------- 命中時間表（秒，從片段開頭算起；逐格量測的結果見 tests/playtest/art/data） ----------
    數字＝武器／身體實際打到對手的那一格；陣列＝連段各擊；{f}＝片長比例。查不到才用片長的 45%。 */
 const IMPACT={
@@ -151,7 +166,18 @@ const PROC={
     T(P.rotation,{x:0},.36,ease.io);arm(a,T,a.rest.armR,.36,ease.io);armL(a,T,a.rest.armL,.36,ease.io);await T(P.scale,{x:1,y:1,z:1},.36,ease.io)}},
 };
 PROC.Die=PROC.Faint;
-const LOOPS={Idle:"idle",Walk:"walk",Run:"run"};
+// 循環動作：值＝沒有片段時用的程式擺動（stalk＝巨獸踏步，比 walk 慢、沉）
+const LOOPS={Idle:"idle",IdleAggro:"idle",Walk:"walk",Run:"run",Stalk:"stalk",StrafeL:"strafeL",StrafeR:"strafeR"};
+// 片段不存在時依序找替代（同事的新片段之後才會到；沒有就退回現有片段＋位移）
+const FALLBACK={IdleAggro:["Idle"],Stalk:["Walk"],StrafeL:["Walk"],StrafeR:["Walk"],Delayed:["Attack2","Attack"],Dash:["Attack"],Combo3:[],Roar:[]};
+// 這些片段播放時開武器拖尾
+const SWING=/^(Slash|HeavySlash|Combo|Combo3|Attack|Attack2|Delayed|Dash)$/;
+// 交叉淡入淡出。three.js 的 crossFadeFrom 會讓「被淡出的片段」從權重 1 開始淡出——如果它自己還在淡入中（例如剛切到待機又馬上出招），
+// 那一格權重會突然跳到 1，畫面就跳一下。這裡改成從它「目前的權重」開始淡出。
+function xfade(from,to,d){if(!from||from===to){to.stopFading();to.setEffectiveWeight(1);return}
+  const w0=from.getEffectiveWeight();from.stopFading();from._scheduleFading(d,w0,0);to.stopFading();to._scheduleFading(d,0,1)}
+// 交叉淡入淡出（秒）：攻擊／受擊進場要短（反應快），回到待機與循環動作要長（不硬切）
+const FADE_IN=.12,FADE_LOOP=.35,FADE_IDLE=.3;
 
 export class Actor{
   // o: {model 代號, height 目標身高（公尺）, standin: ()=>({group, parts, height}), cute, fly 飛行高度, shadow 陰影半徑, toon 漸層貼圖, outline, castShadow}
@@ -159,9 +185,10 @@ export class Actor{
     this.root=new THREE.Group();this.pose=new THREE.Group();this.bob=new THREE.Group();this.root.add(this.pose);this.pose.add(this.bob);
     this.parts={};this.rest={armR:0,armL:0};this.actions={};this.mixer=null;this.curAct=null;this.seq=0;this.bobMode="idle";this.bobT=Math.random()*9;this.tremble=0;
     this.mats=[];this.flashK=0;this.flashC=new THREE.Color(0xffffff);this.glowK=0;this.glowC=new THREE.Color(0xff2a1a);this._tint=false;this.opacity=1;
+    this.kn={z:0,vz:0,r:0,vr:0};this.alt={};this.bobRate=1;this.onStep=null;this._stepS=0;this.trail=null;this.trailColor=o.trail||0xdfe8ff;
     this.shadow=fx.blob(o.shadow||o.height*.42,o.cute?.55:.75);eng.scene.add(this.shadow);eng.scene.add(this.root);
     this._setContent(o.standin(),true);
-    this._off=eng.onUpdate((dt,rdt,time)=>this._update(dt,time));
+    this._off=eng.onUpdate((dt,rdt,time)=>this._update(dt,time),0);
     this.ready=o.load?o.load(o.model).then(g=>{if(g&&!eng.dead&&!this.gone)this._setGLB(g);return this}):Promise.resolve(this)}
 
   _setContent(c,isStandin){if(this.content){this.bob.remove(this.content);this.eng.disposeObject(this.content)}
@@ -180,40 +207,79 @@ export class Actor{
     sc.traverse(o=>{if(o.isSkinnedMesh)o.frustumCulled=false});
     this._setContent({group:sc},false);
     this.eng.container.dataset.glb=(+this.eng.container.dataset.glb||0)+1; // 已換上真模型的角色數（檢查用）
-    this.mixer=new THREE.AnimationMixer(sc);this.actions={};for(const clip of g.animations||[])this.actions[clip.name]=this.mixer.clipAction(clip);
+    // 測試用：window.__v3dropClips＝要假裝不存在的片段名（驗證「片段不存在就退回」的路徑）
+    const drop=typeof window!=="undefined"&&Array.isArray(window.__v3dropClips)?window.__v3dropClips:null;
+    const clips=(g.animations||[]).filter(c=>!drop||!drop.includes(c.name));
+    this.loco=locoOf(this.name,sc,clips);
+    this.mixer=new THREE.AnimationMixer(sc);this.actions={};this.alt={};for(const clip of clips)this.actions[clip.name]=this.mixer.clipAction(clip);
+    if(this.o.trail&&!this.eng.dead){if(this.trail)this.trail.dispose();this.trail=makeTrail(this,sc)}
     // 換上真模型後接續目前的循環動作
     this.curAct=null;const loop=this._loopName||"Idle";if(this.actions[loop]){this.curAct=this.actions[loop];this.curAct.play()}else if(this.actions.Idle){this.curAct=this.actions.Idle;this.curAct.play()}
     this.bobMode=this.actions[loop]?"none":(LOOPS[loop]||"idle")}
 
   has(name){return !!this.actions[name]}
-  // 命中時間點（秒）：真模型的動作抓片長的 45%，補間動作用表定值
-  impactTime(name,speed=1){const a=this.actions[name];
-    if(a){const d=a.getClip().duration,v=(IMPACT[this.name]||{})[name];const t=v==null?d*.45:Array.isArray(v)?v[0]:typeof v==="object"?d*v.f:v;return Math.min(t,d)/speed}
+  // 實際會播的片段名：有就用自己，沒有就找替代（FALLBACK），都沒有回傳原名（交給程式補間／循環擺動）
+  clipName(name){if(this.actions[name])return name;for(const f of FALLBACK[name]||[])if(this.actions[f])return f;return name}
+  // 命中時間點（秒）：clipmeta.json → IMPACT 表 → 片長的 45%；補間動作用表定值
+  impactTime(name,speed=1){name=this.clipName(name);const a=this.actions[name];
+    if(a){const d=a.getClip().duration,mh=metaHits(this.name,name,d);if(mh)return mh[0]/speed;const v=(IMPACT[this.name]||{})[name];const t=v==null?d*.45:Array.isArray(v)?v[0]:typeof v==="object"?d*v.f:v;return Math.min(t,d)/speed}
     const p=PROC[name];return p?(p.impact==null?p.dur*.5:p.impact)/speed:.2}
-  // 連段各擊的命中時間（秒）。真模型查表；補間動作平均分布
-  comboTimes(name="Combo",n=3){const v=(IMPACT[this.name]||{})[name];if(this.actions[name]&&Array.isArray(v))return v;const d=this.duration(name);return Array.from({length:n},(_,i)=>d*(.22+.56*i/Math.max(1,n-1)))}
-  duration(name,speed=1){const a=this.actions[name];if(a)return a.getClip().duration/speed;const p=PROC[name];return p?p.dur/speed:.3}
+  // 片段裡所有命中時間（秒，未除速度）：clipmeta → IMPACT 陣列 → null
+  hitTimes(name){name=this.clipName(name);const a=this.actions[name];if(!a)return null;const d=a.getClip().duration,mh=metaHits(this.name,name,d);if(mh)return mh;const v=(IMPACT[this.name]||{})[name];return Array.isArray(v)?v.slice():null}
+  // 連段各擊的命中時間（秒）。clipmeta／IMPACT 表；都沒有就平均分布
+  comboTimes(name="Combo",n=3){const h=this.hitTimes(name);if(h&&h.length)return h;const d=this.duration(name);return Array.from({length:n},(_,i)=>d*(.22+.56*i/Math.max(1,n-1)))}
+  // 走路類片段原速播放時，身體應有的移動速度（m/s，從支撐腳往後滑的速度量出來）。位移速度＝這個值×播放速度，腳才不會滑步。沒有片段回傳 0
+  locoSpeed(name){const n=this.clipName(name),v=this.loco&&this.loco[n];return v?v:0}
+  duration(name,speed=1){name=this.clipName(name);const a=this.actions[name];if(a)return a.getClip().duration/speed;const p=PROC[name];return p?p.dur/speed:.3}
 
-  resetPose(){const E=this.eng,P=this.pose;E.kill(P.position);E.kill(P.rotation);E.kill(P.scale);P.position.set(0,0,0);P.rotation.set(0,0,0);P.scale.set(1,1,1);this.tremble=0;
+  // soft：補間動作留下的姿勢（前傾、縮放）用 0.15 秒滑回原位，不在換片段的那一格瞬間跳回
+  resetPose(soft=false){const E=this.eng,P=this.pose;E.kill(P.position);E.kill(P.rotation);E.kill(P.scale);this.tremble=0;
+    const off=P.position.lengthSq()+P.rotation.x*P.rotation.x+P.rotation.y*P.rotation.y+P.rotation.z*P.rotation.z+Math.abs(P.scale.x-1)+Math.abs(P.scale.y-1);
+    if(soft&&off>1e-5&&!E.rm){P.rotation.y=Math.atan2(Math.sin(P.rotation.y),Math.cos(P.rotation.y));E.to(P.position,{x:0,y:0,z:0},.15,ease.out);E.to(P.rotation,{x:0,y:0,z:0},.15,ease.out);E.to(P.scale,{x:1,y:1,z:1},.15,ease.out)}
+    else{P.position.set(0,0,0);P.rotation.set(0,0,0);P.scale.set(1,1,1)}
     for(const k of ["armR","armL"])if(this.parts[k]){E.kill(this.parts[k].rotation);this.parts[k].rotation.x=this.rest[k]}}
+  // 同一個片段連續播（例如兩次 Attack）：沒辦法自己淡入自己，改用一份複本交替，前一次的收招和下一次的起手才接得起來
+  // 還在淡出中的同一個片段也一樣（例如 Stalk→Idle 才淡到一半又切回 Stalk）：拿它重來會讓它的權重瞬間歸零，改用複本、讓舊的那份自己淡完
+  _act(name){const a=this.actions[name];if(!a)return a;const busy=x=>x===this.curAct||(x.isRunning()&&x.getEffectiveWeight()>.01);if(!busy(a))return a;
+    let b=this.alt[name];if(!b){const c=a.getClip().clone();b=this.mixer.clipAction(c)}
+    if(busy(b)&&b.getEffectiveWeight()>a.getEffectiveWeight()&&a!==this.curAct)return a; // 兩份都在用：拿權重比較小的那份
+    this.alt[name]=a;this.actions[name]=b;return b}
 
   // 播放動作。循環動作（Idle／Walk／Run）立刻 resolve；單次動作播完才 resolve，並自動回到待機（hold 例外）。
-  play(name,{speed=1,hold=false,fade=.12}={}){if(this.eng.dead||this.gone)return Promise.resolve();const tok=++this.seq,loop=name in LOOPS;
+  // fade：不指定就依種類決定（單次動作 0.08 秒、循環／回待機 0.3–0.35 秒）
+  play(name,{speed=1,hold=false,fade=null}={}){if(this.eng.dead||this.gone)return Promise.resolve();const tok=++this.seq,loop=name in LOOPS,want=name;
     if(loop)this._loopName=name;
-    const act=this.actions[name];
-    if(act){this.resetPose();act.reset();act.setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce,Infinity);act.clampWhenFinished=true;act.timeScale=speed;
-      if(this.curAct&&this.curAct!==act){act.crossFadeFrom(this.curAct,fade,false)}act.play();this.curAct=act;this.bobMode="none";
+    name=this.clipName(name);
+    const fd=fade!=null?fade:loop?(name==="Idle"||name==="IdleAggro"?FADE_IDLE:FADE_LOOP):FADE_IN;
+    if(loop&&this.actions[name]&&this.curAct===this.actions[name]&&this.curAct.isRunning()&&this.curAct.getEffectiveWeight()>.5){this.curAct.timeScale=speed;this.bobMode="none";this.resetPose(true);return Promise.resolve()} // 已經在播同一個循環：不重來
+    const act=this.actions[name]&&this._act(name);
+    if(act){this.resetPose(true);act.reset();act.setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce,Infinity);act.clampWhenFinished=true;act.timeScale=speed;act.setEffectiveWeight(1);
+      if(this.curAct&&this.curAct!==act){xfade(this.curAct,act,fd)}act.play();this.curAct=act;this.bobMode="none";
+      if(SWING.test(name)){if(this.trail)this.trail.on(act.getClip().duration/speed*.8);if(this.onSwing)this.onSwing(name,speed)}
       if(loop)return Promise.resolve();
-      return this.eng.wait(act.getClip().duration/speed).then(()=>{if(tok===this.seq&&!hold&&!PROC[name]?.hold)this.idle()})}
-    // 沒有這個動作片段 → 程式補間（真模型則讓 Idle 片段繼續在底下播）
-    if(loop){this.resetPose();this.bobMode=LOOPS[name];if(this.mixer&&this.actions.Idle&&this.curAct!==this.actions.Idle){const i=this.actions.Idle;i.reset();this.curAct&&i.crossFadeFrom(this.curAct,fade,false);i.play();this.curAct=i}
-      if(this.mixer&&this.actions.Idle)this.bobMode=name==="Idle"?"none":LOOPS[name];return Promise.resolve()}
+      return this.eng.wait(act.getClip().duration/speed).then(()=>{if(tok===this.seq&&!hold&&!PROC[want]?.hold&&!PROC[name]?.hold)this.idle()})}
+    // 沒有這個動作片段 → 程式補間（真模型則讓待機片段繼續在底下播）
+    const base=this.mixer?this.actions[this.clipName(this._loopName==="IdleAggro"?"IdleAggro":"Idle")]:null;
+    if(loop){this.resetPose(true);this.bobMode=LOOPS[want];if(base&&this.curAct!==base){const b=this._act(this.clipName("Idle"));b.reset();b.setEffectiveWeight(1);this.curAct&&xfade(this.curAct,b,fd);b.play();this.curAct=b}
+      if(base)this.bobMode=(want==="Idle"||want==="IdleAggro")?"none":LOOPS[want];return Promise.resolve()}
     const p=PROC[name];if(!p)return this.eng.wait(.3);
-    this.resetPose();if(this.mixer&&this.actions.Idle&&this.curAct!==this.actions.Idle){const i=this.actions.Idle;i.reset();this.curAct&&i.crossFadeFrom(this.curAct,fade,false);i.play();this.curAct=i}
-    this.bobMode=this.mixer&&this.actions.Idle?"none":"still";
+    this.resetPose();if(base&&this.curAct!==base){const b=this._act(this.clipName("Idle"));b.reset();b.setEffectiveWeight(1);this.curAct&&xfade(this.curAct,b,FADE_IDLE);b.play();this.curAct=b}
+    this.bobMode=base?"none":"still";
     const T=(obj,props,d,ez)=>this.eng.to(obj,props,d/speed,ez);
     return p.run(this,T).then(()=>{if(tok!==this.seq)return;if(hold||p.hold)return;this.idle()})}
   idle(){return this.play(this._loopName||"Idle")}
+  // 分段播放（例如三連擊的每一段各配一題）：從 t0 秒播到 t1 秒，之後幾乎停住（極慢地往前飄，不是死格），
+  // 下一段 t0 傳 null 就從目前位置接著播。片段不存在回傳 null。
+  playSeg(name,t0,t1,speed=1){const a0=this.actions[name];if(!a0||this.eng.dead||this.gone)return null;const tok=++this.seq;let a=a0;
+    if(this.curAct!==a||t0!=null){if(this.curAct!==a||t0===0){a=this._act(name);this.resetPose(true);a.reset();a.setLoop(THREE.LoopOnce,Infinity);a.clampWhenFinished=true;a.setEffectiveWeight(1);if(this.curAct&&this.curAct!==a)xfade(this.curAct,a,FADE_IN);a.play();this.curAct=a;this.bobMode="none"}
+      if(t0!=null)a.time=t0}
+    a.paused=false;a.timeScale=speed;const from=a.time;if(this.trail)this.trail.on(Math.max(.1,(t1-from)/speed+.12));
+    return this.eng.wait(Math.max(0,(t1-from)/speed)).then(()=>{if(tok===this.seq&&this.curAct===a)a.timeScale=.04;return tok===this.seq})}
+  // 把目前片段放慢到幾乎停住（延遲攻擊的「舉著武器停住」）
+  freeze(k=.03){if(this.curAct)this.curAct.timeScale=k}
+  // 受擊位移與後仰（彈簧：先被推開，再回到原位，帶一點過衝）。dist：公尺（往自己背後）、lean：弧度（後仰）
+  // 不是瞬間給速度（會在一格內跳一大段），而是把「目標偏移」推出去再讓它衰減，彈簧追著目標走：約 60ms 內推到、再帶點過衝回原位
+  knock(dist=.2,lean=.15){if(this.eng.rm){dist*=.4;lean*=.4}const k=this.kn;k.tz=(k.tz||0)+dist;k.tr=(k.tr||0)+lean}
   // 設定「單次動作播完後要回到哪個循環動作」，不立刻切換
   setLoop(name){this._loopName=name}
 
@@ -230,9 +296,19 @@ export class Actor{
     let y=fly,sy=1,rz=0,rx=0,sw=0;
     if(this.bobMode==="idle"){if(fly)y+=Math.sin(t*2.4)*.07*h;else sy=1+Math.sin(t*(this.cute?3.2:1.8))*(this.cute?.035:.012)}
     else if(this.bobMode==="walk"){y+=Math.abs(Math.sin(t*5.5))*.035*h;rz=Math.sin(t*5.5)*.035;sw=Math.sin(t*5.5)*.55}
+    // 巨獸踏步（Boss 沒有走路片段時）：慢而沉，落腳時往下頓一下；橫移時身體往移動方向傾
+    else if(this.bobMode==="stalk"||this.bobMode==="strafeL"||this.bobMode==="strafeR"){const f=2.7*this.bobRate,s=Math.sin(t*f),c=Math.abs(s);
+      y+=-(1-c)*(1-c)*.022*h+c*.012*h;rx=.05;rz=this.bobMode==="stalk"?s*.022:(this.bobMode==="strafeL"?.05:-.05)+s*.012;sw=s*.45;
+      const side=s>=0?1:-1;if(side!==this._stepS){this._stepS=side;this.onStep&&this.onStep(side)}}
     else if(this.bobMode==="run"){y+=Math.abs(Math.sin(t*10))*(this.cute?.14:.05)*h;rx=.22;sw=Math.sin(t*10)*.9}
     else if(this.bobMode==="still"&&fly)y+=0;
-    b.position.y=y;b.scale.set(1/Math.sqrt(sy),sy,1/Math.sqrt(sy));b.rotation.set(rx,0,rz);
+    // 受擊彈簧（ω≈14、阻尼比 0.5：被推開後帶一點過衝回到原位）
+    {const K=this.kn,w=20,z=.55,d=Math.min(dt,.033),dec=Math.exp(-d/.09);K.tz=(K.tz||0)*dec;K.tr=(K.tr||0)*dec;
+      K.vz+=(w*w*(K.tz-K.z)-2*z*w*K.vz)*d;K.z+=K.vz*d;K.vr+=(w*w*(K.tr-K.r)-2*z*w*K.vr)*d;K.r+=K.vr*d}
+    // 有走路片段時，落腳由片段時間決定（clipmeta 的 steps，沒有就用片長的 0 與 1/2）
+    if(this.bobMode==="none"&&this.onStep&&this.curAct&&/^(Walk|Stalk|StrafeL|StrafeR)/.test(this.curAct.getClip().name)&&this.curAct.getEffectiveWeight()>.5){const cl=this.curAct.getClip(),d=cl.duration,st=metaSteps(this.name,cl.name,d)||[0,d/2];
+      const tt=this.curAct.time%d;let idx=-1;for(let i=0;i<st.length;i++)if(tt>=st[i])idx=i;if(idx!==this._stepI){this._stepI=idx;if(idx>=0)this.onStep(idx%2?1:-1)}}
+    b.position.y=y;b.position.z=-this.kn.z;b.scale.set(1/Math.sqrt(sy),sy,1/Math.sqrt(sy));b.rotation.set(rx-this.kn.r,0,rz);
     if(this.tremble)b.position.x=(Math.random()-.5)*this.tremble*2;else b.position.x=0;
     if(P.legL){P.legL.rotation.x=sw;P.legR.rotation.x=-sw}
     if(P.wingL){const slow=P.wingL.userData.flap,f=slow?Math.sin(t*1.7)*slow:Math.sin(t*(this.bobMode==="still"?22:13))*.55;P.wingL.rotation.z=f;P.wingR.rotation.z=-f}
@@ -250,12 +326,66 @@ export class Actor{
         if(fk>0)x.m.emissive.lerp(this.flashC,fk/(soft?Math.max(1,x.m.emissiveIntensity||1):1))}}
     // 假陰影跟著腳下，跳高時縮小
     const r=this.root,s=this.shadow;s.position.x=r.position.x;s.position.z=r.position.z;s.visible=r.visible;
-    const lift=Math.max(0,r.position.y+this.pose.position.y+y),k=(this.o.shadow||h*.42)*2*Math.max(.35,1-lift/(h*2.5))*((this.pose.scale.x+1)/2);s.scale.setScalar(k)}
+    const lift=Math.max(0,r.position.y+this.pose.position.y+y),k=(this.o.shadow||h*.42)*2*Math.max(.35,1-lift/(h*2.5))*((this.pose.scale.x+1)/2);s.scale.setScalar(k);
+    if(this.trail)this.trail.update(dt)}
 
   // 面向某個世界座標（只轉 Y 軸）
   face(p){this.root.rotation.y=Math.atan2(p.x-this.root.position.x,p.z-this.root.position.z)}
   // 身體中心的世界座標（特效用）
   center(out=new THREE.Vector3(),k=.5){return out.set(this.root.position.x,this.root.position.y+this.pose.position.y+(this.isStandin?(this.o.fly||0):(this.baseY||0))+this.h*k,this.root.position.z)}
-  remove(){this.gone=true;this._off();this.eng.scene.remove(this.root);this.eng.scene.remove(this.shadow);this.shadow.material.dispose();if(this.mixer){this.mixer.stopAllAction();this.mixer.uncacheRoot(this.content)}this.eng.disposeObject(this.root)}
+  remove(){this.gone=true;this._off();if(this.trail){this.trail.dispose();this.trail=null}this.eng.scene.remove(this.root);this.eng.scene.remove(this.shadow);this.shadow.material.dispose();if(this.mixer){this.mixer.stopAllAction();this.mixer.uncacheRoot(this.content)}this.eng.disposeObject(this.root)}
 }
+/* ---------- 走路片段的步速（載入時量一次，依模型快取） ----------
+   用一個暫時的 mixer 把 Stalk／StrafeL／StrafeR／Walk／Run 各取 30 格，找比較低的那隻腳（支撐腳），算它在模型座標裡往後滑的平均速度。
+   量完把骨頭姿勢還原，不影響正式的 mixer。換了模型檔（重新匯出）也會自動跟著變。 */
+const LOCO=new Map();
+function locoOf(name,sc,clips){const key=name+"|"+sc.scale.x.toFixed(4)+"|"+clips.map(c=>c.name+c.duration.toFixed(3)).join(",");if(LOCO.has(key))return LOCO.get(key);const out={};
+  try{let fl=null,fr=null;const bones=[];sc.traverse(o=>{if(o.isBone)bones.push(o);if(/^Foot\.?L$/.test(o.name)&&!fl)fl=o;if(/^Foot\.?R$/.test(o.name)&&!fr)fr=o});
+    if(fl&&fr){const saved=bones.map(b=>[b.position.clone(),b.quaternion.clone(),b.scale.clone()]),mx=new THREE.AnimationMixer(sc),a=new THREE.Vector3(),b=new THREE.Vector3();
+      for(const c of clips){if(!/^(Stalk|StrafeL|StrafeR|Walk|Run)$/.test(c.name))continue;const act=mx.clipAction(c);act.play();const N=30,P=[];
+        for(let i=0;i<=N;i++){mx.setTime(c.duration*i/N);sc.updateMatrixWorld(true);P.push([fl.getWorldPosition(new THREE.Vector3()),fr.getWorldPosition(new THREE.Vector3())])}
+        act.stop();mx.uncacheClip(c);const dt=c.duration/N;let minY=Infinity;for(const p of P)minY=Math.min(minY,p[0].y,p[1].y);const box=new THREE.Box3().setFromObject(sc),hh=box.max.y-box.min.y;
+        let vx=0,vz=0,n=0;for(let i=0;i<N;i++){const k=P[i][0].y<P[i][1].y?0:1;a.copy(P[i][k]);b.copy(P[i+1][k]);if(a.y>minY+.04*hh)continue;vx-=(b.x-a.x)/dt;vz-=(b.z-a.z)/dt;n++}
+        if(n)out[c.name]=Math.hypot(vx/n,vz/n)}
+      mx.uncacheRoot(sc);bones.forEach((bn,i)=>{bn.position.copy(saved[i][0]);bn.quaternion.copy(saved[i][1]);bn.scale.copy(saved[i][2])});sc.updateMatrixWorld(true)}}catch(e){console.warn("[view3d] 步速量測失敗",e)}
+  LOCO.set(key,out);return out}
+
+/* ---------- 武器拖尾 ----------
+   找武器骨（Weapon／Sword／Staff，沒有就用右手指／右手），用蒙皮權重找出刀身在骨頭座標裡的兩端（只算一次、依模型快取）。
+   揮擊片段播放時每格記下刀根與刀尖的世界座標，畫成一條往後淡出的帶子（Catmull-Rom 補點，快速揮砍也是圓弧不是折線）。一個角色一次 draw call。 */
+const BLADE=new Map();
+function bladeOf(name,sc){if(BLADE.has(name))return BLADE.get(name);let res=null;
+  try{let mesh=null;sc.traverse(o=>{if(o.isSkinnedMesh&&!mesh)mesh=o});
+    if(mesh){const bones=mesh.skeleton.bones,pick=re=>bones.findIndex(b=>re.test(b.name));let j=pick(/^(Weapon|Sword|Staff)$/i);const weapon=j>=0;if(j<0)j=pick(/^Fingers\.?R$/i);if(j<0)j=pick(/^Hand\.?R$/i);
+      if(j>=0){const g=mesh.geometry,P=g.attributes.position,SI=g.attributes.skinIndex,SW=g.attributes.skinWeight,inv=mesh.skeleton.boneInverses[j],v=new THREE.Vector3(),pts=[];
+        for(let i=0;i<P.count;i++){let w=0;for(let k=0;k<4;k++)if(SI.getComponent(i,k)===j)w+=SW.getComponent(i,k);if(w<.5)continue;v.fromBufferAttribute(P,i).applyMatrix4(mesh.bindMatrix).applyMatrix4(inv);pts.push(v.clone())}
+        if(pts.length>=4){let tip=pts[0];for(const q of pts)if(q.lengthSq()>tip.lengthSq())tip=q;const dir=tip.clone().normalize();let lo=Infinity;for(const q of pts)lo=Math.min(lo,q.dot(dir));
+          const len=tip.length();res={bone:bones[j].name,tip:tip.clone(),base:dir.clone().multiplyScalar(Math.max(lo,weapon?len*.3:len*.1))}}}}}catch(e){res=null}
+  BLADE.set(name,res);return res}
+const TRAIL_VS=`attribute float alpha;varying float vA;void main(){vA=alpha;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
+const TRAIL_FS=`uniform vec3 uColor;uniform float uOp;varying float vA;void main(){gl_FragColor=vec4(uColor*vA*uOp,1.);}`;
+function makeTrail(actor,sc){const info=bladeOf(actor.name,sc);if(!info)return null;let bone=null;sc.traverse(o=>{if(o.isBone&&o.name===info.bone&&!bone)bone=o});if(!bone)return null;
+  const N=12,SUB=3,M=(N-1)*SUB+1,pos=new Float32Array(M*2*3),al=new Float32Array(M*2),idx=[];
+  for(let i=0;i<M-1;i++){const a=i*2;idx.push(a,a+1,a+2,a+1,a+3,a+2)}
+  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(pos,3).setUsage(THREE.DynamicDrawUsage));g.setAttribute("alpha",new THREE.BufferAttribute(al,1).setUsage(THREE.DynamicDrawUsage));g.setIndex(idx);
+  // 加色混合：輸出顏色×透明度，黑色＝不加任何東西
+  const mat=new THREE.ShaderMaterial({vertexShader:TRAIL_VS,fragmentShader:TRAIL_FS,uniforms:{uColor:{value:new THREE.Color(actor.trailColor)},uOp:{value:.8}},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(g,mat);mesh.frustumCulled=false;mesh.renderOrder=12;mesh.visible=false;actor.eng.scene.add(mesh);
+  const hb=[],ht=[];let left=0,fade=0;const wb=new THREE.Vector3(),wt=new THREE.Vector3();
+  const cr=(p0,p1,p2,p3,t,o)=>{const t2=t*t,t3=t2*t;o.set(0,0,0).addScaledVector(p0,-.5*t3+t2-.5*t).addScaledVector(p1,1.5*t3-2.5*t2+1).addScaledVector(p2,-1.5*t3+2*t2+.5*t).addScaledVector(p3,.5*t3-.5*t2);return o};
+  const tmpA=new THREE.Vector3(),tmpB=new THREE.Vector3();
+  return{color(c){mat.uniforms.uColor.value.set(c)},
+    on(dur){if(!fade){hb.length=0;ht.length=0}left=Math.max(left,dur);fade=1},
+    update(dt){if(!fade&&!left)return;if(dt<=0)return;left=Math.max(0,left-dt);if(!left){fade=Math.max(0,fade-dt*5);if(!fade){mesh.visible=false;hb.length=0;ht.length=0;return}}
+      bone.updateWorldMatrix(true,false);wb.copy(info.base).applyMatrix4(bone.matrixWorld);wt.copy(info.tip).applyMatrix4(bone.matrixWorld);
+      // 沒在動（例如停住的延遲攻擊）就不推新點，拖尾自然縮短
+      if(hb.length&&ht[0].distanceToSquared(wt)<1e-6){hb.pop();ht.pop()}
+      hb.unshift(wb.clone());ht.unshift(wt.clone());if(hb.length>N){hb.length=N;ht.length=N}
+      const n=hb.length;if(n<2){mesh.visible=false;return}mesh.visible=true;let k=0;
+      for(let i=0;i<n-1;i++)for(let s=0;s<SUB;s++){if(k>=M-1)break;const t=s/SUB,i0=Math.max(0,i-1),i3=Math.min(n-1,i+2);
+        cr(hb[i0],hb[i],hb[i+1],hb[i3],t,tmpA);cr(ht[i0],ht[i],ht[i+1],ht[i3],t,tmpB);const a=Math.pow(Math.max(0,1-(i+t)/(N-1)),1.6)*fade;
+        pos[k*6]=tmpA.x;pos[k*6+1]=tmpA.y;pos[k*6+2]=tmpA.z;pos[k*6+3]=tmpB.x;pos[k*6+4]=tmpB.y;pos[k*6+5]=tmpB.z;al[k*2]=a*.12;al[k*2+1]=a;k++}
+      const last=hb[n-1],lt=ht[n-1];while(k<M){pos[k*6]=last.x;pos[k*6+1]=last.y;pos[k*6+2]=last.z;pos[k*6+3]=lt.x;pos[k*6+4]=lt.y;pos[k*6+5]=lt.z;al[k*2]=0;al[k*2+1]=0;k++}
+      g.attributes.position.needsUpdate=true;g.attributes.alpha.needsUpdate=true},
+    dispose(){actor.eng.scene.remove(mesh);g.dispose();mat.dispose()}}}
 export { PROC };

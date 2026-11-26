@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 NAME = "boss_priest"
 MODEL_BLEND = os.path.join(HERE, "source", NAME + "_model.blend")
 OUT_BLEND = os.path.join(HERE, "source", NAME + ".blend")
-OUT_GLB = os.path.join(ROOT, "public", "models", NAME + ".glb")
+OUT_GLB = os.path.join(HERE, "export_raw", NAME + ".glb")   # 未壓縮原檔；public/models 的壓縮版由 run_anim2.sh 產生
 PREV = os.path.join(HERE, "preview")
 TMP = os.path.join(PREV, "_frames")
 BAKED = os.path.join(HERE, "textures", "baked", NAME)
@@ -400,7 +400,7 @@ def define_actions(A, sym):
           "UpperArm.R": (2, 3, 0), "ForeArm.R": (-6, 0, 0), "Fingers.R": (16, 0, 0), "Hand.R": (6, 0, 0), "SkirtF": (1.5, 0, 0), "SkirtB": (-1, 0, 0),
           "UpperArm.L": (-2, 0, 0)}
     i2 = {"Hips:loc": (0, 0, 0.004), "Chest": (1, 0, -1), "Head": (-2, -2, -5), "Fingers.R": (-8, 0, 0), "UpperArm.R": (-1, -1, 0), "SkirtF": (-1, 0, 0)}
-    A.action("Idle", [(1, S), (34, i1), (70, i2), (100, S)], lag=LAG)
+    A.action("Idle", [(1, S), (34, i1), (70, i2), (100, S)], lag=LAG, loop=True)
 
     # ---------------- Enter：冰封低首→碎冰抽動→緩緩挺直→舉杖頓地
     bow = {"Hips:loc": (0, 0.02, -0.10), "Spine": (22, 0, 0), "Chest": (24, 0, 0), "Neck": (18, 0, 0), "Head": (24, 0, 0),
@@ -429,8 +429,9 @@ def define_actions(A, sym):
             "UpperArm.R": (36, 16, 0), "ForeArm.R": (-20, 0, 0), "Fingers.R": (20, 0, 0), "SkirtF": (-10, 0, 0), "SkirtB": (-14, 0, 0), "Foot.L:ik": (0, -0.22, 0)}
     reb = P(hitp, {"Staff": (138, 0, 0), "Hips:loc": (0, -0.22, -0.13), "Chest": (19, 0, 6)})
     hold = P(hitp, {"Staff": (145, 0, 0), "Hips:loc": (0, -0.21, -0.15), "SkirtF": (-4, 0, 0), "SkirtB": (-6, 0, 0)})
-    A.action("Attack", [(1, TG), (7, P(ant, {"Foot.L:ik": (0, -0.08, 0.08)}), "L"), (12, hitp), (15, reb), (18, hold), (28, hold),
-                        (42, {"Hips:loc": (0, -0.08, -0.04), "Spine": (6, 0, 0), "Chest": (4, 0, 0), "UpperArm.L": (-30, -6, 0), "Staff:plant": 0.6, "Foot.L:ik": (0, -0.1, 0.06)}), (54, S)], lag=LAG)
+    A.action("Attack", [(1, TG), (10, P(ant, {"Foot.L:ik": (0, -0.08, 0.08)}), "io"), (14, hitp, "in3"), (17, reb, "out"), (20, hold, "io"), (30, hold),
+                        (44, {"Hips:loc": (0, -0.08, -0.04), "Spine": (6, 0, 0), "Chest": (4, 0, 0), "UpperArm.L": (-30, -6, 0), "Staff:plant": 0.6, "Foot.L:ik": (0, -0.1, 0.06)}, "io"), (56, S, "io")],
+             lag=LAG, hits=[(14, "Staff")])
 
     # ---------------- Attack2：右手橫掃冰霜＋權杖頓地
     wind = P(TG, {"Spine": (-4, 0, -18), "Chest": (-6, 0, -24), "Head": (4, 0, 26), "UpperArm.R": (-40, 62, 0), "ForeArm.R": (-70, 0, 0), "Fingers.R": (24, 0, 0),
@@ -439,8 +440,9 @@ def define_actions(A, sym):
              "UpperArm.R": (-84, -34, 0), "ForeArm.R": (-12, 0, 0), "Hand.R": (-20, 0, 0), "Fingers.R": (-34, 0, 0),
              "UpperArm.L": (4, 0, 0), "Staff:plant": 1.0, "SkirtF": (-6, 0, 8), "SkirtB": (-8, 0, 8), "Foot.R:ik": (0, -0.18, 0)}
     follow = P(sweep, {"Chest": (12, 0, 34), "UpperArm.R": (-70, -52, 0), "ForeArm.R": (-26, 0, 0), "Hips:loc": (0, -0.15, -0.12)})
-    A.action("Attack2", [(1, TG), (8, P(wind, {"Foot.R:ik": (0, -0.05, 0.07)}), "L"), (14, sweep), (18, follow), (30, follow),
-                         (46, {"Hips:loc": (0, -0.05, -0.03), "Chest": (3, 0, 8), "UpperArm.R": (-20, -8, 0), "ForeArm.R": (-20, 0, 0), "Foot.R:ik": (0, -0.08, 0.05)}), (60, S)], lag=LAG)
+    A.action("Attack2", [(1, TG), (10, P(wind, {"Foot.R:ik": (0, -0.05, 0.07)}), "io"), (15, sweep, "in3"), (19, follow, "out3"), (30, follow, "io"),
+                         (46, {"Hips:loc": (0, -0.05, -0.03), "Chest": (3, 0, 8), "UpperArm.R": (-20, -8, 0), "ForeArm.R": (-20, 0, 0), "Foot.R:ik": (0, -0.08, 0.05)}, "io"), (60, S, "io")],
+             lag=LAG, hits=[(15, "Fingers.R")])
 
     # ---------------- Hit
     hit = {"Hips:loc": (0, 0.08, -0.03), "Spine": (-8, 0, 6), "Chest": (-11, 0, 9), "Neck": (4, 0, -6), "Head": (12, 0, -15),
@@ -485,6 +487,64 @@ def define_actions(A, sym):
                      (61, P(down, fall(79, 0.24), {"Head": (-10, 0, 14)})), (66, down), (100, down)], lag={"Fingers.R": 2})
 
 
+    # ================================================================ 第二版新增（壓迫感）：滑步逼近、繞行、二階段待機、三連擊、延遲杖擊、突進冰爪、尖嘯
+    def glide(N, stride, lift, d, step=4, lean=6, dz=-0.04, side=0.0):
+        keys = []
+        for f in range(0, N + 1, step):
+            ph = (f / N) % 1.0
+            gl = L.gait(ph, stride, lift, 0.40, d, pitch=8)
+            gr = L.gait(ph + 0.5, stride, lift, 0.40, d, pitch=8)
+            s2 = math.sin(2 * math.pi * ph)
+            c2 = math.cos(2 * math.pi * ph)
+            pose = {"Hips:loc": (0.02 * math.sin(2 * math.pi * (ph - 0.15)), -0.02, dz - 0.012 * math.cos(4 * math.pi * ph)),
+                    "Spine": (lean, side, 3 * s2), "Chest": (lean + 2, 0, -4 * s2), "Neck": (-4, 0, 0), "Head": (-6, 4 * c2 - side, 2 * s2),
+                    "UpperArm.R": (-34 + 8 * s2, 10, 0), "ForeArm.R": (-52, 0, 0), "Hand.R": (-10, 0, 0), "Fingers.R": (8 * c2, 0, 0),
+                    "UpperArm.L": (-8 - 6 * s2, -2, 0), "Staff:plant": 1.0,
+                    "SkirtF": (-6 * s2 * abs(d[1]) + 3 * d[0] * s2, 0, 4 * s2 * abs(d[0])), "SkirtB": (6 * s2 * abs(d[1]), 0, -4 * s2 * abs(d[0])),
+                    "Foot.L:ik": gl, "Foot.R:ik": gr}
+            keys.append((f, pose))
+        return keys
+    A.action("Stalk", glide(48, 0.34, 0.05, (0, -1)), lag=LAG, loop=True)
+    A.action("StrafeL", glide(44, 0.28, 0.045, (1, 0), lean=4, side=-4), lag=LAG, loop=True)
+    A.action("StrafeR", glide(44, 0.28, 0.045, (-1, 0), lean=4, side=4), lag=LAG, loop=True)
+
+    # ---------------- IdleAggro：佝僂前探、頭部神經質地抽搐歪斜、右手指爪緩緩收張、權杖微離地
+    AG = {"Hips:loc": (0, -0.04, -0.10), "Spine": (12, 0, 0), "Chest": (14, 0, 0), "Neck": (-6, 0, 0), "Head": (-10, 0, 0),
+          "UpperArm.R": (-50, 10, 0), "ForeArm.R": (-50, 0, 0), "Hand.R": (-20, 0, 0), "Fingers.R": (-30, 0, 0),
+          "UpperArm.L": (-22, -6, 0), "ForeArm.L": (-8, 0, 0), "Staff:plant": 0.85, "SkirtF": (6, 0, 0), "SkirtB": (4, 0, 0)}
+    tw1 = P(AG, {"Head": (-12, 18, 10), "Neck": (-6, 6, 0), "Fingers.R": (10, 0, 0)})
+    tw2 = P(AG, {"Head": (-8, -14, -8), "Neck": (-6, -4, 0), "Fingers.R": (-36, 0, 0), "Chest": (16, 0, 3), "Hips:loc": (0.02, -0.04, -0.11)})
+    A.action("IdleAggro", [(0, AG), (6, tw1, "in"), (14, tw1, "io"), (20, AG, "io"), (27, tw2, "in"), (36, tw2, "io"), (44, P(AG, {"Fingers.R": (6, 0, 0)}), "io"), (52, AG, "io")],
+             lag=LAG, loop=True)
+
+    # ---------------- Combo3：右手冰霜橫掃（快）→ 反手回掃（更快）→ 停頓高舉提燈 → 重砸（重）
+    windP = P(wind, {"Hips:loc": (0, 0.10, -0.05), "Chest": (-6, 0, -28), "UpperArm.R": (-40, 68, 0)})
+    back = P(sweep, {"Chest": (8, 0, -16), "Spine": (6, 0, -8), "Head": (-4, 0, 12), "UpperArm.R": (-72, 58, 0), "ForeArm.R": (-18, 0, 0), "Fingers.R": (-30, 0, 0),
+                     "Foot.R:ik": (0, -0.12, 0)})
+    back2 = P(back, {"Chest": (8, 0, -24), "UpperArm.R": (-60, 72, 0), "Hips:loc": (0, -0.12, -0.10)})
+    antH = P(ant, {"Hips:loc": (0, 0.11, 0.03), "UpperArm.L": (-122, -26, 0), "Staff": (120, 0, 0), "Chest": (-17, 0, -8)})
+    hrec = {"Hips:loc": (0, -0.08, -0.04), "Spine": (6, 0, 0), "Chest": (4, 0, 0), "UpperArm.L": (-30, -6, 0), "Staff:plant": 0.6, "Foot.L:ik": (0, -0.1, 0.06)}
+    A.action("Combo3", [(0, S), (8, wind, "io"), (12, windP, "io"), (15, sweep, "in3"), (18, follow, "out3"), (21, follow, "io"), (24, back, "in"), (28, back2, "out3"),
+                        (40, TG, "io"), (48, ant, "io"), (52, antH, "io"), (56, hitp, "in3"), (59, reb, "out"), (70, hold, "io"), (82, hrec, "io"), (98, S, "io")],
+             lag=LAG, hits=[(15, "Fingers.R"), (24, "Fingers.R"), (56, "Staff")])
+
+    # ---------------- Delayed：提燈舉過頭頂後懸停約 0.8 秒（燈微微再升）→ 猛砸
+    A.action("Delayed", [(0, S), (14, TG, "io"), (22, TG2, "io"), (30, ant, "io"), (42, antH, "io"), (52, P(antH, {"Staff": (116, 0, 0), "Hips:loc": (0, 0.12, 0.04)}), "io"),
+                         (56, hitp, "in3"), (59, reb, "out"), (72, hold, "io"), (86, hrec, "io"), (102, S, "io")], lag=LAG, hits=[(56, "Staff")])
+
+    # ---------------- Dash：後縮（起手短）→ 貼地滑行突進、右爪冰刺前掃 → 收回
+    pullD = P(wind, {"Hips:loc": (0, 0.12, -0.12), "Spine": (2, 0, -16), "Foot.R:ik": (0, 0.10, 0)})
+    lungeD = P(sweep, {"Hips:loc": (0, -0.52, -0.18), "Spine": (14, 0, 16), "UpperArm.R": (-92, -20, 0), "Foot.R:ik": (0, -0.46, 0), "Foot.L:ik": (0, -0.08, 0)})
+    lungeD2 = P(follow, {"Hips:loc": (0, -0.56, -0.20), "Foot.R:ik": (0, -0.46, 0), "Foot.L:ik": (0, -0.08, 0)})
+    A.action("Dash", [(0, S), (6, pullD, "io"), (10, lungeD, "in3"), (14, lungeD2, "out3"), (28, lungeD2, "io"),
+                      (42, {"Hips:loc": (0, -0.2, -0.05), "Chest": (3, 0, 8), "UpperArm.R": (-20, -8, 0), "Foot.R:ik": (0, -0.18, 0.05)}, "io"), (58, S, "io")],
+             lag=LAG, hits=[(10, "Fingers.R")])
+
+    # ---------------- Roar：蜷身 → 雙臂大張仰首尖嘯（顫抖）→ 頓杖
+    A.action("Roar", [(0, S), (12, curl, "io"), (17, P(curl, {"Hips:loc": (0, 0.02, -0.15), "Chest": (25, 0, 0)}), "io"), (21, burst, "in3"), (27, q1, "out"), (33, q2, "io"),
+                      (39, q1, "io"), (45, q2, "io"), (55, P(AG, {"Staff:plant": 1.0}), "io"), (72, S, "io")],
+             lag={"Fingers.R": 2, "SkirtF": 2, "SkirtB": 2})
+
 def build_anim():
     bpy.ops.wm.open_mainfile(filepath=MODEL_BLEND)
     arm = bpy.data.objects["Priest"]
@@ -518,4 +578,25 @@ if STAGE == "view":
     view_only()
 if STAGE in ("anim", "all"):
     build_anim()
+def build_anim2():
+    """第二版動畫：讀 model.blend → 全部動作（含新增片段）→ 匯出 export_raw/ 未壓縮 GLB＋命中時間表 → 每片段 10 格預覽。"""
+    bpy.ops.wm.open_mainfile(filepath=MODEL_BLEND)
+    arm = bpy.data.objects["Priest"]
+    mesh = bpy.data.objects["PriestMesh"]
+    L.clear_actions(arm)
+    A = L.Animator(arm, base={"Staff:plant": 1.0})
+    A.ground_r = {"*": 0.04, "Hips": 0.15, "Spine": 0.16, "Chest": 0.17, "Neck": 0.08, "Head": 0.10, "SkirtF": 0.02, "SkirtB": 0.02}
+    A.ground_skip = {"Staff", "SkirtF", "SkirtB"}   # 袍襬可貼地，不拿來抬骨盆
+    define_actions(A, L.sym)
+    L.export_glb(OUT_GLB, arm, mesh)
+    L.write_meta(A, NAME, os.path.join(HERE, "export_raw"))
+    cam, _ = L.studio(HEIGHT)
+    A.show(None, 0)
+    L.render_actions(cam, A, TMP, NAME, HEIGHT, frames=10, extra=0.9, res=(400, 420), center=(0.1, 0.0, HEIGHT * 0.45))
+    bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
+
+
+if STAGE == "anim2":
+    build_anim2()
+
 print("DONE", NAME, STAGE)

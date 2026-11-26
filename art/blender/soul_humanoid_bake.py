@@ -526,8 +526,18 @@ def render_actions(arm, H, tiles_dir, cam, n=6, res=(400, 400), az=-32, only=Non
         ad.action = act
         f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])
         for k in range(n):
-            f = round(f0 + (f1 - f0) * k / (n - 1))
+            f = int(round(f0 + (f1 - f0) * k / (n - 1)))
             sc.frame_set(f)
             sc.render.filepath = os.path.join(tiles_dir, f"act_{r:02d}_{name}_{k}_f{f:03d}.png")
             bpy.ops.render.render(write_still=True)
     ad.action = None
+
+
+def write_meta(rig, model, out_dir):
+    """把 rig.meta（各片段時長、命中時間、是否循環）寫成 <out_dir>/<model>.clipmeta.json。"""
+    import json
+    os.makedirs(out_dir, exist_ok=True)
+    p = os.path.join(out_dir, model + ".clipmeta.json")
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(rig.meta, f, ensure_ascii=False, indent=1)
+    print("META", p, flush=True)

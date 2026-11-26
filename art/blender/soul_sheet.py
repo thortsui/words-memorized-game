@@ -23,7 +23,7 @@ if cl:
     sheet.save(os.path.join(outdir, f"{model}_closeup.jpg"), quality=90)
 acts = {}
 for p in sorted(glob.glob(os.path.join(tiles, "act_*.png"))):
-    m = re.match(r"act_(\d+)_(.+)_(\d)_f(\d+)\.png", os.path.basename(p))
+    m = re.match(r"act_(\d+)_(.+)_(\d+)_f(\d+)\.png", os.path.basename(p))
     if m:
         acts.setdefault((int(m.group(1)), m.group(2)), []).append((int(m.group(3)), int(m.group(4)), p))
 rows = []

@@ -12,7 +12,8 @@ except ImportError:
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODELS = os.path.join(ROOT, "public", "models")
-ACTIONS = ["Idle", "Enter", "Telegraph", "Attack", "Attack2", "Hit", "Stagger", "PhaseShift", "Die"]
+ACTIONS = ["Idle", "Enter", "Telegraph", "Attack", "Attack2", "Hit", "Stagger", "PhaseShift", "Die",
+           "Stalk", "StrafeL", "StrafeR", "IdleAggro", "Combo3", "Delayed", "Dash", "Roar"]
 SPEC = {
     "boss_gargoyle.glb": dict(tris=30000, mb=3.0, tex=1024, actions=ACTIONS, sets=2),
     "boss_priest.glb": dict(tris=30000, mb=3.0, tex=1024, actions=ACTIONS, sets=2),

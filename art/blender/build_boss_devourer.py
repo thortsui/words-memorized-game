@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 NAME = "boss_devourer"
 MODEL_BLEND = os.path.join(HERE, "source", NAME + "_model.blend")
 OUT_BLEND = os.path.join(HERE, "source", NAME + ".blend")
-OUT_GLB = os.path.join(ROOT, "public", "models", NAME + ".glb")
+OUT_GLB = os.path.join(HERE, "export_raw", NAME + ".glb")   # 未壓縮原檔；public/models 的壓縮版由 run_anim2.sh 產生
 PREV = os.path.join(HERE, "preview")
 TMP = os.path.join(PREV, "_frames")
 BAKED = os.path.join(HERE, "textures", "baked", NAME)
@@ -524,7 +524,7 @@ def define_actions(A, sym):
     i1 = {"Hips:loc": (0, 0, -0.025), "Spine": (2, 0, 0), "Chest": (-4, 0, 1.5), "Neck": (2, 0, 0), "Head": (3, 0, 5), "Jaw": (5, 0, 0),
           "UpperArm.L": (-3, -3, 0), "ForeArm.L": (-6, 0, 0), "Fingers.L": (-14, 0, 0), "Cloak1": (2, 0, 0), "Cloak2": (2, 0, 2), "Cloak3": (3, 0, 3), "Tabard": (2, 0, 0)}
     i2 = {"Hips:loc": (0, 0, 0.006), "Chest": (1.5, 0, -1), "Head": (-2, 0, -5), "Fingers.L": (12, 0, 0), "UpperArm.L": (2, 2, 0), "Cloak2": (-1, 0, -2), "Cloak3": (-2, 0, -3), "Tabard": (-1, 0, 0)}
-    A.action("Idle", [(1, S), (38, i1), (76, i2), (110, S)], lag=LAG)
+    A.action("Idle", [(1, S), (38, i1), (76, i2), (110, S)], lag=LAG, loop=True)
 
     # ---------------- Enter：垂首佇立→緩緩抬頭、符文手亮起→拔劍→重重頓劍怒吼
     bow = {"Hips:loc": (0, 0.02, -0.10), "Spine": (14, 0, 0), "Chest": (18, 0, 0), "Neck": (16, 0, 0), "Head": (26, 0, 0),
@@ -556,8 +556,9 @@ def define_actions(A, sym):
             "Cloak1": (-20, 0, 0), "Cloak2": (10, 0, 0), "Cloak3": (14, 0, 0), "Tabard": (-18, 0, 0), "Foot.L:ik": (0, -0.5, 0)}
     reb = P(hitp, {"Sword": (-46, 0, 0), "Hips:loc": (0, -0.40, -0.26), "Chest": (17, 0, 14)})
     hold = P(hitp, {"Sword": (-41, 0, 0), "Hips:loc": (0, -0.39, -0.29), "Jaw": (14, 0, 0), "Cloak2": (0, 0, 0), "Cloak3": (0, 0, 0)})
-    A.action("Attack", [(1, TG), (8, ant, "L"), (13, hitp), (17, reb), (21, hold), (34, hold),
-                        (50, {"Hips:loc": (0, -0.18, -0.10), "Spine": (6, 0, 0), "Chest": (6, 0, 0), "UpperArm.R": (-30, 4, 0), "Sword:plant": 0.7, "Foot.L:ik": (0, -0.25, 0.10)}), (66, S)], lag=LAG)
+    A.action("Attack", [(1, TG), (11, ant, "io"), (15, hitp, "in3"), (19, reb, "out3"), (23, hold, "io"), (35, hold),
+                        (51, {"Hips:loc": (0, -0.18, -0.10), "Spine": (6, 0, 0), "Chest": (6, 0, 0), "UpperArm.R": (-30, 4, 0), "Sword:plant": 0.7, "Foot.L:ik": (0, -0.25, 0.10)}, "io"), (68, S, "io")],
+             lag=LAG, hits=[(15, "Hand.R")])
 
     # ---------------- Attack2：符文爪高舉→跪砸地面（右手拄劍支撐）
     lift = {"Hips:loc": (0, 0.10, 0.02), "Spine": (-8, 0, 6), "Chest": (-12, 0, 10), "Head": (-4, 0, -6), "Jaw": (16, 0, 0),
@@ -568,8 +569,9 @@ def define_actions(A, sym):
              "UpperArm.R": (-30, 20, 0), "ForeArm.R": (-10, 0, 0), "Sword:plant": 1.0,
              "Cloak1": (-40, 0, 0), "Cloak2": (10, 0, 0), "Cloak3": (16, 0, 0), "Tabard": (-30, 0, 0), "Foot.L:ik": (0, -0.42, 0), "Foot.R:ik": (0, 0.50, 0.02, 40)}
     smash2 = P(smash, {"Hips:loc": (0, -0.36, -0.69), "Chest": (22, 0, -12), "Cloak2": (0, 0, 0), "Cloak3": (0, 0, 0)})
-    A.action("Attack2", [(1, TG), (12, P(lift, {"Foot.L:ik": (0, -0.12, 0.12)}), "L"), (18, smash), (22, smash2), (26, smash), (40, smash),
-                         (56, {"Hips:loc": (0, -0.15, -0.25), "Spine": (10, 0, 0), "Chest": (8, 0, 0), "UpperArm.L": (-20, 0, 0), "Foot.L:ik": (0, -0.2, 0.06), "Foot.R:ik": (0, 0.2, 0.10)}), (70, S)], lag=LAG)
+    A.action("Attack2", [(1, TG), (14, P(lift, {"Foot.L:ik": (0, -0.12, 0.12)}), "io"), (19, smash, "in3"), (23, smash2, "out"), (27, smash, "io"), (40, smash),
+                         (56, {"Hips:loc": (0, -0.15, -0.25), "Spine": (10, 0, 0), "Chest": (8, 0, 0), "UpperArm.L": (-20, 0, 0), "Foot.L:ik": (0, -0.2, 0.06), "Foot.R:ik": (0, 0.2, 0.10)}, "io"), (70, S, "io")],
+             lag=LAG, hits=[(19, "Fingers.L")])
 
     # ---------------- Hit
     hit = {"Hips:loc": (0, 0.10, -0.04), "Spine": (-6, 0, 5), "Chest": (-9, 0, 8), "Neck": (4, 0, -5), "Head": (10, 0, -14), "Jaw": (18, 0, 0),
@@ -618,6 +620,70 @@ def define_actions(A, sym):
              lag={"Cloak2": 3, "Cloak3": 6, "Fingers.L": 2})
 
 
+    # ================================================================ 第二版新增（壓迫感）：拖劍壓近、繞行、二階段待機、三連擊、延遲重劈、躍斬、咆哮
+    def march(N, stride, lift, d, step=4, lean=6, dz=-0.14, sway=0.05, side=0.0, plant=1.0):
+        keys = []
+        for f in range(0, N + 1, step):
+            ph = (f / N) % 1.0
+            gl = L.gait(ph, stride, lift, 0.36, d, pitch=10)
+            gr = L.gait(ph + 0.5, stride, lift, 0.36, d, pitch=10)
+            s2 = math.sin(2 * math.pi * ph)
+            c2 = math.cos(2 * math.pi * ph)
+            bob = -0.035 * math.cos(4 * math.pi * (ph - 0.06))
+            pose = {"Hips:loc": (sway * math.sin(2 * math.pi * (ph - 0.15)), -0.02, dz + bob), "Hips": (lean, 3 * s2 + side, 5 * s2),
+                    "Spine": (lean * 0.6, -2 * s2, -3 * s2), "Chest": (lean * 0.5, 0, -5 * s2), "Neck": (-4, 0, 0), "Head": (-6, -side, 3 * s2),
+                    "Jaw": (8 + 4 * abs(c2), 0, 0),
+                    "UpperArm.L": (-22 - 14 * s2 * abs(d[1]), -8, 0), "ForeArm.L": (-26, 0, 0), "Fingers.L": (-12 + 10 * c2, 0, 0),
+                    "UpperArm.R": (-6 + 6 * s2 * abs(d[1]), 4, 0), "Sword:plant": plant,
+                    "Cloak1": (5, 0, 0), "Cloak2": (5 + 4 * s2, 0, 3 * c2), "Cloak3": (7, 0, 5 * s2), "Tabard": (4 * s2 * abs(d[1]), 0, 3 * s2 * abs(d[0])),
+                    "Foot.L:ik": gl, "Foot.R:ik": gr}
+            keys.append((f, pose))
+        return keys
+    # Stalk：巨劍劍尖拖地，沉重地一步步逼近
+    A.action("Stalk", march(56, 0.58, 0.11, (0, -1), lean=8), lag=LAG, loop=True)
+    A.action("StrafeL", march(48, 0.40, 0.09, (1, 0), lean=5, side=-4, sway=0.06), lag=LAG, loop=True)
+    A.action("StrafeR", march(48, 0.40, 0.09, (-1, 0), lean=5, side=4, sway=0.06), lag=LAG, loop=True)
+
+    # ---------------- IdleAggro：沉身前壓、左爪符文手舉在胸前張合、下顎咬合、披風翻動
+    AG = {"Hips:loc": (0, -0.06, -0.20), "Hips": (8, 0, -6), "Spine": (8, 0, -4), "Chest": (8, 0, -6), "Neck": (-6, 0, 4), "Head": (-10, 0, 6), "Jaw": (18, 0, 0),
+          "UpperArm.L": (-54, -16, 0), "ForeArm.L": (-34, 0, 0), "Hand.L": (-20, 0, 0), "Fingers.L": (-30, 0, 0),
+          "UpperArm.R": (-14, 8, 0), "Sword:plant": 1.0, "Cloak1": (8, 0, 0), "Cloak2": (6, 0, 0), "Cloak3": (6, 0, 0), "Tabard": (-6, 0, 0)}
+    ag1 = P(AG, {"Hips:loc": (0.05, -0.07, -0.23), "Chest": (10, 3, -10), "Head": (-14, 0, 12), "Jaw": (32, 0, 0), "Fingers.L": (-8, 0, 0), "Cloak2": (10, 0, 4)})
+    ag2 = P(AG, {"Hips:loc": (-0.05, -0.07, -0.23), "Chest": (10, -3, -2), "Head": (-14, 0, -2), "Jaw": (8, 0, 0), "Fingers.L": (-40, 0, 0), "Cloak2": (10, 0, -4)})
+    A.action("IdleAggro", [(0, AG), (10, ag1, "io"), (20, P(AG, {"Jaw": (6, 0, 0)}), "io"), (32, ag2, "io"), (42, P(AG, {"Jaw": (26, 0, 0)}), "io"), (52, AG, "io")],
+             lag=LAG, loop=True)
+
+    # ---------------- Combo3：過肩斜劈（快）→ 左爪橫撈（更快）→ 停頓、符文爪高舉 → 跪砸地面（重）
+    windL = P(reb, {"Chest": (14, 0, 22), "Spine": (10, 0, 12), "UpperArm.L": (-64, -64, 0), "ForeArm.L": (-30, 0, 0), "Hand.L": (-10, 0, 0), "Fingers.L": (-34, 0, 0),
+                    "Head": (-12, 0, -16)})
+    clawL = P(reb, {"Chest": (16, 0, -20), "Spine": (12, 0, -10), "UpperArm.L": (-86, 24, 0), "ForeArm.L": (-14, 0, 0), "Hand.L": (10, 0, 0), "Fingers.L": (10, 0, 0),
+                    "Head": (-14, 0, 14)})
+    clawL2 = P(clawL, {"Chest": (16, 0, -28), "UpperArm.L": (-74, 40, 0)})
+    srec = {"Hips:loc": (0, -0.15, -0.25), "Spine": (10, 0, 0), "Chest": (8, 0, 0), "UpperArm.L": (-20, 0, 0), "Foot.L:ik": (0, -0.2, 0.06), "Foot.R:ik": (0, 0.2, 0.10)}
+    A.action("Combo3", [(0, S), (10, TG, "io"), (16, ant, "io"), (20, hitp, "in3"), (24, reb, "out3"), (29, windL, "io"), (33, clawL, "in3"), (37, clawL2, "out3"),
+                        (50, P(lift, {"Foot.L:ik": (0, -0.12, 0.12)}), "io"), (58, P(lift, {"Hips:loc": (0, 0.12, 0.04), "Foot.L:ik": (0, -0.14, 0.14)}), "io"),
+                        (62, smash, "in3"), (66, smash2, "out3"), (80, smash, "io"), (94, srec, "io"), (112, S, "io")],
+             lag=LAG, hits=[(20, "Hand.R"), (33, "Fingers.L"), (62, "Fingers.L")])
+
+    # ---------------- Delayed：巨劍高舉後懸停約 0.9 秒（再往後蓄一點），才全力劈下
+    antH = P(ant, {"UpperArm.R": (-142, 28, 0), "Sword": (-70, 0, 0), "Hips:loc": (0, 0.19, -0.05), "Chest": (-16, 0, -22)})
+    arec = {"Hips:loc": (0, -0.18, -0.10), "Spine": (6, 0, 0), "Chest": (6, 0, 0), "UpperArm.R": (-30, 4, 0), "Sword:plant": 0.7, "Foot.L:ik": (0, -0.25, 0.10)}
+    A.action("Delayed", [(0, S), (12, TG, "io"), (20, TG2, "io"), (26, ant, "io"), (40, antH, "io"), (52, P(antH, {"UpperArm.R": (-146, 29, 0), "Jaw": (24, 0, 0)}), "io"),
+                         (56, hitp, "in3"), (60, reb, "out3"), (74, hold, "io"), (88, arec, "io"), (106, S, "io")], lag=LAG, hits=[(56, "Hand.R")])
+
+    # ---------------- Dash：短起手（沉身舉劍）→ 跨步躍斬 → 劍砸地 → 拔起
+    crD = P(TG, {"Hips:loc": (0, 0.14, -0.24), "Spine": (6, 0, -10), "Chest": (2, 0, -14), "Foot.R:ik": (0, 0.12, 0)})
+    hitD = P(hitp, {"Hips:loc": (0, -0.66, -0.36), "Foot.L:ik": (0, -0.72, 0), "Foot.R:ik": (0, -0.10, 0)})
+    rebD = P(reb, {"Hips:loc": (0, -0.68, -0.32), "Foot.L:ik": (0, -0.72, 0), "Foot.R:ik": (0, -0.10, 0)})
+    A.action("Dash", [(0, S), (8, crD, "io"), (13, hitD, "in3"), (17, rebD, "out3"), (30, rebD, "io"),
+                      (46, P(arec, {"Hips:loc": (0, -0.30, -0.14), "Foot.L:ik": (0, -0.36, 0.08)}), "io"), (64, S, "io")],
+             lag=LAG, hits=[(13, "Hand.R")])
+
+    # ---------------- Roar：蜷身 → 雙臂大張、仰首咆哮、披風揚起（顫抖）→ 頓劍回戒備
+    A.action("Roar", [(0, S), (14, curl, "io"), (20, P(curl, {"Hips:loc": (0, 0.02, -0.26), "Chest": (25, 0, 0)}), "io"), (24, burst, "in3"), (30, q1, "out"),
+                      (36, q2, "io"), (42, q1, "io"), (48, q2, "io"), (58, P(AG, {"Jaw": (30, 0, 0)}), "io"), (78, S, "io")],
+             lag={"Fingers.L": 2, "Cloak2": 2, "Cloak3": 4, "Tabard": 2})
+
 def render_all(A=None):
     cam, _ = L.studio(HEIGHT)
     if A:
@@ -630,6 +696,7 @@ def render_all(A=None):
     L.aim(cam, (0.05, 0, 2.70), 3.6, -25, 4)
     L.render(os.path.join(TMP, NAME + "_close.png"), (900, 760))
     return cam
+
 
 
 def build_anim():
@@ -654,4 +721,25 @@ if STAGE == "view":
     render_all()
 if STAGE in ("anim", "all"):
     build_anim()
+def build_anim2():
+    """第二版動畫：讀 model.blend → 全部動作（含新增片段）→ 匯出 export_raw/ 未壓縮 GLB＋命中時間表 → 每片段 10 格預覽。"""
+    bpy.ops.wm.open_mainfile(filepath=MODEL_BLEND)
+    arm = bpy.data.objects["Devourer"]
+    mesh = bpy.data.objects["DevourerMesh"]
+    L.clear_actions(arm)
+    A = L.Animator(arm, base={"Sword:plant": 1.0})
+    A.ground_r = {"*": 0.05, "Hips": 0.24, "Spine": 0.26, "Chest": 0.30, "Neck": 0.14, "Head": 0.14, "Jaw": 0.06, "Cloak1": 0.04, "Cloak2": 0.03, "Cloak3": 0.03, "Tabard": 0.03}
+    A.ground_skip = {"Sword", "Cloak1", "Cloak2", "Cloak3", "Tabard"}   # 布料可貼地，不拿來抬骨盆
+    define_actions(A, L.sym)
+    L.export_glb(OUT_GLB, arm, mesh)
+    L.write_meta(A, NAME, os.path.join(HERE, "export_raw"))
+    cam, _ = L.studio(HEIGHT)
+    A.show(None, 0)
+    L.render_actions(cam, A, TMP, NAME, HEIGHT, frames=10, extra=1.0, res=(400, 420), center=(0, 0.0, HEIGHT * 0.42))
+    bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
+
+
+if STAGE == "anim2":
+    build_anim2()
+
 print("DONE", NAME, STAGE)

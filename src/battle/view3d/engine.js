@@ -49,15 +49,23 @@ export function createEngine(container,{reducedMotion=false}={}){
   // 取消某個物件身上還在跑的補間（直接結束，不跳到終點）
   E.kill=obj=>{for(const tw of tweens)if(tw.target===obj&&!tw.done){tw.done=true;tw.res()}};
 
-  /* ---------- 每幀更新 ---------- */
-  const updaters=new Set();
-  E.onUpdate=fn=>{updaters.add(fn);return()=>updaters.delete(fn)};
+  /* ---------- 每幀更新 ----------
+     order：小的先跑。場景的走位邏輯（-20〜-10）→ 角色（0：動畫混合器、陰影跟腳）→ 特效（50）→ 鏡頭（100）。
+     原本依註冊順序跑：Boss 比鏡頭晚建立，鏡頭會用到上一格的 Boss 位置，陰影也會落後主角一格（走位時腳下會抖）。 */
+  let updaters=[],updN=0;
+  E.onUpdate=(fn,order=0)=>{const u={fn,order,n:updN++};updaters.push(u);updaters.sort((a,b)=>a.order-b.order||a.n-b.n);return()=>{u.dead=true;updaters=updaters.filter(x=>x!==u)}};
 
-  /* ---------- 頓格／局部慢動作／震動 ---------- */
-  let freezeUntil=0,slowUntil=0,slowK=1,shakeAmp=0,shakeDur=0,shakeT=0;
+  /* ---------- 頓格／局部慢動作／震動 ----------
+     頓格（hitStop）：命中那一刻時間幾乎停住 60–150ms（輕擊短、重擊長）。
+     震動：平滑的多頻正弦雜訊（不是每格亂跳的白雜訊）＋輕微滾轉，強度依重量分級；freq 越低越「沉」。
+     rumble：低頻、持續的晃動（咆哮、巨獸踏步）。prefers-reduced-motion 時震動、頓格、局部慢動作全部關掉。 */
+  let freezeUntil=0,slowUntil=0,slowFrom=0,slowK=1;
+  const shakes=[]; // {amp, dur, t, freq, roll, ph}
   E.hitStop=ms=>{if(reducedMotion)return;freezeUntil=Math.max(freezeUntil,performance.now()+ms)};
-  E.slowmo=(k,ms)=>{if(reducedMotion)return;slowK=k;slowUntil=performance.now()+ms};
-  E.shake=(amp,dur=.3)=>{if(reducedMotion)return;if(amp>=shakeAmp*(1-shakeT/Math.max(.001,shakeDur))){shakeAmp=amp;shakeDur=dur;shakeT=0}};
+  E.slowmo=(k,ms)=>{if(reducedMotion)return;slowK=k;slowFrom=performance.now();slowUntil=slowFrom+ms};
+  E.shake=(amp,dur=.3,o={})=>{if(reducedMotion||amp<=0)return;if(shakes.length>5)shakes.shift();
+    shakes.push({amp,dur,t:0,freq:o.freq||(amp>.08?14:22),roll:o.roll==null?amp*.35:o.roll,ph:[rand(0,9),rand(0,9),rand(0,9),rand(0,9)],dir:o.dir||null})};
+  E.rumble=(amp,dur=1)=>E.shake(amp,dur,{freq:7,roll:amp*.5});
 
   /* ---------- 尺寸 ---------- */
   E.resize=()=>{const w=Math.max(1,container.clientWidth),h=Math.max(1,container.clientHeight);
@@ -90,14 +98,20 @@ export function createEngine(container,{reducedMotion=false}={}){
     if(lowCount>=2){lowCount=0;degrade(E.fps<22)}}
 
   /* ---------- 主迴圈 ---------- */
-  let raf=0,last=0;
-  const shakeOff=new THREE.Vector3();
+  let raf=0,last=0,avgDt=1/60,tsNow=1;
+  const shakeOff=new THREE.Vector3(),camQ=new THREE.Quaternion();
   function frame(now){raf=requestAnimationFrame(frame);
-    let rdt=(now-last)/1000;last=now;if(rdt<=0)return;const real=Math.min(rdt,1);if(rdt>.1)rdt=.1;
+    let rdt=(now-last)/1000;last=now;if(rdt<=0)return;const real=Math.min(rdt,1);
+    // 幀時間尖峰：偶發的長幀（GC、shader 編譯、DOM 重排）不要讓動作一次跳一大段——上限是平均幀長的 1.6 倍（至少 1/20 秒、最多 0.1 秒）。
+    // 真的一直很慢的裝置平均幀長會跟著變大，遊戲時間仍和真實時間一致。
+    const cap=Math.max(.05,Math.min(.1,avgDt*1.6));avgDt+=(Math.min(rdt,.25)-avgDt)*.08;if(rdt>cap)rdt=cap;
     fpsTick(rdt,real);
     if(E.paused){renderer.render(scene,camera);return} // 暫停：畫面留著，時間不走
-    let k=E.timeScale*(E.fast||1); // fast：跳過演出時的快轉倍率
-    if(E.fast>1)rdt=Math.min(rdt,.034);if(now<freezeUntil)k*=.02;else if(now<slowUntil)k*=slowK;
+    // 時間倍率不直接跳：指令選單的慢動作、出招時的 0.85 倍都在約 0.1 秒內滑過去
+    tsNow+=(E.timeScale-tsNow)*(1-Math.exp(-rdt*14));if(Math.abs(E.timeScale-tsNow)<.002)tsNow=E.timeScale;
+    let k=tsNow*(E.fast||1); // fast：跳過演出時的快轉倍率
+    // 局部慢動作：最後 35% 的時間平滑回到正常速度（不會突然恢復）
+    if(E.fast>1)rdt=Math.min(rdt,.034);if(now<freezeUntil)k*=.02;else if(now<slowUntil){const r=(now-slowFrom)/Math.max(1,slowUntil-slowFrom);k*=r<.65?slowK:lerp(slowK,1,ease.io((r-.65)/.35))}
     const dt=rdt*k;E.time+=dt;E.dt=dt;E.rdt=rdt;
     // 補間
     const n=tweens.length;let anyDone=false;
@@ -106,12 +120,17 @@ export function createEngine(container,{reducedMotion=false}={}){
       if(tw.fn){try{tw.fn(tw.ez(r),r)}catch(e){console.warn("[view3d] tween",e);tw.done=true;tw.res();anyDone=true;continue}}
       if(r>=1){tw.done=true;anyDone=true;tw.res()}}
     if(anyDone)tweens=tweens.filter(t=>!t.done);
-    for(const f of updaters)f(dt,rdt,E.time);
-    // 震動：只在這一幀暫時偏移鏡頭
-    let sh=false;
-    if(shakeAmp>0){shakeT+=rdt;const kk=1-shakeT/shakeDur;if(kk<=0)shakeAmp=0;else{sh=true;shakeOff.set(rand(-1,1),rand(-1,1),rand(-1,1)).multiplyScalar(shakeAmp*kk);camera.position.add(shakeOff)}}
+    for(const u of updaters)if(!u.dead)u.fn(dt,rdt,E.time);
+    // 震動：只在這一幀暫時偏移／滾轉鏡頭（畫完就還原，不影響鏡頭的阻尼計算）
+    let sh=false,roll=0;shakeOff.set(0,0,0);
+    for(let i=shakes.length-1;i>=0;i--){const s=shakes[i];s.t+=rdt;const r=s.t/s.dur;if(r>=1){shakes.splice(i,1);continue}
+      const env=(1-r)*(1-r)*Math.min(1,s.t*40),w=s.freq*Math.PI*2*s.t,a=s.amp*env; // 起音 25ms、平方衰減
+      const nx=Math.sin(w+s.ph[0])*.6+Math.sin(w*2.3+s.ph[1])*.4,ny=Math.sin(w*1.1+s.ph[2])*.6+Math.sin(w*1.9+s.ph[3])*.4;
+      if(s.dir){shakeOff.addScaledVector(s.dir,a*Math.sin(w*.5+s.ph[0]))}
+      shakeOff.x+=nx*a;shakeOff.y+=ny*a*.8;roll+=Math.sin(w*.7+s.ph[1])*s.roll*env;sh=true}
+    if(sh){camQ.copy(camera.quaternion);shakeOff.applyQuaternion(camera.quaternion);camera.position.add(shakeOff);if(roll)camera.rotateZ(roll*.25)}
     renderer.render(scene,camera);
-    if(sh)camera.position.sub(shakeOff)}
+    if(sh){camera.position.sub(shakeOff);camera.quaternion.copy(camQ)}}
   const start=()=>{if(raf||E.dead)return;last=performance.now();raf=requestAnimationFrame(frame)};
   const stop=()=>{cancelAnimationFrame(raf);raf=0};
   // 頁面隱藏時暫停渲染（動畫也跟著停，回來再接著播）
@@ -139,7 +158,7 @@ export function createEngine(container,{reducedMotion=false}={}){
     document.removeEventListener("visibilitychange",onVis);window.removeEventListener("resize",onWinResize);ro&&ro.disconnect();
     canvas.removeEventListener("webglcontextlost",onLost);canvas.removeEventListener("webglcontextrestored",onRestored);
     const tw=tweens;tweens=[];for(const t of tw)if(!t.done){t.done=true;t.res()}
-    updaters.clear();
+    updaters=[];
     try{E.disposeObject(scene)}catch(e){}
     if(scene.background&&scene.background.isTexture)scene.background.dispose();
     for(const o of extra){try{o.dispose&&o.dispose()}catch(e){}}

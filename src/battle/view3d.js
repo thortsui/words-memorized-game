@@ -21,7 +21,7 @@ import { mountText } from './view3d/textview.js';
 export const EVENTS={
   common:["skill","hit","playerHit","faint","heal","win","lose"],
   monster:["enter","gain","hold","chainStart","chainCharge","chainFire","chainStage","chainDone","chainBreak","foeAttack"],
-  soul:["bossEnter","playerTurn","atb","miss","quickSlash","windowEnd","bossPhase","enemyTurn","telegraph","parry","counter","dodge","guard","graze","foeHit"],
+  soul:["bossEnter","playerTurn","atb","miss","quickSlash","windowEnd","bossPhase","enemyTurn","telegraph","parry","counter","deflect","delayRelease","dodge","guard","graze","foeHit","flaskStart","drink","spill","flaskPunish","flaskRefill","ambush","ambushEnd"],
 };
 
 // 先用一個丟棄式 canvas 確認 WebGL 能用，不能用就不必下載 three.js

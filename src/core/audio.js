@@ -11,9 +11,14 @@ export const VOL={
 let actx=null;
 function ac(){actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume();return actx}
 
-export function sfx(t){try{const c=ac(),n=c.currentTime;
-  const tone=(f1,f2,d,type,v,at=0)=>{const o=c.createOscillator(),gg=c.createGain();o.type=type;o.frequency.setValueAtTime(f1,n+at);o.frequency.exponentialRampToValueAtTime(f2,n+at+d);gg.gain.setValueAtTime(v*VOL.sfx,n+at);gg.gain.exponentialRampToValueAtTime(.001,n+at+d);o.connect(gg);gg.connect(c.destination);o.start(n+at);o.stop(n+at+d)};
-  const noise=(d,v,at=0)=>{const b=c.createBuffer(1,c.sampleRate*d,c.sampleRate),a=b.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=(Math.random()*2-1)*(1-i/a.length);const s=c.createBufferSource(),gg=c.createGain();s.buffer=b;gg.gain.value=v*VOL.sfx;s.connect(gg);gg.connect(c.destination);s.start(n+at)};
+// o.v：這一聲的音量倍率（0–1，只會更小聲）；o.low：swoosh 用較低沉的版本（Boss 揮擊）
+export function sfx(t,o={}){try{const c=ac(),n=c.currentTime,ov=Math.max(0,Math.min(1,o.v==null?1:o.v));
+  const tone=(f1,f2,d,type,v,at=0)=>{const o=c.createOscillator(),gg=c.createGain();o.type=type;o.frequency.setValueAtTime(f1,n+at);o.frequency.exponentialRampToValueAtTime(f2,n+at+d);gg.gain.setValueAtTime(v*VOL.sfx*ov,n+at);gg.gain.exponentialRampToValueAtTime(.001,n+at+d);o.connect(gg);gg.connect(c.destination);o.start(n+at);o.stop(n+at+d)};
+  const noise=(d,v,at=0)=>{const b=c.createBuffer(1,c.sampleRate*d,c.sampleRate),a=b.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=(Math.random()*2-1)*(1-i/a.length);const s=c.createBufferSource(),gg=c.createGain();s.buffer=b;gg.gain.value=v*VOL.sfx*ov;s.connect(gg);gg.connect(c.destination);s.start(n+at)};
+  // 濾波雜訊：type＝lowpass／bandpass，f1→f2 掃頻，起音 a 秒（破風聲、咆哮的氣聲、踏步的悶響）
+  const fnoise=(d,v,type,f1,f2,q=1,at=0,a=.01)=>{const b=c.createBuffer(1,Math.ceil(c.sampleRate*d),c.sampleRate),ch=b.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1;
+    const s=c.createBufferSource(),f=c.createBiquadFilter(),gg=c.createGain();s.buffer=b;f.type=type;f.Q.value=q;f.frequency.setValueAtTime(f1,n+at);f.frequency.exponentialRampToValueAtTime(f2,n+at+d);
+    gg.gain.setValueAtTime(.0001,n+at);gg.gain.linearRampToValueAtTime(v*VOL.sfx*ov,n+at+a);gg.gain.exponentialRampToValueAtTime(.001,n+at+d);s.connect(f);f.connect(gg);gg.connect(c.destination);s.start(n+at);s.stop(n+at+d+.02)};
   if(t==="shot")tone(300,1200,.18,"square",.08);
   if(t==="hit"){noise(.25,.35,.0);tone(180,40,.3,"sine",.5)}
   if(t==="crit"){noise(.4,.45);tone(220,30,.5,"sawtooth",.25);tone(880,1760,.25,"square",.08,.05)}
@@ -21,7 +26,13 @@ export function sfx(t){try{const c=ac(),n=c.currentTime;
   if(t==="parry"){tone(1400,2400,.12,"square",.1);noise(.12,.3)}
   if(t==="faint")tone(600,60,.9,"triangle",.3);
   if(t==="win")[523,659,784,1047].forEach((f,i)=>tone(f,f,.22,"square",.08,i*.12));
-  if(t==="lose")[392,330,262,196].forEach((f,i)=>tone(f,f*.98,.3,"triangle",.2,i*.2));}catch(e){}}
+  if(t==="lose")[392,330,262,196].forEach((f,i)=>tone(f,f*.98,.3,"triangle",.2,i*.2));
+  // 魂系用的重低音（音量都不超過既有的 hit：正弦 0.5）
+  if(t==="step"){tone(72,38,.28,"sine",.32);fnoise(.16,.12,"lowpass",420,90,.7)}             // 巨獸踏步
+  if(t==="swoosh"){if(o.low)fnoise(.32,.2,"bandpass",260,1300,1.4,0,.12);else fnoise(.2,.16,"bandpass",900,3200,1.6,0,.07)} // 揮擊破風
+  if(t==="heavy"){tone(110,32,.55,"sine",.45);fnoise(.35,.18,"lowpass",900,120,.8)}         // 重擊、落地
+  if(t==="roar"){tone(92,58,1.2,"sawtooth",.1);tone(61,44,1.3,"sine",.34);fnoise(1.1,.2,"bandpass",380,180,2.2,0,.18)} // 咆哮
+}catch(e){}}
 
 /* 配樂：兩套主題，音量都由 VOL 控制
    bright（打怪）：C 大調，每步 0.2 秒，64 步循環；方波主旋律、三角波低音、hi-hat、大鼓

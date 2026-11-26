@@ -1,0 +1,5 @@
+// 精簡輸出：node tests/sim/brief.mjs [N]（數值用目前 data.js；可用 SIMSET 環境變數覆寫 JSON：{"SOUL":{...},"B":[{...},...]}）
+import { SOUL, SOUL_BOSSES } from '../../src/battle/data.js';
+const o = process.env.SIMSET ? JSON.parse(process.env.SIMSET) : {}; Object.assign(SOUL, o.SOUL || {}); (o.B || []).forEach((b, i) => b && Object.assign(SOUL_BOSSES[i], b));
+const { PLAYERS, batch } = await import('./soul-sim-lib.mjs'); const N = +process.argv[2] || 1000;
+for (const [n, p] of Object.entries(PLAYERS)) { const r = batch(p, {}, N); if (process.env.SHORT) { console.log(n.slice(0, 6).padEnd(8), `win ${String(r['win%']).padStart(3)}% kills ${r.kills} hurtWin ${r.hurtWin}% rol ${r.dodge} grd ${r.guard} hpLost ${r.hpLost} drink ${r.drinks}/${r.spills} amb ${r.ambush}/${r.ambushHit} pun ${r.punish} sec ${r.sec} winSec ${r.winSec}`); continue } console.log(n.padEnd(16), `win ${String(r['win%']).padStart(3)}% kills ${r.kills} eT ${r.eTurnsPerBoss} atk ${r.atk} par ${r.parry} rol ${r.dodge} grd ${r.guard} grz ${r.graze} hit ${r.hit} chainHit ${r.chainHits} dng ${r.dangerHit} fl ${r.flinch} hpLost ${r.hpLost} hurtWin ${r.hurtWin}% minSta ${r.minSta} sec ${r.sec} winSec ${r.winSec}`) }

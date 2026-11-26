@@ -258,6 +258,8 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .v3-vig.blue{background:radial-gradient(ellipse at center,rgb(40 110 220/.1) 20%,rgb(24 80 190/.72) 100%);transition:opacity .25s}
 .v3-vig.white{background:#fff}
 .v3-vig.dark{background:radial-gradient(ellipse at center,rgb(0 0 0/.2) 30%,rgb(0 0 0/.9) 100%);transition:opacity 1.5s}
+.v3-vig.danger{background:radial-gradient(ellipse at center,rgb(150 0 0/.22) 0%,rgb(120 0 0/.35) 45%,rgb(210 12 0/.9) 100%)} /* 魂系必殺：全畫面泛紅 */
+.v3-banner.soul.danger span{color:#ff5a40;font-weight:900;letter-spacing:.5em}
 @media(max-width:480px){.v3-t{font-size:17px}.v3-t.dmg{font-size:22px}.v3-t.dmg.big{font-size:30px}.v3-t.ono{font-size:18px}.v3-t.ono.big{font-size:24px}}
 
 /* ---------- 戰鬥介面修正（第一輪試玩回報） ---------- */
@@ -339,7 +341,7 @@ body.soulmode{background:#0a0b0e;color:#d9d4c8}
 .bopts button.long{font-size:12.5px;line-height:1.2}
 /* 魂系指令列：題目卡下面的一排，不蓋戰場 */
 .cmdrow{margin-top:6px}.cmdhead{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:#7fb4ff;letter-spacing:.06em;margin-bottom:4px}.cmdhead b{font-weight:600;color:var(--ink)}
-.cmds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.cmds{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
 .cmds button{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-height:50px;padding:4px 7px;font-size:13px;line-height:1.2;background:#191a1f;color:var(--ink);border:1px solid #5a5548;border-radius:2px;text-align:left}
 .cmds button b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.cmds button .k{display:none}.cmds button .c{font:600 10px Lexend,"Noto Sans TC";color:#c9a24a;white-space:nowrap}
 .cmds button.big{border-color:#c9a24a}.cmds button.skip{border-style:dashed}.cmds button:disabled{opacity:.35}
@@ -467,3 +469,21 @@ body:has(#pauseov) #bq,body.inbattle:has(#modal:not(.hide)) #bq{filter:blur(12px
 @media(orientation:landscape) and (max-height:520px){.bqcard>.row:has(>.ex){margin-top:3px!important;padding-top:3px!important}.bqcard .ex{font-size:14px!important}.bwrap.soul .bqcard{padding:6px 10px}}
 /* 橫式、已作答：例句列收起來（答案列上還有「例句」喇叭），答案列與「繼續」才放得下 */
 @media(orientation:landscape) and (max-height:520px){.bwrap.ans .bqcard>.row:has(>.ex){display:none}}
+/* 魂系：延遲攻擊的選項鎖定、突進／必殺的提示 */
+.bopts.locked button{opacity:.42;filter:saturate(.3);cursor:not-allowed}
+.bopts.shake{animation:vshake .28s}
+@keyframes vshake{20%{transform:translateX(-6px)}45%{transform:translateX(5px)}70%{transform:translateX(-3px)}100%{transform:none}}
+.lockb{position:relative;height:18px;margin:0 0 6px;border:1px solid #7d7566;background:#17171a;overflow:hidden}
+.lockb i{position:absolute;inset:0;display:block;background:linear-gradient(90deg,#5a1e18,#a8322a);transform-origin:left}
+.lockb span{position:relative;display:block;text-align:center;font:600 11px/16px "Noto Sans TC",sans-serif;letter-spacing:.12em;color:#f0d8c8}
+.bwrap.soul .chainq.k-dash{box-shadow:0 0 0 2px #e0311f,0 0 22px rgb(224 49 31/.55)}
+.bwrap.soul .chainq.k-dash .stime i{background:linear-gradient(90deg,#d8442e,#ff5a40)}
+.bwrap.soul .chainq.k-danger{box-shadow:0 0 0 2px #ff2a10,0 0 30px rgb(255 30 10/.7);animation:dangerpulse .6s ease-in-out infinite alternate}
+@keyframes dangerpulse{to{box-shadow:0 0 0 2px #ff6a40,0 0 44px rgb(255 30 10/.85)}}
+.msgbox.danger,.msgbox.dash{color:#ff6a50;font-weight:800}
+@media (prefers-reduced-motion:reduce){.bwrap.soul .chainq.k-danger{animation:none}.bopts.shake{animation:none}}
+/* 魂系：藥壺、突襲 */
+.cmdrow .cmds button.flask b{color:#e8b070}.cmds button .c{overflow:hidden;text-overflow:ellipsis;max-width:100%}.cmdrow .cmds button.flask:not([disabled]){box-shadow:inset 0 0 0 1px #a8643a}
+.bwrap.soul .flaskq{box-shadow:0 0 0 1px #a8643a,0 0 14px rgb(200 120 60/.35)}
+.bwrap.soul .chainq.k-ambush{box-shadow:0 0 0 2px #ff3a20,0 0 26px rgb(255 40 20/.7)}
+.pflask{color:#e8b070;white-space:nowrap}

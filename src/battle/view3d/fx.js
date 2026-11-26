@@ -77,7 +77,7 @@ export function createFx(eng,{soul=false}={}){
   const add=makePool(eng,soul?700:500,true),norm=makePool(eng,400,false);
   const setScale=()=>{const s=eng.height*eng.dpr*.5/Math.tan(camera.fov*Math.PI/360);add.mat.uniforms.uScale.value=s;norm.mat.uniforms.uScale.value=s};
   eng.onResize.push(setScale);
-  eng.onUpdate(dt=>{add.update(dt);norm.update(dt)});
+  eng.onUpdate(dt=>{add.update(dt);norm.update(dt)},50);
   const glowTex=eng.track(glowTexture()),blobTex=eng.track(blobTexture()),circTex=eng.track(circleTexture()),beamTex=eng.track(beamTexture());
   const G={
     arc:new THREE.RingGeometry(.72,1,28,1,0,Math.PI*.95),
@@ -120,7 +120,7 @@ export function createFx(eng,{soul=false}={}){
   function banner(str,cls="",dur=1.1){if(eng.dead)return Promise.resolve();const el=document.createElement("div");el.className="v3-banner "+cls;el.innerHTML="<span></span>";el.firstChild.textContent=str;el.style.opacity=0;eng.overlay.appendChild(el);
     return eng.tween(dur,(k,r)=>{const a=r<.18?ease.out(r/.18):r>.8?1-(r-.8)/.2:1;el.style.opacity=a;el.style.transform=`translateX(${((1-Math.min(1,r/.18))*-40+(r>.8?(r-.8)*200:0)).toFixed(1)}px)`},ease.lin,{real:true}).then(()=>el.remove())}
   // 全畫面暈影（紅：危險／受傷，藍：慢動作，白：閃光，暗：天色轉暗），由程式直接設不透明度
-  const vig={};for(const k of ["red","blue","white","dark"]){const el=document.createElement("div");el.className="v3-vig "+k;eng.overlay.appendChild(el);vig[k]=el}
+  const vig={};for(const k of ["red","blue","white","dark","danger"]){const el=document.createElement("div");el.className="v3-vig "+k;eng.overlay.appendChild(el);vig[k]=el}
   const setVig=(k,a)=>{vig[k].style.opacity=a};
   const pulseVig=(k,a,dur=.4)=>eng.rm&&k==="white"?Promise.resolve():eng.tween(dur,(kk,r)=>setVig(k,a*(1-r)),ease.lin,{real:true});
 

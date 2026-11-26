@@ -19,9 +19,10 @@ NOANIM = "--noanim" in argv
 ONLY = argv[argv.index("--only") + 1].split(",") if "--only" in argv else None
 MODEL = "hero_knight"
 ROOT = os.path.dirname(os.path.dirname(HERE))
-OUT_GLB = os.path.join(ROOT, "public", "models", MODEL + ".glb")
+OUT_GLB = os.path.join(HERE, "export_raw", MODEL + ".glb")   # 未壓縮原檔；遊戲用的壓縮版由 run_soul.sh 以 gltf-transform 產生
 OUT_BLEND = os.path.join(HERE, "source", MODEL + ".blend")
 TILES = os.path.join(HERE, "preview", "_tiles", MODEL)
+NOVIEWS = "--noviews" in argv
 
 reset_scene()
 body = Body(H=1.8, bulk=1.0, wf=1.0, head=0.235)
@@ -191,9 +192,13 @@ if not NOANIM:
 
 if not ONLY:
     BK.export_glb(arm, mesh, OUT_GLB)
+    BK.write_meta(rig, MODEL, os.path.join(HERE, "export_raw"))
     bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
 print("TRIS_FINAL", BK.tri_count(mesh), flush=True)
-cam = BK.render_views(arm, body.H, TILES)
+if NOVIEWS:
+    cam = BK.setup_preview(body.H)
+else:
+    cam = BK.render_views(arm, body.H, TILES)
 if not NOANIM:
-    BK.render_actions(arm, body.H, TILES, cam, only=ONLY)
+    BK.render_actions(arm, body.H, TILES, cam, n=10, only=ONLY)
 print("DONE", MODEL, flush=True)

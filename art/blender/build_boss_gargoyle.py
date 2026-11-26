@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 NAME = "boss_gargoyle"
 MODEL_BLEND = os.path.join(HERE, "source", NAME + "_model.blend")
 OUT_BLEND = os.path.join(HERE, "source", NAME + ".blend")
-OUT_GLB = os.path.join(ROOT, "public", "models", NAME + ".glb")
+OUT_GLB = os.path.join(HERE, "export_raw", NAME + ".glb")   # 未壓縮原檔；public/models 的壓縮版由 run_anim2.sh 產生
 PREV = os.path.join(HERE, "preview")
 TMP = os.path.join(PREV, "_frames")
 BAKED = os.path.join(HERE, "textures", "baked", NAME)
@@ -273,7 +273,7 @@ def define_actions(A, sym):
            sym({"UpperArm": (0, -4, 0), "Fingers": (10, 0, 0), "Wing1": (-3, -5, 0), "WingF": (0, -7, 0)}))
     b2 = P({"Hips:loc": (0, 0, 0.004), "Spine2": (1.5, 0, 0), "Head": (0, 0, -6), "Neck": (0, 0, -3), "Tail1": (2, 0, -6), "Tail2": (0, 0, -7), "Tail3": (0, 0, -6)},
            sym({"UpperArm": (0, 2, 0), "Fingers": (-6, 0, 0), "WingF": (0, 3, 0)}))
-    A.action("Idle", [(1, S), (30, b1), (62, b2), (90, S)], lag=LAG)
+    A.action("Idle", [(1, S), (30, b1), (62, b2), (90, S)], lag=LAG, loop=True)
 
     # ---------------- Enter：石像蹲伏→甦醒→展翼怒吼→站定
     statue = P({"Hips:loc": (0, 0.05, -0.40), "Hips": (12, 0, 0), "Spine1": (18, 0, 0), "Spine2": (14, 0, 0), "Neck": (14, 0, 0), "Head": (26, 0, 0),
@@ -307,8 +307,8 @@ def define_actions(A, sym):
                sym({"Wing1": (14, -10, 0), "WingF": (0, -18, 0)}))
     over = P(strike, {"Hips:loc": (0, -0.47, -0.30), "Spine2": (14, 6, 23), "UpperArm.R": (-40, -34, 0), "ForeArm.R": (-8, 0, 0), "Head": (-10, 0, -18)})
     settle = P(over, {"Hips:loc": (0, -0.45, -0.27), "Spine2": (12, 5, 20), "Jaw": (12, 0, 0)})
-    A.action("Attack", [(1, TG), (6, P(TG2, {"Foot.L:ik": (0, -0.12, 0.16), "UpperArm.R": (-218, 26, 0)}), "L"), (10, strike), (13, over), (24, settle),
-                        (36, P({"Hips:loc": (0, -0.2, -0.1), "Spine2": (6, 0, 6), "Foot.L:ik": (0, -0.2, 0.12)})), (48, S)], lag=LAG)
+    A.action("Attack", [(1, TG), (9, P(TG2, {"Foot.L:ik": (0, -0.12, 0.16), "UpperArm.R": (-218, 26, 0)}), "io"), (13, strike, "in3"), (17, over, "out3"), (27, settle, "io"),
+                        (39, P({"Hips:loc": (0, -0.2, -0.1), "Spine2": (6, 0, 6), "Foot.L:ik": (0, -0.2, 0.12)}), "io"), (52, S, "io")], lag=LAG, hits=[(13, "Fingers.R")])
 
     # ---------------- Attack2：蠍尾式鎚擊（尾鎚越過左肩往前砸）
     coil = P({"Hips:loc": (0, -0.08, -0.30), "Hips": (20, 0, -6), "Spine1": (14, 0, -4), "Spine2": (10, 0, -6), "Neck": (-10, 0, 6), "Head": (-22, 0, 6), "Jaw": (10, 0, 0),
@@ -318,11 +318,11 @@ def define_actions(A, sym):
                     "Head": (-26, 0, 6), "Jaw": (22, 0, 0)})
     slam = P(coil, {"Hips:loc": (0, -0.24, -0.46), "Hips": (34, 0, -10), "Spine1": (18, 0, -4), "Spine2": (14, 0, -6), "Head": (-38, 0, 8), "Jaw": (30, 0, 0),
                     "Tail1": (100, 0, 0), "Tail2": (46, 0, 0), "Tail3": (28, 0, 0), "Tail4": (12, 0, 24, "ZYX"), "Tail5": (8, 0, 30, "ZYX")},
-             sym({"UpperArm": (-44, -16, 0), "ForeArm": (-10, 0, 0), "Wing1": (6, -44, 0), "WingF": (0, -40, 0)}))
+             sym({"UpperArm": (-88, -22, 0), "ForeArm": (-34, 0, 0), "Fingers": (-10, 0, 0), "Wing1": (6, -44, 0), "WingF": (0, -40, 0)}))
     reb = P(slam, {"Tail1": (93, 0, 0), "Tail4": (6, 0, 24, "ZYX"), "Tail5": (2, 0, 30, "ZYX"), "Hips:loc": (0, -0.22, -0.44)})
-    A.action("Attack2", [(1, TG), (12, coil), (20, apex), (24, apex, "L"), (28, slam), (31, reb), (34, slam), (44, slam),
-                         (56, P({"Hips:loc": (0, -0.05, -0.15), "Tail1": (40, 0, 0), "Tail2": (20, 0, 0), "Spine1": (6, 0, 0)})), (70, S)],
-             lag={"Wing2.L": 1, "Wing2.R": 1, "WingF.L": 3, "WingF.R": 3})
+    A.action("Attack2", [(1, TG), (12, coil, "io"), (20, apex, "out"), (27, apex, "io"), (31, slam, "in3"), (34, reb, "out"), (37, slam, "in"), (46, slam),
+                         (58, P({"Hips:loc": (0, -0.05, -0.15), "Tail1": (40, 0, 0), "Tail2": (20, 0, 0), "Spine1": (6, 0, 0)}), "io"), (72, S, "io")],
+             lag={"Wing2.L": 1, "Wing2.R": 1, "WingF.L": 3, "WingF.R": 3}, hits=[(31, "Tail5")])
 
     # ---------------- Hit：受擊後仰
     hit = P({"Hips:loc": (0, 0.14, -0.05), "Hips": (-6, 0, 8), "Spine1": (-10, 0, 10), "Spine2": (-12, 0, 12), "Neck": (4, 0, -8), "Head": (10, 0, -20), "Jaw": (20, 0, 0),
@@ -366,12 +366,92 @@ def define_actions(A, sym):
            sym({"UpperArm": (-14, -6, 0), "ForeArm": (-8, 0, 0), "Fingers": (20, 0, 0), "Wing1": (12, 8, 0), "WingF": (0, 6, 0)}))
     d4 = P({"Hips:loc": (0, -0.50, -0.84), "Hips": (58, 0, 0), "Spine1": (14, 0, 0), "Spine2": (8, 0, 0), "Neck": (-14, 0, 0), "Head": (-22, 0, 26), "Jaw": (10, 0, 0),
             "Tail1": (-30, 0, 0), "Tail2": (7, 0, 0),
-            "UpperArm.L": (-60, -36, 0), "ForeArm.L": (-40, 0, 0), "UpperArm.R": (-30, 30, 0), "ForeArm.R": (-50, 0, 0)},
+            "UpperArm.L": (-110, -36, 0), "ForeArm.L": (-50, 0, 0), "UpperArm.R": (-84, 30, 0), "ForeArm.R": (-60, 0, 0)},
            sym({"Fingers": (10, 0, 0), "Wing1": (22, -30, 0), "WingF": (0, -52, 0)}))
     d5 = P(d4, {"Hips:loc": (0, -0.50, -0.79), "Head": (-18, 0, 26)})
     A.action("Die", [(1, S, "L"), (5, d1), (18, d2), (34, d3), (42, P(d3, {"Head": (28, 0, 6), "Hips:loc": (0, -0.15, -0.60)}), "L"), (54, d4), (58, d5), (64, d4), (96, d4)],
              lag={"Tail2": 2, "Tail3": 4, "Tail4": 5, "WingF.L": 4, "WingF.R": 4})
 
+
+    # ================================================================ 第二版新增（壓迫感）：踱步、繞行、二階段待機、三連擊、延遲重擊、撲擊、咆哮
+    mir = L.mirror
+    G_ARMS = sym({"UpperArm": (-24, -12, 0), "ForeArm": (-36, 0, 0), "Fingers": (-8, 0, 0)})
+
+    def prowl(N, stride, lift, d, step=4, lean=12, dz=-0.12, sway=0.04, swing=0.38, side=0.0):
+        keys = []
+        for f in range(0, N + 1, step):
+            ph = (f / N) % 1.0
+            gl = L.gait(ph, stride, lift, swing, d, pitch=14)
+            gr = L.gait(ph + 0.5, stride, lift, swing, d, pitch=14)
+            s2 = math.sin(2 * math.pi * ph)
+            c2 = math.cos(2 * math.pi * ph)
+            bob = -0.03 * math.cos(4 * math.pi * (ph - 0.05))
+            pose = P({"Hips:loc": (sway * math.sin(2 * math.pi * (ph - 0.15)), -0.04, dz + bob), "Hips": (lean, 3 * s2 + side, 7 * s2),
+                      "Spine1": (lean * 0.6, 0, -4 * s2), "Spine2": (lean * 0.4, -2 * s2, -5 * s2), "Neck": (-lean * 0.6, 0, -1 * s2), "Head": (-lean * 0.8, -side, 3 * s2),
+                      "Jaw": (8 + 5 * abs(s2), 0, 0),
+                      "UpperArm.L": (-22 - 18 * s2 * (1 if d[1] else 0.3), -12, 0), "UpperArm.R": (-22 + 18 * s2 * (1 if d[1] else 0.3), 12, 0),
+                      "ForeArm.L": (-34 - 8 * c2, 0, 0), "ForeArm.R": (-34 + 8 * c2, 0, 0),
+                      "Tail1": (12, 0, 12 * s2), "Tail2": (4, 0, 12 * s2), "Tail3": (0, 0, 10 * s2), "Tail4": (0, 0, 8 * s2),
+                      "Foot.L:ik": gl, "Foot.R:ik": gr},
+                     sym({"Fingers": (-10, 0, 0), "Wing1": (-6, -12, 0), "WingF": (0, -22 + 6 * c2, 0)}))
+            keys.append((f, pose))
+        return keys
+    A.action("Stalk", prowl(40, 0.46, 0.11, (0, -1)), lag=LAG, loop=True)
+    A.action("StrafeL", prowl(36, 0.34, 0.09, (1, 0), lean=9, side=-4), lag=LAG, loop=True)
+    A.action("StrafeR", prowl(36, 0.34, 0.09, (-1, 0), lean=9, side=4), lag=LAG, loop=True)
+
+    # ---------------- IdleAggro：伏低、翼半張、喘息咬合、左右焦躁晃動
+    AG = P({"Hips:loc": (0, -0.06, -0.22), "Hips": (16, 0, 0), "Spine1": (10, 0, 0), "Spine2": (8, 0, 0), "Neck": (-12, 0, 0), "Head": (-18, 0, 0), "Jaw": (16, 0, 0),
+            "Tail1": (22, 0, 0), "Tail2": (8, 0, 0)},
+           sym({"UpperArm": (-34, -18, 0), "ForeArm": (-42, 0, 0), "Fingers": (-24, 0, 0), "Wing1": (-10, -26, 0), "WingF": (0, -46, 0)}))
+    ag1 = P(AG, {"Hips:loc": (0.05, -0.07, -0.25), "Spine2": (10, 3, 8), "Head": (-20, 0, -10), "Jaw": (30, 0, 0), "Tail1": (24, 0, -14), "Tail2": (8, 0, -12)},
+            sym({"Fingers": (-34, 0, 0), "WingF": (0, -54, 0)}))
+    ag2 = P(AG, {"Hips:loc": (-0.05, -0.07, -0.25), "Spine2": (10, -3, -8), "Head": (-20, 0, 10), "Jaw": (26, 0, 0), "Tail1": (24, 0, 14), "Tail2": (8, 0, 12)},
+            sym({"Fingers": (-10, 0, 0), "WingF": (0, -50, 0)}))
+    A.action("IdleAggro", [(0, AG), (9, ag1, "io"), (18, P(AG, {"Jaw": (8, 0, 0)}), "io"), (29, ag2, "io"), (38, P(AG, {"Jaw": (22, 0, 0)}), "io"), (46, AG, "io")],
+             lag=LAG, loop=True)
+
+    # ---------------- Combo3：右爪下砸（快）→ 左爪反撈（更快）→ 停頓、雙爪高舉 → 雙爪砸地（重）
+    windL = mir(TG)
+    strikeL = mir(strike)
+    overL = mir(over)
+    both = P({"Hips:loc": (0, 0.12, 0.0), "Hips": (-8, 0, 0), "Spine1": (-8, 0, 0), "Spine2": (-12, 0, 0), "Neck": (8, 0, 0), "Head": (10, 0, 0), "Jaw": (22, 0, 0),
+              "Tail1": (26, 0, 0), "Tail2": (10, 0, 0)},
+             sym({"UpperArm": (-196, 18, 0), "ForeArm": (-40, 0, 0), "Hand": (-20, 0, 0), "Fingers": (-30, 0, 0), "Wing1": (-14, -32, 0), "WingF": (0, -58, 0)}))
+    both2 = P(both, {"Hips:loc": (0, 0.15, 0.03), "Spine2": (-15, 0, 0), "Jaw": (30, 0, 0)}, sym({"UpperArm": (-206, 20, 0), "WingF": (0, -64, 0)}))
+    both3 = P(both2, {"Hips:loc": (0, 0.16, 0.04), "Head": (6, 0, 4)}, sym({"UpperArm": (-210, 22, 0)}))
+    slam = P({"Hips:loc": (0, -0.40, -0.36), "Hips": (22, 0, 0), "Spine1": (18, 0, 0), "Spine2": (16, 0, 0), "Neck": (-14, 0, 0), "Head": (-26, 0, 0), "Jaw": (32, 0, 0),
+              "Tail1": (38, 0, 0), "Tail2": (14, 0, 0), "Foot.L:ik": (0, -0.30, 0)},
+             sym({"UpperArm": (-60, -18, 0), "ForeArm": (-12, 0, 0), "Hand": (16, 0, 0), "Fingers": (30, 0, 0), "Wing1": (12, -14, 0), "WingF": (0, -26, 0)}))
+    slam2 = P(slam, {"Hips:loc": (0, -0.44, -0.42), "Spine2": (20, 0, 0), "Head": (-20, 0, 0)}, sym({"UpperArm": (-48, -20, 0)}))
+    srec = P({"Hips:loc": (0, -0.18, -0.12), "Spine2": (6, 0, 0), "Foot.L:ik": (0, -0.16, 0.10)}, G_ARMS)
+    A.action("Combo3", [(0, S), (8, TG, "io"), (12, TG2, "io"), (15, strike, "in3"), (18, over, "out3"), (23, windL, "io"), (26, strikeL, "in3"), (29, overL, "out3"),
+                        (42, both, "io"), (52, both2, "io"), (57, slam, "in3"), (61, slam2, "out3"), (74, slam2, "io"), (86, srec, "io"), (102, S, "io")],
+             lag=LAG, hits=[(15, "Fingers.R"), (26, "Fingers.L"), (57, "Fingers.R")])
+
+    # ---------------- Delayed：立起、雙爪高舉後停住約 0.8 秒（微微再往上蓄），才猛然砸下
+    crouch = P(gather, {"Hips:loc": (0, 0.04, -0.26)})
+    A.action("Delayed", [(0, S), (10, crouch, "io"), (22, both, "out"), (30, both2, "io"), (42, both3, "io"), (52, both2, "io"), (56, slam, "in3"), (60, slam2, "out3"),
+                         (76, slam2, "io"), (88, srec, "io"), (106, S, "io")], lag=LAG, hits=[(56, "Fingers.R")])
+
+    # ---------------- Dash：伏低收翼（起手短）→ 振翼撲出右爪掃擊 → 落地壓低 → 收回
+    coilD = P({"Hips:loc": (0, 0.10, -0.32), "Hips": (24, 0, -6), "Spine1": (14, 0, 0), "Spine2": (10, 0, -8), "Neck": (-16, 0, 6), "Head": (-24, 0, 8), "Jaw": (14, 0, 0),
+               "UpperArm.R": (24, -20, 0), "ForeArm.R": (-56, 0, 0), "UpperArm.L": (-30, -14, 0), "ForeArm.L": (-40, 0, 0), "Foot.R:ik": (0, 0.16, 0), "Tail1": (6, 0, 0)},
+              sym({"Wing1": (8, 10, 0), "WingF": (0, 10, 0)}))
+    leap = P({"Hips:loc": (0, -0.56, -0.08), "Hips": (18, 0, 10), "Spine1": (8, 0, 8), "Spine2": (6, 4, 12), "Neck": (-14, 0, -8), "Head": (-20, 0, -10), "Jaw": (32, 0, 0),
+              "UpperArm.R": (-120, -22, 0), "ForeArm.R": (-14, 0, 0), "Fingers.R": (-30, 0, 0), "UpperArm.L": (20, -20, 0), "ForeArm.L": (-30, 0, 0),
+              "Foot.L:ik": (0, -0.48, 0.12, -8), "Foot.R:ik": (0, -0.24, 0.20, 30), "Tail1": (30, 0, 0)},
+             sym({"Wing1": (-16, -40, 10), "WingF": (0, -70, 0)}))
+    landD = P(strike, {"Hips:loc": (0, -0.62, -0.30), "Foot.L:ik": (0, -0.62, 0), "Foot.R:ik": (0, -0.18, 0)})
+    landD2 = P(over, {"Hips:loc": (0, -0.66, -0.35), "Foot.L:ik": (0, -0.62, 0), "Foot.R:ik": (0, -0.18, 0)})
+    A.action("Dash", [(0, S), (6, coilD, "io"), (10, leap, "in"), (13, landD, "in3"), (17, landD2, "out3"), (30, landD2, "io"),
+                      (44, P({"Hips:loc": (0, -0.25, -0.12), "Spine2": (6, 0, 6), "Foot.L:ik": (0, -0.24, 0.10)}, G_ARMS), "io"), (60, S, "io")],
+             lag=LAG, hits=[(13, "Fingers.R")])
+
+    # ---------------- Roar：縮身 → 展翼仰首咆哮（顫抖）→ 壓低回戒備
+    A.action("Roar", [(0, S), (12, gather, "io"), (18, gather2, "io"), (22, burst, "in3"), (28, t1, "out"), (34, t2, "io"), (40, t1, "io"), (46, t2, "io"),
+                      (56, P(AG, {"Jaw": (24, 0, 0)}), "io"), (74, S, "io")],
+             lag={"Tail2": 2, "Tail3": 3, "Tail4": 4, "WingF.L": 2, "WingF.R": 2})
 
 def build_anim():
     bpy.ops.wm.open_mainfile(filepath=MODEL_BLEND)
@@ -405,4 +485,25 @@ if STAGE in ("model", "all"):
     build_model()
 if STAGE in ("anim", "all"):
     build_anim()
+def build_anim2():
+    """第二版動畫：讀 model.blend → 全部動作（含新增片段）→ 匯出 export_raw/ 未壓縮 GLB＋命中時間表 → 每片段 10 格預覽。"""
+    bpy.ops.wm.open_mainfile(filepath=MODEL_BLEND)
+    arm = bpy.data.objects["Gargoyle"]
+    mesh = bpy.data.objects["GargoyleMesh"]
+    L.clear_actions(arm)
+    A = L.Animator(arm, base=None)
+    A.ground_r = {"*": 0.04, "Hips": 0.20, "Spine1": 0.22, "Spine2": 0.24, "Neck": 0.14, "Head": 0.12, "Jaw": 0.03, "Fingers.L": 0.02, "Fingers.R": 0.02}
+    A.ground_skip = {b.name for b in arm.data.bones if b.name.startswith(("Tail", "Wing"))}   # 尾巴、翼可貼地，不拿來抬骨盆
+    define_actions(A, L.sym)
+    L.export_glb(OUT_GLB, arm, mesh)
+    L.write_meta(A, NAME, os.path.join(HERE, "export_raw"))
+    cam, _ = L.studio(HEIGHT)
+    A.show(None, 0)
+    L.render_actions(cam, A, TMP, NAME, HEIGHT, frames=10, extra=1.0, res=(400, 420), center=(0, 0.0, HEIGHT * 0.40))
+    bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
+
+
+if STAGE == "anim2":
+    build_anim2()
+
 print("DONE", NAME, STAGE)

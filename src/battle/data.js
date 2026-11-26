@@ -32,15 +32,15 @@ export const SOUL={
   windowMs:10500,      // 玩家回合的攻擊時間（只在題目顯示中倒數）；10.5 秒＝每題 2.5 秒的玩家答得到第 4 題
   minCostMs:2500,      // 每一題至少消耗這麼多攻擊時間（答得再快，一回合也只有 4 題）
   missPenaltyMs:2000,  // 攻擊回合答錯，多扣的攻擊時間
-  healOnKill:40,       // 打倒 Boss 回復的 HP
+  healOnKill:15,       // 打倒 Boss 回復的 HP（有藥壺之後從 40 降到 15：回血改成自己決定什麼時候喝）
   atbMax:3,
   staminaMax:100,
-  staminaTurn:15,      // 每次輪到玩家回復
+  staminaTurn:25,      // 每次輪到玩家回復（連擊改版：敵人回合題數變多，從 15 提高）
   staminaHit:8,        // 攻擊回合每答對一題回復
   staminaParry:10,     // 彈反回復
-  dodgeCost:20,        // 翻滾閃避消耗
+  dodgeCost:22,        // 翻滾閃避消耗
   blockCost:50,        // 答錯／超時但耐力足夠：硬擋下來要消耗的耐力（耐力不足才吃全額傷害）
-  blockRate:.5,        // 硬擋承受 50% 傷害
+  blockRate:.55,       // 硬擋承受 55% 傷害
   grazeCost:5,
   guardRate:.3,        // 格擋承受 30% 傷害（答對但耐力不足以翻滾、或答錯但耐力足以硬擋）
   grazeRate:.5,        // 太慢才答對：擦傷，承受 50% 傷害
@@ -55,10 +55,40 @@ export const SOUL={
   limitSwing:.35,      // 時限最多縮短／放寬 35%
   perfectSwing:300,    // 彈反判定最多 ±0.3 秒
   tightAt:.8, perfectTight:420, // d 超過 tightAt 後彈反門檻再收緊，d=1 時多收 0.42 秒（1.5−0.3−0.42＝0.78 秒）：高手也會有一兩成落到翻滾
-  foeDmgSwing:1,       // Boss 傷害 ×(1＋foeDmgSwing×max(0,d))：只跟動態難度掛勾的壓力（模擬：0.3 對熟練玩家幾乎沒影響，1.0 才把熟練壓到約九成）
+  foeDmgSwing:.75,     // Boss 傷害 ×(1＋foeDmgSwing×max(0,d))：只跟動態難度掛勾的壓力（連擊／藥壺／突襲改版後用模擬定在 0.75，熟練約 90%）
   dmgBonus:0,          // 高難度時的玩家傷害加成（已取消：答得快本來就打得多）
-  extraAt:.6,          // d 超過這個值，Boss 多出手一次
+  extraAt:.6,          // d 超過這個值，Boss 多出手一次（extraSeg：改成連擊多一段，沒有連擊才多一記單擊）
+  extraSeg:true,
   easeDown:false,      // true＝d 低於 −extraAt 時少出手一次（已關閉：亂點會被判成「很慢」而佔到便宜）
+  // ---- 敵人回合的招式種類（壓迫感：連擊、延遲、突進、必殺） ----
+  comboLimit:[1,.85,.7,.7], // 連擊每一段的時限倍率（逐段縮短；彈反門檻也跟著縮）
+  comboDmg:.45,         // 連擊每一段的傷害倍率（段數多，單段輕一點）
+  chainParryDmg:3,     // 連擊中段彈反：不衝上去反擊，只彈刀造成的小傷害（最後一段才完整反擊）
+  delayLockMs:[700,900], // 延遲攻擊：題目先出現、選項鎖住的時間＝Delayed 片段舉起後的停頓（約 0.8 秒，畫面依實際值微調停頓速度）
+  delayLimitMul:.85,   // 延遲攻擊解鎖後的時限倍率（鎖住期間已經能讀題）
+  delayDmg:1.1,
+  flinchMs:400,        // 延遲攻擊鎖住期間亂點：每點一下作答時間 +0.4 秒（最多算 2 下）
+  dashLimitMul:.6,     // 突進：時限只有 60%，不能彈反（答得再快也只是翻滾）
+  dashDmg:.7,
+  dangerLimitMul:.9,   // 必殺（第二階段起）：答對才閃得掉，答錯／超時不能硬擋、吃全額
+  dangerDmg:1.25,
+  // ---- 突襲（攻擊回合中 Boss 搶先出手，每個玩家回合最多一次；大招不會被打斷） ----
+  ambushBase:[.02,.025,.03,.035,.04], // 每次判定（答一題／出一招／喝一次藥）的基本機率，依第幾隻 Boss
+  ambushPhaseMul:1.5,  // 第二階段起
+  ambushSlackMs:2000,  // 作答或猶豫超過這個時間的部分才加機率
+  ambushPerSec:.03,    // 每多拖 1 秒 +3%
+  ambushFlask:.08,     // 喝藥時額外 +8%
+  ambushMax:.3,
+  ambushLimitMul:.75,  // 突襲閃避題的時限倍率
+  ambushResumeMs:1000, // 撐過突襲後攻擊時間還有這麼多才回到攻擊回合，不然直接進敵人回合（剩 0.1 秒回去也答不了）
+  // ---- 藥壺（戰鬥中回血） ----
+  flaskStart:3,        // 開場幾壺
+  flaskMax:3,          // 上限（打倒 Boss 補 flaskOnKill 壺，不會超過上限）
+  flaskOnKill:1,
+  flaskHeal:.4,        // 答對喝下回復最大 HP 的 40%
+  flaskBelow:.75,      // HP 低於 75% 才能喝（滿血時指令列不會一直跳出來）
+  flaskCostMs:2500,    // 喝藥至少花掉的攻擊時間
+  flaskPunishMs:2500,  // 喝完攻擊時間剩不到這麼多：Boss 趁空檔逼近，下個敵人回合先出一記突進
 };
 export const SOUL_CMDS=[
  {k:1,id:"slash",name:"斬擊",bars:1,move:"slash",hits:[12]},
@@ -70,16 +100,28 @@ export const SOUL_BIG=[
  {name:"流星斬",move:"meteorEnd",hits:[84]},
  {name:"火球術",move:"fire",hits:[76]},
  {name:"聖光審判劍",move:"holy",hits:[115]}];
-// phases：血量比例降到 at 以下就進入該階段（atkMul 攻擊倍率、extra 多出手次數、limitMul 閃避時限倍率）
+// phases：血量比例降到 at 以下就進入該階段（atkMul 攻擊倍率、extra 多出手次數、limitMul 閃避時限倍率、danger 該回合最後一招改成必殺的機率）
+// kit：各階段的招式比重 {single 單擊, combo 連擊, delayed 延遲, dash 突進}；combo：各階段連擊段數 [最少, 最多]；names：各招式名
+// attacks＝每個敵人回合出幾「招」（連擊一招算多題）
 export const SOUL_BOSSES=[
  {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:60,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
-  phases:[{at:.5,name:"根鬚暴走",atkMul:1.15,extra:0,limitMul:.95,move:"根鬚纏擊"}]},
- {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:200,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
-  phases:[{at:.5,name:"石翼狂嘯",atkMul:1.15,extra:1,limitMul:.95,move:"碎石吐息"}]},
- {id:"priest",name:"霜冠祭司",lv:16,hp:230,atk:13,move:"霜槍連刺",attacks:2,limitMs:4000,model:"boss_priest",arena:"frozen_chapel",
-  phases:[{at:.5,name:"永凍禱詞",atkMul:1.2,extra:0,limitMul:.9,move:"冰棺降臨"}]},
- {id:"executioner",name:"暗影行刑者",lv:22,hp:270,atk:14,move:"斷頭斧斬",attacks:2,limitMs:4000,model:"boss_executioner",arena:"execution_yard",
-  phases:[{at:.5,name:"處刑之舞",atkMul:1.2,extra:1,limitMul:.9,move:"影分身處刑"}]},
- {id:"devourer",name:"噬語魔王",lv:30,hp:350,atk:15,move:"噬語巨劍",attacks:3,limitMs:3600,model:"boss_devourer",arena:"throne_of_words",boss:true,
-  phases:[{at:.66,name:"吞噬詞語",atkMul:1.15,extra:0,limitMul:.95,move:"詞語風暴"},{at:.33,name:"終焉咒言",atkMul:1.3,extra:1,limitMul:.9,move:"終焉之言"}]}];
+  names:{combo:"鏽戟三連刺",delayed:"沉重高舉斬",dash:"盾牌衝撞"},
+  kit:[{single:.6,dash:.2,delayed:.2},{single:.3,combo:.4,dash:.15,delayed:.15}],combo:[[2,2],[2,2]],
+  phases:[{at:.5,name:"根鬚暴走",atkMul:1.15,extra:0,limitMul:.95,move:"根鬚纏擊",danger:.35}]},
+ {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:170,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
+  names:{combo:"狂亂爪擊",delayed:"懸停俯衝",dash:"石翼突襲"},
+  kit:[{single:.35,combo:.3,dash:.2,delayed:.15},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[2,2],[2,3]],
+  phases:[{at:.5,name:"石翼狂嘯",atkMul:1.15,extra:1,limitMul:.95,move:"碎石吐息",danger:.5}]},
+ {id:"priest",name:"霜冠祭司",lv:16,hp:195,atk:13,move:"霜槍突刺",attacks:1,limitMs:4000,model:"boss_priest",arena:"frozen_chapel",
+  names:{combo:"霜槍連刺",delayed:"寒冰蓄勢",dash:"冰面滑襲"},
+  kit:[{single:.3,combo:.35,dash:.15,delayed:.2},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[2,3],[3,3]],
+  phases:[{at:.5,name:"永凍禱詞",atkMul:1.2,extra:0,limitMul:.9,move:"冰棺降臨",danger:.5}]},
+ {id:"executioner",name:"暗影行刑者",lv:22,hp:230,atk:14,move:"斷頭斧斬",attacks:1,limitMs:4000,model:"boss_executioner",arena:"execution_yard",
+  names:{combo:"處刑連斬",delayed:"高舉斷罪",dash:"影步突進"},
+  kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[2,3],[3,4]],
+  phases:[{at:.5,name:"處刑之舞",atkMul:1.2,extra:1,limitMul:.9,move:"影分身處刑",danger:.6}]},
+ {id:"devourer",name:"噬語魔王",lv:30,hp:300,atk:15,move:"噬語巨劍",attacks:2,limitMs:3600,model:"boss_devourer",arena:"throne_of_words",boss:true,
+  names:{combo:"吞字連斬",delayed:"沉默之劍",dash:"虛空突刺"},
+  kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[2,3],[3,4],[3,4]],
+  phases:[{at:.66,name:"吞噬詞語",atkMul:1.15,extra:0,limitMul:.95,move:"詞語風暴",danger:.5},{at:.33,name:"終焉咒言",atkMul:1.3,extra:1,limitMul:.9,move:"終焉之言",danger:1}]}];
 export const SOUL_STORY=["詞語之火熄滅之後，王國只剩下灰與低語。","被奪走名字的騎士們，仍守著早已無人通過的門。","你是最後一名記得單字的人。","每答出一個字，劍就多一分重量；每遲疑一瞬，死亡就近一步。","穿過廢墟，討伐噬語魔王。"];
