@@ -61,16 +61,18 @@ for i,b in enumerate(T['boss']):
     add(taiko(1.4,.8),b); stab([m for m in chords[i]],b,.32); shing(b+.6,.15)
     for k in range(1,5): add(taiko(.45 if k%2 else .6),b+k)
     if i==4: [add(taiko(.5),b+4+j*.25) for j in range(4)]
-# 對決：出題時滴答聲，選擇時一聲，答對＝鼓＋金屬聲，答錯＝不和諧重擊
-drone([D-12,D-11],T['duel'],T['mont']+.2,a=.3,r=.4,g=.09,cut=500)
-def tick(t,g=.2):
-    n=int(.05*SR); s=np.sin(2*np.pi*2400*np.arange(n)/SR)*np.exp(-np.arange(n)/SR*90); add(s,t,.2,g)
-for b0,du,kind,hit,_ in T['beats']:
-    for j in range(6): tick(b0+.1+j*.25,.18)
-    tick(b0+1.6,.45); add(taiko(.5,1.3),b0+1.6)
-    ht=b0+2.4+hit
-    if kind=='ok': add(taiko(1.3),ht); shing(ht,.3); stab([D-12,D-5,D+2],ht,.28)
-    else: add(taiko(1.6,.6),ht); stab([D-12,D-11,D-6],ht,.45); add(gong(3.)*.5,ht)
+# 實戰段：低鳴鋪底＋依畫面事件下鼓點
+P=T['play']
+drone([D-12,D-11,D-5],P['start'],T['mont']+.2,a=.3,r=.4,g=.11,cut=520)
+t=P['start']
+while t<P['end']-.2:
+    add(taiko(.32,1.1),t); t+=1.0
+for ct,kind in P['cues']:
+    if kind in('ok','big'): add(taiko(1.2 if kind=='ok' else 1.6),ct); shing(ct,.25); stab([D-12,D-5,D+2],ct,.25 if kind=='ok' else .4)
+    elif kind=='parry': add(taiko(1.1,1.2),ct); shing(ct,.4); shing(ct+.06,.2)
+    elif kind=='alarm': stab([D-12,D-11,D-6],ct,.45); add(gong(3.)*.6,ct); add(taiko(1.5,.7),ct)
+    elif kind=='bad': add(taiko(1.6,.6),ct); stab([D-12,D-11,D-6],ct,.42)
+    elif kind=='drum': [add(taiko(.8),ct+q*.25) for q in range(3)]
 add(taiko(1.2),T['slogan']); stab([D-12,D-5,D],T['slogan'],.3)
 # 剪輯高潮：每個剪接點一記鼓＋弦樂快速頓音
 drone([D-12,D-5,D],T['mont'],T['black'],a=.2,r=.1,g=.15,cut=900)

@@ -33,10 +33,19 @@ add('c_hook',3,ovs=[('n4',.1,2.9,.25),('n5',1.5,2.9,.15)])
 # 18–43 五隻 Boss 登場
 for i,ss in enumerate([4.0,32.5,62.5,94.0,117.5]):
     add(f'd_boss{i+1}',5,'raw_soul.mp4',ss,ovs=[(f'boss{i+1}',.6,4.85,.35)],fin=.15,fout=.15)
-# 對決：題目卡（1.6 秒）→選擇（0.8 秒）→結果（答對出劍／答錯受擊）
-for n,(b0,du,kind,hit,ans) in enumerate(T['beats']):
-    q=f'q{n+1}';res=['r_ok1','r_bad','r_ok2'][n]
-    add(f'e_d{n+1}',du,'raw_duel4.mp4',round(ans-2.4,2),ovs=[(q,0,1.66,.2),(q+'s',1.6,2.4,.06),(res,2.45,du-.05,.18)],fin=.15,fout=.1)
+# 實戰：手機直式真實遊玩畫面（右），左側階段字卡；背景是同畫面的模糊放大
+def seg_phone(name,src,ss,dur,caps):
+    ins=['-ss',str(ss),'-t',str(dur),'-i',src,'-loop','1','-t',str(dur),'-i','cards/bezel.png','-loop','1','-t',str(dur),'-i','cards/leftshade.png']
+    fc=['[0:v]fps=30,split[a][b]','[a]scale=1920:-2,crop=1920:1080:0:(ih-1080)*0.38,boxblur=28:3,eq=brightness=-0.3:saturation=0.5[bg0]','[bg0][2:v]overlay=0:0[bg]',
+        '[b]scale=461:1000[ph]','[bg][ph]overlay=1196:40[x0]','[x0][1:v]overlay=1180:24[c0]'];cur='c0'
+    for i,(png,a,b_) in enumerate(caps):
+        ins+=['-loop','1','-t',str(dur),'-i',f'cards/{png}.png'];k=i+3
+        fc.append(f'[{k}:v]format=rgba,fade=t=in:st={a}:d=0.15:alpha=1,fade=t=out:st={b_-0.12}:d=0.12:alpha=1[o{i}]')
+        fc.append(f"[{cur}][o{i}]overlay=0:0:enable='between(t,{a},{b_})'[c{i+1}]");cur=f'c{i+1}'
+    fc.append(f'[{cur}]format=yuv420p[out]')
+    run(ins+['-filter_complex',';'.join(fc),'-map','[out]','-r',str(FPS),'-c:v','libx264','-crf','14','-preset','fast','-an',f'seg/{name}.mp4'])
+    return f'seg/{name}.mp4'
+for n,(src,ss,du,caps,st) in enumerate(T['play']['clips']): S.append(seg_phone(f'e_p{n}',src,ss,du,caps))
 add('e_slo',2.2,ovs=[('slogan',.1,2.15,.25)])
 # 48–56 剪輯高潮
 picks=[10.7,18.5,24.7,40.2,48.6,51.8,69.6,79.5,82.8,98.6,105.6,121.6,127.6,138.6]
@@ -61,7 +70,8 @@ for t,w in T['words']:
     ins+=['-loop','1','-t','0.4','-itsoffset',str(t),'-i',f'cards/{w}.png']
     fc.append(f"[{cur}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='between(t,{t},{t+.3})'[b{k}]")
     fc.append(f"[b{k}][{k}:v]overlay=0:0:eof_action=pass:enable='between(t,{t},{t+.3})'[w{k}]"); cur=f'w{k}'; k+=1
-fc.append(f'[{cur}]drawbox=x=0:y=0:w=iw:h=132:color=black:t=fill,drawbox=x=0:y=ih-132:w=iw:h=132:color=black:t=fill,format=yuv420p[v]')
+LB=f"enable='not(between(t,{T['play']['start']},{T['play']['end']}))'"
+fc.append(f'[{cur}]drawbox=x=0:y=0:w=iw:h=132:color=black:t=fill:{LB},drawbox=x=0:y=ih-132:w=iw:h=132:color=black:t=fill:{LB},format=yuv420p[v]')
 ins+=['-i','music.wav']
 run(ins+['-filter_complex',';'.join(fc),'-map','[v]','-map',f'{k}:a','-c:v','libx264','-crf','21','-maxrate','7M','-bufsize','14M','-preset','slow','-profile:v','high','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-shortest','單字魂_宣傳片.mp4'])
 print('done')
