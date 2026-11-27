@@ -570,3 +570,37 @@ header nav a.on{color:#f6d88f;background:rgba(201,162,74,.16)}
 @media(max-width:600px){.upd{margin-left:auto}.hd{row-gap:4px}}
 @media(prefers-reduced-motion:reduce){header::after{animation:none}}
 @media(max-width:600px){.hd nav{flex-wrap:nowrap;overflow-x:auto;width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch}.hd nav::-webkit-scrollbar{display:none}.hd nav a{white-space:nowrap;flex:none}}
+
+/* ---------- 魂系題目卡：宣傳片風格（襯線字、金框、✓✗），底部留出安全距離避免按不到 ---------- */
+.bwrap.soul{padding-bottom:max(22px,calc(env(safe-area-inset-bottom) + 12px))}
+@media(pointer:coarse) and (orientation:portrait){.bwrap.soul{padding-bottom:max(30px,calc(env(safe-area-inset-bottom) + 16px))}}
+.bwrap.soul .bqcard{background:linear-gradient(180deg,rgb(22 18 14/.97),rgb(10 9 8/.98));border:1px solid rgb(201 162 74/.4);border-radius:6px;padding:12px 14px 14px}
+.bwrap.soul .bprompt{font-family:"Noto Serif TC",serif;font-weight:700;color:#f6eedb;letter-spacing:.02em}
+.bwrap.soul .bprompt.en{font:700 clamp(28px,7.2vw,42px)/1.12 Georgia,"Noto Serif TC",serif;text-shadow:0 0 22px rgb(233 192 106/.35),0 2px 6px #000}
+.bwrap.soul .bprompt.zh{font-size:clamp(22px,5.8vw,32px);line-height:1.25;text-shadow:0 0 18px rgb(233 192 106/.25)}
+.bwrap.soul .bqcard .small,.bwrap.soul .bqcard .ex,.bwrap.soul .cloze{font-family:"Noto Serif TC",serif}
+.bwrap.soul .bopts{gap:9px;margin-top:12px}
+.bwrap.soul .bopts button{position:relative;min-height:56px;padding:8px 34px 8px 12px;font:500 16px/1.32 "Noto Serif TC",serif;color:#e2d8c3;background:rgb(24 19 14/.88);border:1.5px solid rgb(201 162 74/.4);border-radius:6px;transition:box-shadow .2s,background .2s,border-color .2s}
+.bwrap.soul .bopts button.en{font:500 17px/1.3 Georgia,"Noto Serif TC",serif}
+.bwrap.soul .bopts button.long{font-size:14px;line-height:1.25}
+.bwrap.soul .bopts button .k{font:600 14px Georgia,serif;color:#8a7f6c;border:0;padding:0;margin-right:10px;background:none}
+@media(hover:hover){.bwrap.soul .bopts button:not(:disabled):hover{border-color:#e2bd6a;background:linear-gradient(90deg,rgb(120 82 32/.45),rgb(24 19 14/.9))}}
+.bwrap.soul .bopts button:not(:disabled):active{border-color:#e2bd6a;background:linear-gradient(90deg,rgb(120 82 32/.55),rgb(24 19 14/.9))}
+.bwrap.soul .bopts button.right{border-color:#f0cf7a;background:linear-gradient(90deg,rgb(150 110 40/.68),rgb(40 30 15/.85));color:#fff6df;box-shadow:0 0 22px rgb(240 207 122/.45)}
+.bwrap.soul .bopts button.wrong{border-color:#e0453a;background:linear-gradient(90deg,rgb(150 30 25/.72),rgb(40 12 10/.85));color:#ffe9e6;box-shadow:0 0 22px rgb(224 69 58/.5)}
+.bwrap.soul .bopts button.right::after,.bwrap.soul .bopts button.wrong::after{position:absolute;right:11px;top:50%;transform:translateY(-50%);font:900 22px "Noto Serif TC",serif}
+.bwrap.soul .bopts button.right::after{content:"✓";color:#ffe08a}.bwrap.soul .bopts button.wrong::after{content:"✗";color:#ff6b5e}
+.bwrap.soul .bopts button.right .k{color:#ffe08a}.bwrap.soul .bopts button.wrong .k{color:#ff9d92}
+.bwrap.soul .bopts button:disabled{opacity:1}.bwrap.soul .bopts button:disabled:not(.right):not(.wrong){opacity:.55}
+.bwrap.soul .msgbox,.bwrap.soul .ansline{font-family:"Noto Serif TC",serif}
+.bwrap.soul .ansline .w{font-family:Georgia,"Noto Serif TC",serif}
+.bwrap.soul input{font-family:Georgia,"Noto Serif TC",serif;font-size:18px;min-height:48px}
+@media(max-height:700px){.bwrap.soul .bprompt.en{font-size:28px}.bwrap.soul .bopts button{min-height:50px;font-size:15px}.bwrap.soul .bopts button.long{font-size:13px}}
+@media(orientation:landscape) and (max-height:520px){.bwrap.soul{padding-bottom:max(10px,env(safe-area-inset-bottom))}.bwrap.soul .bprompt.en{font-size:24px}.bwrap.soul .bopts{gap:6px;margin-top:6px}.bwrap.soul .bopts button{min-height:44px;font-size:14px}}
+.bwrap.soul .bopts button{padding:8px 26px 8px 11px}
+.bwrap.soul .bopts button .k{margin-right:8px}
+.bwrap.soul .bopts button.right::after,.bwrap.soul .bopts button.wrong::after{right:8px;font:700 20px system-ui,"Segoe UI Symbol","Apple Symbols",sans-serif}
+.bwrap.soul .ansline.ok{background:linear-gradient(90deg,rgb(120 88 30/.5),rgb(30 24 14/.6));border:1px solid rgb(201 162 74/.35);color:#f3e6c4}
+.bwrap.soul .ansline.no{background:linear-gradient(90deg,rgb(120 30 24/.5),rgb(30 12 10/.6));border:1px solid rgb(224 69 58/.35);color:#f3d6d0}
+.bwrap.soul .ansline .w{color:#f0cf7a}
+@media(max-height:700px){.bwrap.soul .bprompt.en{font-size:26px}.bwrap.soul .bopts{gap:7px;margin-top:9px}.bwrap.soul .bopts button{min-height:46px;font-size:14.5px;padding:6px 24px 6px 10px}.bwrap.soul .bopts button.long{font-size:12.5px}.bwrap.soul .bqcard{padding:10px 12px 12px}}
