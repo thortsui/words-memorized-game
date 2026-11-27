@@ -12,6 +12,7 @@ import numpy as np
 from mathutils import Vector, Quaternion, Matrix
 
 FPS = 30
+WING_SIGN = -1.0       # v4：wing_keys 正值＝紙翼往上張開（翼骨 flap 負值是上抬；渲染確認）
 LIFT_MAX = 0.18          # 只在網格最低點 < 0 的格才抬（實際只有 Die 倒地需要 >6 cm）
 
 
@@ -234,6 +235,20 @@ def run(arm, rig, ink_obj=None, words=None, wing_flap=True, log=print, tip_rest=
             qs = [c.rotations(MA[f][c.anchor], res[id(c)][i]) for i, f in enumerate(frames)]
             for k, bn in enumerate(c.names):
                 _write_quats(act, bn, [q[k] for q in qs], f0)
+        # v4：整身自轉的片段（rig.spin_keys）——自轉角 th(t)，骨盆真實偏航展開成連續角 θu(t)
+        v4clip = tr.name in getattr(rig, "wing_keys", {})
+        spin = getattr(rig, "spin_keys", {}).get(tr.name)
+        th_t = None
+        if spin:
+            sf, sv = zip(*spin)
+            th_t = np.radians(np.interp(np.arange(N), np.array(sf, float), np.array(sv, float)))
+            Hr0 = bones["Hips"].matrix_local.to_3x3().normalized()
+            th_true = []
+            for f in frames:
+                fw = (MA[f]["Hips"].to_3x3().normalized() @ Hr0.inverted()) @ Vector((0, -1, 0))
+                th_true.append(math.atan2(fw.x, -fw.y))
+            th_u = np.unwrap(np.array(th_true))
+            th_u += 2 * math.pi * round((th_t[0] - th_u[0]) / (2 * math.pi))
         # 墨潮骨（高度最多降到貼地）與披風地面骨（高度固定）：跟骨盆的水平位置與偏航
         for gbn, drop in (("InkTide", ink_drop), ("CapeGround", 0.0)):
             if gbn not in bones:
@@ -243,14 +258,18 @@ def run(arm, rig, ink_obj=None, words=None, wing_flap=True, log=print, tip_rest=
             Hr = bones["Hips"].matrix_local.to_3x3().normalized()
             hz0 = bones["Hips"].head_local.z
             locs, qs = [], []
-            for f in frames:
+            for i, f in enumerate(frames):
                 Mh = MA[f]["Hips"]
                 hp = Mh.to_translation()
                 Rw = Mh.to_3x3().normalized() @ Hr.inverted()
                 fw = Rw @ Vector((0, -1, 0)); fw.z = 0
                 yaw = math.atan2(-fw.x, -fw.y) if fw.length > 1e-6 else 0.0
                 qy = Quaternion((0, 0, 1), yaw * (1.0 if gbn == "InkTide" else 0.6))
-                tgt = Vector((hp.x, hp.y, h0.z + min(0.0, max(hp.z - hz0, -drop)) + max(0.0, hp.z - hz0) * (1 if gbn == "InkTide" else 0)))
+                if th_t is not None:     # v4 自轉：整圈跟著轉（正確方向），其餘小偏航維持原本的慣例 → 起訖與 IdleAggro 一致
+                    k_ = 1.0 if gbn == "InkTide" else 0.6
+                    qy = Quaternion((0, 0, 1), float(th_t[i] - k_ * (th_u[i] - th_t[i])))
+                rise = 1.0 if gbn == "InkTide" else (0.9 if v4clip else 0.0)     # v4：躍起／懸浮時披風地面段跟著離地
+                tgt = Vector((hp.x, hp.y, h0.z + min(0.0, max(hp.z - hz0, -drop)) + max(0.0, hp.z - hz0) * rise))
                 locs.append(Rr.inverted() @ (tgt - h0))
                 qs.append((Rr.inverted() @ qy.to_matrix() @ Rr).to_quaternion())
             _write_locs(act, gbn, locs, f0); _write_quats(act, gbn, qs, f0)
@@ -275,6 +294,10 @@ def run(arm, rig, ink_obj=None, words=None, wing_flap=True, log=print, tip_rest=
             if tr.name in ("PhaseShift", "PhaseShift2"):
                 Tb = 1.15 if tr.name == "PhaseShift" else 1.25
                 flap = flap - 0.9 * np.clip(1 - (t - Tb) / 0.3, 0, 1) * (t >= Tb)
+            wk = getattr(rig, "wing_keys", {}).get(tr.name)
+            if wk:                       # v4：招式專屬的紙翼開合（正＝張開）
+                wf, wv = zip(*wk)
+                flap = flap + WING_SIGN * np.interp(np.arange(N), np.array(wf, float), np.array(wv, float))
             for side, bn in ((1, "WingL"), (-1, "WingR")):
                 Br = bones[bn].matrix_local; Sr = bones["Spine2"].matrix_local
                 Rb = Br.to_3x3().normalized()
@@ -283,6 +306,8 @@ def run(arm, rig, ink_obj=None, words=None, wing_flap=True, log=print, tip_rest=
                     M0 = MA[f]["Spine2"] @ Sr.inverted() @ Br
                     R0 = M0.to_3x3().normalized()
                     fw = Quaternion((0, 1, 0), float(side * flap[i])) @ Quaternion((0, 0, 1), float(side * 0.5 * flap[i]))
+                    if th_t is not None:  # v4 自轉：紙翼跟著整身轉
+                        fw = Quaternion((0, 0, 1), float(th_t[i])) @ fw
                     qs.append((R0.inverted() @ fw.to_matrix() @ Rb).to_quaternion())
                 _write_quats(act, bn, qs, f0)
                 # 紙翼骨縮放：所有片段都 key 成 1；Die 在倒地前（約 1.25–1.75 秒）收成 0，二階一擊致死也不會翼尖入地

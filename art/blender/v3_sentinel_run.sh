@@ -1,5 +1,5 @@
 #!/bin/bash
-# v3 sentinel 一鍵流程：bash art/blender/v3_sentinel_run.sh [--quick] [--noanim] [--only A,B] [--norender]
+# v3 sentinel 一鍵流程：bash art/blender/v3_sentinel_run.sh [--quick] [--noanim] [--only A,B] [--norender]  （--nobake：沿用 v3/tmp/sentinel/baked 的烘焙圖）
 # Blender（headless）建模＋烘焙＋動作＋匯出 export_raw → 預覽拼圖 → P2 群組節點 → gltf-transform（meshopt、webp 2048，保留節點）→ P2 scale 0 → 量測 → 檢查
 cd "$(dirname "$0")"
 BL="/c/Program Files/Blender Foundation/Blender 4.2/blender.exe"

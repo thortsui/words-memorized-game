@@ -1,6 +1,6 @@
 """單字魂 v3 主角騎士 hero_knight（規格：art/v3/specs/hero_knight.md；參考：art/reference/hero_knight_sheet.jpg）。
 用法（headless）：
-  blender --background --factory-startup --python v3_hero_build.py -- [--quick] [--nobake] [--noanim] [--only A,B] [--noviews]
+  blender --background --factory-startup --python v3_hero_build.py -- [--quick] [--nobake] [--reusebake] [--noanim] [--only A,B] [--noviews]
 輸出：art/blender/export_raw/hero_knight.glb（未壓縮）、export_raw/hero_knight.clipmeta.json、
       art/blender/source/v3_hero_knight.blend、預覽圖塊 art/v3/tmp/hero/tiles/
 壓縮到 public/models 由 v3_hero_run.sh 用 gltf-transform 做。
@@ -20,13 +20,14 @@ QUICK = "--quick" in argv
 NOBAKE = "--nobake" in argv
 NOANIM = "--noanim" in argv
 NOVIEWS = "--noviews" in argv
+REUSE = "--reusebake" in argv          # v4：沿用 textures/baked 既有烘焙圖（不重烘），照常匯出
 ONLY = argv[argv.index("--only") + 1].split(",") if "--only" in argv else None
 TEX = int(argv[argv.index("--tex") + 1]) if "--tex" in argv else 2048
 MODEL = "hero_knight"
 ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT_GLB = os.path.join(HERE, "export_raw", MODEL + ".glb")
 OUT_BLEND = os.path.join(HERE, "source", "v3_" + MODEL + ".blend")
-TMP = os.path.join(ROOT, "art", "v3", "tmp", "hero")
+TMP = os.environ.get("HERO_TMP") or os.path.join(ROOT, "art", "v3", "tmp", "hero")
 TILES = os.path.join(TMP, "tiles")
 
 reset_scene()
@@ -136,7 +137,7 @@ print("TOPTRIS", " ".join(f"{n}:{t}" for t, n in _top), flush=True)
 
 import v3_hero_measure as MS
 MS.measure(B.parts, body, 1.8, os.path.join(TMP, "measure.json"))
-mesh = BK.assemble(B, MODEL, size=(TEX, TEX), bake=not (QUICK or NOBAKE), quick=QUICK, samples=16)
+mesh = BK.assemble(B, MODEL, size=(TEX, TEX), bake=not (QUICK or NOBAKE or REUSE), quick=QUICK, samples=16)
 BK.bind(mesh, arm)
 
 # ---------------------------------------------------------------- 動作
@@ -147,6 +148,10 @@ rig.tip_len = TIP_LEN
 if not NOANIM:
     import v3_hero_actions
     v3_hero_actions.build(rig, ONLY)
+    if QUICK or ONLY:
+        import json
+        os.makedirs(TMP, exist_ok=True)
+        json.dump(rig.meta, open(os.path.join(TMP, "meta_quick.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 if not (ONLY or QUICK or NOANIM or NOBAKE):
     BK.export_glb(arm, mesh, OUT_GLB)

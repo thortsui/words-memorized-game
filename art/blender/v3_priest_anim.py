@@ -6,6 +6,7 @@ import math
 import bpy
 from mathutils import Vector, Quaternion
 import v3_priest_actions
+import v3_priest_moves
 
 
 def _sim_chain(self, ch, data, loop):
@@ -106,6 +107,8 @@ def fix_weapon_ground(arm, zmin=0.03):
             bpy.context.view_layer.update()
             q = pb.rotation_quaternion.copy()
             pb.location = (0, 0, 0)
+            if sum(q[c] * fcs[c].evaluate(f) for c in range(4)) < 0:     # v1.3.0：與原關鍵格同半球，避免半格插值翻轉（槍瞬間掃進地面）
+                q = -q
             for c in range(4):
                 for k in fcs[c].keyframe_points:
                     if abs(k.co[0] - f) < 0.01:
@@ -206,6 +209,49 @@ def run(rig, only=None):
         "ps_open": lambda p: one(p, (-0.64, -0.18, 1.48), (-0.25, -0.15, 1.0), (0, -1, 0), (0.66, -0.16, 1.52), hintL=(0.2, 0.6, -0.7)),
         "ps_open2": lambda p: one(p, (-0.66, -0.14, 1.52), (-0.30, -0.10, 1.0), (0, -1, 0), (0.68, -0.12, 1.58), hintL=(0.2, 0.6, -0.7)),
         "ps_point": lambda p: two(p, (-0.10, -0.56, 1.28), (-0.06, -0.18, 1.10), (1, 0, 0)),
+        # ---- v1.3.0 新招（座標同上：x＋＝祭司左側、−y＝前方；槍尖在右手往「右手−左手」方向延伸）
+        # Sweep 寒杖橫掃：槍橫抱到左側（槍尖朝左後）→ 由左往右的低位大橫掃（大腿高）→ 掃到右後
+        "sw_wind": lambda p: two(p, (0.20, -0.20, 1.12), (-0.10, -0.32, 1.04), (0, 0, 1), elL=(0.2, -0.8, -0.6)),
+        "sw_coil": lambda p: two(p, (0.24, -0.12, 1.06), (-0.08, -0.30, 1.00), (0, 0, 1), elL=(0.2, -0.8, -0.6)),
+        "sw_mid": lambda p: two(p, (0.22, -0.50, 0.92), (-0.04, -0.30, 0.98), (0, 0, 1)),
+        "sw_hit": lambda p: two(p, (-0.08, -0.64, 0.86), (0.02, -0.32, 0.94), (0, 0, 1)),
+        "sw_fol": lambda p: two(p, (-0.50, -0.24, 0.90), (-0.18, -0.06, 0.98), (0, 0, 1)),
+        "sw_fol2": lambda p: two(p, (-0.46, 0.08, 0.98), (-0.16, -0.12, 1.02), (0, 0, 1)),
+        # Smash 冰柱砸落：單手把槍直立高舉（槍尖指天）、左手張掌向天召喚 → 槍尾垂直重砸地面、左掌按地
+        "sm_gather": lambda p: two(p, (-0.28, -0.26, 1.10), (0.10, -0.22, 0.86), (0.2, -0.5, -0.8)),
+        "sm_up": lambda p: one(p, (-0.30, -0.18, 1.92), (0.0, -0.06, 1), (1, 0, 0), (0.46, -0.12, 1.86), hintR=(-0.8, 0.3, -0.4), hintL=(0.4, 0.5, -0.7)),
+        "sm_up2": lambda p: one(p, (-0.30, -0.16, 2.00), (0.0, -0.04, 1), (1, 0, 0), (0.50, -0.10, 1.94), hintR=(-0.8, 0.3, -0.4), hintL=(0.4, 0.5, -0.7)),
+        "sm_hit": lambda p: one(p, (-0.28, -0.42, 1.40), (0.0, -0.10, 1), (1, 0, 0), (0.30, -0.46, 0.84), hintR=(-0.8, 0.4, -0.3), hintL=(0.7, 0.4, 0.2)),
+        "sm_low": lambda p: one(p, (-0.28, -0.44, 1.38), (0.0, -0.12, 1), (1, 0, 0), (0.30, -0.48, 0.78), hintR=(-0.8, 0.4, -0.3), hintL=(0.7, 0.4, 0.2)),
+        "sm_rec": lambda p: two(p, (-0.30, -0.30, 1.30), (0.06, -0.26, 0.96), (0.2, -0.5, -0.8)),
+        # Leap 冰面滑步斬：槍拖在右後低處（槍尖朝後）、低身滑行 → 槍尖經右側掄到前方、由右下往左上斜撩
+        "lp_drag": lambda p: two(p, (-0.34, 0.26, 0.98), (-0.12, -0.02, 1.02), (0, 0, 1)),
+        "lp_drag2": lambda p: two(p, (-0.36, 0.30, 0.92), (-0.14, 0.02, 0.98), (0, 0, 1)),
+        "lp_mid": lambda p: two(p, (-0.46, -0.34, 0.92), (-0.16, -0.20, 0.98), (0, 0, 1)),
+        "lp_hit": lambda p: two(p, (0.02, -0.68, 1.38), (-0.10, -0.38, 1.18), (1, 0, 0)),
+        "lp_fol": lambda p: two(p, (0.18, -0.48, 1.74), (0.00, -0.26, 1.48), (1, 0, 0)),
+        "lp_rec": lambda p: two(p, (-0.20, -0.36, 1.34), (0.04, -0.24, 1.00), (0.2, -0.5, -0.8)),
+        # ComboB 霜咒三連（慢－快－快）：右上高舉→斜劈到左下（重）→ 反手上撩回右上（快）→ 收槍直立、左掌推出冰咒（快）
+        "cb_w1": lambda p: two(p, (-0.36, 0.08, 1.74), (-0.10, -0.12, 1.48), (1, 0, 0)),
+        "cb_w1b": lambda p: two(p, (-0.38, 0.12, 1.80), (-0.12, -0.10, 1.54), (1, 0, 0)),
+        "cb_h1": lambda p: two(p, (0.10, -0.56, 1.00), (-0.12, -0.30, 1.20), (1, 0, 0)),
+        "cb_h1f": lambda p: two(p, (0.20, -0.46, 0.94), (-0.04, -0.26, 1.12), (1, 0, 0)),
+        "cb_h2": lambda p: two(p, (-0.40, -0.46, 1.56), (-0.12, -0.26, 1.30), (1, 0, 0)),
+        "cb_h2f": lambda p: two(p, (-0.44, -0.30, 1.66), (-0.16, -0.14, 1.40), (1, 0, 0)),
+        "cb_h3p": lambda p: one(p, (-0.42, 0.04, 1.36), (-0.05, 0.15, 1), (1, 0, 0), (0.08, -0.18, 1.34), hintL=(0.8, 0.3, -0.5)),
+        "cb_h3": lambda p: one(p, (-0.44, 0.10, 1.34), (-0.05, 0.20, 1), (1, 0, 0), (0.06, -0.74, 1.40), hintL=(0.8, 0.3, -0.5)),
+        "cb_h3f": lambda p: one(p, (-0.44, 0.08, 1.32), (-0.05, 0.18, 1), (1, 0, 0), (0.06, -0.68, 1.36), hintL=(0.8, 0.3, -0.5)),
+        # Special 冰棺降臨：低伏蓄力 → 浮空、槍直指天、雙臂張開（最長預備）→ 槍尖轉向前方鎖定 → 雙手倒握高舉（槍尖朝下）
+        #   → 落地單膝跪、槍尖垂直插向地面（冰棺升起，命中 1）→ 停頓 → 扭槍上撩（冰棺爆裂，命中 2）
+        "sp_gather": lambda p: two(p, (-0.24, -0.28, 0.98), (0.12, -0.20, 0.80), (0.2, -0.5, -0.8)),
+        "sp_rise": lambda p: one(p, (-0.36, -0.14, 1.86), (0.0, -0.03, 1), (1, 0, 0), (0.64, -0.12, 1.62), hintR=(-0.8, 0.3, -0.4), hintL=(0.2, 0.6, -0.7)),
+        "sp_rise2": lambda p: one(p, (-0.38, -0.12, 1.96), (0.0, -0.02, 1), (1, 0, 0), (0.68, -0.08, 1.76), hintR=(-0.8, 0.3, -0.4), hintL=(0.2, 0.6, -0.7)),
+        "sp_aim": lambda p: two(p, (-0.16, -0.50, 1.70), (-0.06, -0.14, 1.66), (1, 0, 0)),
+        "sp_pre": lambda p: two(p, (-0.12, -0.42, 1.80), (-0.10, -0.38, 2.20), (1, 0, 0)),
+        "sp_hit": lambda p: two(p, (-0.10, -0.50, 0.96), (-0.08, -0.47, 1.30), (1, 0, 0)),
+        "sp_low": lambda p: two(p, (-0.10, -0.50, 0.94), (-0.08, -0.47, 1.26), (1, 0, 0)),
+        "sp_wrench": lambda p: two(p, (-0.46, -0.32, 1.44), (-0.16, -0.30, 1.16), (1, 0, 0)),
+        "sp_wrench2": lambda p: two(p, (-0.50, -0.20, 1.56), (-0.20, -0.22, 1.26), (1, 0, 0)),
     }
     FLOAT = 0.235
 
@@ -226,7 +272,7 @@ def run(rig, only=None):
     def wp(key, p):
         print("WPKEY", key, flush=True)
         WP[key](p)
-    v3_priest_actions.build(rig, wp, primary="sweep", slow=1.0, only=only, wide=0.95, phase=phase)
+    v3_priest_actions.build(rig, wp, primary="sweep", slow=1.0, only=only, wide=0.95, phase=phase, extra=v3_priest_moves.extra)
     # 光環在 IdleAggro 中左右緩擺 ±6°（開口朝下的環不能整圈轉），首尾無縫
     act = bpy.data.actions.get("IdleAggro")
     if act:
@@ -243,10 +289,10 @@ def run(rig, only=None):
             print("HALO wobble keyed", n, flush=True)
     rig.arm["spear"] = (BUTT, TIPS)
     fix_weapon_ground(rig.arm)
-    fix_mesh_ground(rig.arm)
+    fix_mesh_ground(rig.arm, more=("Sweep", "Smash", "Leap", "ComboB", "Special"))
 
 
-def fix_mesh_ground(arm, zmin=0.012, max_iter=30):
+def fix_mesh_ground(arm, zmin=0.012, max_iter=30, more=()):
     """最後一道地面約束（逐片段逐格、看真正蒙皮後的網格）：頂點低於地面且主要權重是布料骨（袍擺 Hem*、袖尾 Sleeve*）時，
     把那根骨頭小步往上掀（骨頭方向轉向 +Z；快垂直時改往外掀），直到網格離地，改寫該格的旋轉關鍵格。
     遊戲是連續時間取樣：再檢查每個半格，半格仍低於地面時，把前後兩格用更高的門檻再抬一次（最多 3 輪）。"""
@@ -290,10 +336,12 @@ def fix_mesh_ground(arm, zmin=0.012, max_iter=30):
         pb.location = (0, 0, 0)
 
     def write(fcm, b, f):
-        q = arm.pose.bones[b].rotation_quaternion
+        q = arm.pose.bones[b].rotation_quaternion.copy()
         fc4 = fcm.get(b)
         if not fc4 or None in fc4:
             return
+        if sum(q[c] * fc4[c].evaluate(f) for c in range(4)) < 0:      # v1.3.0：同半球，避免半格插值翻轉
+            q = -q
         for c in range(4):
             for k in fc4[c].keyframe_points:
                 if abs(k.co[0] - f) < 0.01:
@@ -331,7 +379,7 @@ def fix_mesh_ground(arm, zmin=0.012, max_iter=30):
             for c in v:
                 if c:
                     c.update()
-        for rnd_ in range(3):
+        for rnd_ in range(6 if tr.name in more else 3):      # v1.3.0 新招多補幾輪半格（既有片段維持 3 輪，結果不變）
             extra = 0.012 * (rnd_ + 1)
             hit = 0
             for f in range(f0, f1):

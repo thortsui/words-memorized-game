@@ -148,6 +148,8 @@ const MSG={
   ambushEnd:e=>[`撐過突襲，繼續攻擊！（剩 ${(e.atkLeft/1000).toFixed(1)} 秒）`,"good"],
 };
 const SFX={gain:"shot",atb:"shot",chainStart:"shot",chainCharge:"shot",telegraph:"hurt",parry:"parry",dodge:"shot",faint:"faint",heal:"win"};
+// 魂系：真實取樣音效（audio.js）。telegraph 的預警聲由場景依招式自己放
+const SFX_SOUL={faint:"bossDie",heal:"drink",flaskRefill:"drink",bossPhase:"phase",weakBreak:"finisher",assault:"clashBig",miss:"gradeWrong"};
 const LOCK_TIP="鎖住時亂點，每下慢 "+SOUL.flinchMs/1000+" 秒";
 // 大招演出期間（起手到最後一段傷害）在 .bwrap 掛 bigfx：「你」的血量框先收起來，不擋畫面
 const bigFx=v=>{const w=app.querySelector(".bwrap");if(w)w.classList.toggle("bigfx",!!v)};
@@ -156,13 +158,15 @@ async function run(t,events){try{await runEvents(t,events)}finally{if(alive(t))b
 function staDrain(n){const el=app.querySelector(".enb.sta");if(!el||!n)return;el.classList.remove("drain");void el.offsetWidth;el.classList.add("drain");
   const f=document.createElement("em");f.className="stadrop";f.textContent="−"+n;el.appendChild(f);setTimeout(()=>f.remove(),900)}
 async function runEvents(t,events){for(const e of events){if(!alive(t))return;
-    if(!t.soul){if((e.type==="skill"&&e.big)||e.type==="chainFire")bigFx(true);else if(e.type!=="hit"&&e.type!=="chainStage"&&!(e.type==="skill"&&e.chainStage))bigFx(false)}const m=MSG[e.type]&&MSG[e.type](e);if(m)say(m[0],m[1]);if(SFX[e.type])sfx(SFX[e.type]);
+    if(!t.soul){if((e.type==="skill"&&e.big)||e.type==="chainFire")bigFx(true);else if(e.type!=="hit"&&e.type!=="chainStage"&&!(e.type==="skill"&&e.chainStage))bigFx(false)}const m=MSG[e.type]&&MSG[e.type](e);if(m)say(m[0],m[1]);const sx=t.soul?SFX_SOUL[e.type]:SFX[e.type];if(sx)sfx(sx);
     const s=e.s;
-    if(e.type==="hit"){e.onImpact=()=>{sfx(e.big||e.dmg>=40?"crit":"hit");hud(s,"foe")}} // 命中瞬間才扣怪物血
+    // 魂系連斬：答題期間刀先存著，整套答完才一口氣播（view 會在 payload 標 deferred）。這段期間 Boss 血條不動，等真的砍到（onImpact）才扣
+    const H2=(x,part)=>hud(x,t.foeHold&&part!=="foe"?"me":part);
+    if(e.type==="hit"){e.onImpact=()=>{sfx(t.soul?(e.big||e.dmg>=40||e.last?"crit":SOUL_BOSSES[s.mi]&&SOUL_BOSSES[s.mi].id==="gargoyle"?"stone":"flesh"):(e.big||e.dmg>=40?"crit":"hit"));hud(s,"foe")}} // 命中瞬間才扣怪物血
     else if(e.type==="playerHit"){e.onImpact=()=>{sfx("hurt");hud(s,"me")}}
-    else if(e.type==="drink"){e.onImpact=()=>{sfx("win");hud(s,"me")}} // 喝下去那一刻才補血
+    else if(e.type==="drink"){e.onImpact=()=>{sfx(t.soul?"drink":"win");hud(s,"me")}} // 喝下去那一刻才補血
     else if(e.type==="heal"&&!t.soul){e.onImpact=()=>hud(s,"me")} // 打怪模式：治癒光落到身上那一刻才補血（音效照舊在事件開頭）
-    else hud(s);
+    else H2(s);
     if(t.soul&&(e.type==="guard"||e.type==="dodge"||e.type==="graze")){const prev=t.lastSta==null?s.stamina:t.lastSta;if(prev>s.stamina)staDrain(prev-s.stamina)}
     if(t.soul&&s)t.lastSta=s.stamina;
     if(e.type==="win")sfx("win");if(e.type==="lose")sfx("lose");
@@ -175,7 +179,8 @@ async function runEvents(t,events){for(const e of events){if(!alive(t))return;
       else if(bq&&e.type==="assault"){closeMenu();bq.innerHTML=soulHud();$("#sphase").textContent="突擊！";$("#satb").innerHTML=atbHtml(s)}
       else if(bq&&e.type==="perkOffer"){closeMenu();bq.innerHTML=""}
       if(e.type==="bossEnter"&&e.index>0){t.skippable=true;say(`${e.boss.name} 擋在你面前。（點戰場可跳過登場）`,"bad")}}
-    await t.view.play(e.type,e);t.skippable=false;if(!alive(t))return;hud(s);if(t.soul){const sa=$("#satb");if(sa)sa.innerHTML=atbHtml(s)}}}
+    await t.view.play(e.type,e);t.skippable=false;if(!alive(t))return;
+    if(e.deferred)t.foeHold=true;else if(t.foeHold&&(e.type==="hit"||e.type==="slashEnd"||e.type==="bossPhase"||e.type==="faint"))t.foeHold=false;H2(s);if(t.soul){const sa=$("#satb");if(sa)sa.innerHTML=atbHtml(s)}}}
 
 /* ---------- 題目卡（兩種模式共用） ---------- */
 function qCard(t,w,m,o={}){let prompt="",body="";t.qm=m; // 綜合題型：記下這一題實際的題型（錯題紀錄用）
@@ -272,7 +277,7 @@ function sQ_(t){if(!alive(t)||!$("#bq"))return;++t.seq;t.view.setTimeScale(1);cl
     say(ok?`答對！${loose?"（"+loose+"）":""}${sk?(sk.perfect?"完美！":"")+sk.n+" 連斬":""}。剩餘攻擊時間 ${(s.atkLeft*sc/1000).toFixed(1)} 秒`:`答錯了，多扣 ${(SOUL.missPenaltyMs*sc/1000).toFixed(1)} 秒！剩餘攻擊時間 ${(s.atkLeft*sc/1000).toFixed(1)} 秒`,ok?"good":"bad");
     setAns(true);const seq=t.seq;
     // 連斬第 2 刀起要答斬擊題：先砍第一刀，接著出題
-    if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,700);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}
+    if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,450);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}
     const r=await settle(t,seq,evs,{flask:true});if(!r)return;if(t.E.state.phase!=="cmd")return sGo(t); // 被突襲、打倒 Boss（練等）、陣亡
     if(r==="flask"){await run(t,t.E.command(4));if(!alive(t))return;return sFlask(t)}
     soulNext(t,seq)},()=>tm.stop());
@@ -306,7 +311,7 @@ function sSlash_(t){if(!alive(t)||!$("#bq"))return;const seq=++t.seq;closeMenu()
   let done=false,tm=null;
   const fin=async(ok,idx,given,opt)=>{if(done)return;done=true;const ms=tm?tm.stop():0;t.phase="busy";setAns(true);mark(w,ok,given,t.qm||t.mode);markOpts(t,idx);answerLine(w,ok,exSpk(w));readShort(w,$("#bans .spk"));
     const evs=t.E.answerSlash(ok,opt&&opt.timeout?q.limitMs+1:ms,opt||{});
-    if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,700);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}
+    if(t.E.state.phase==="slash"){await run(t,evs);if(!alive(t)||t.seq!==seq)return;await holdFor(t,450);if(!alive(t)||t.seq!==seq)return;return sSlash(t)}
     const r=await settle(t,seq,evs,{flask:true});if(!r)return;if(t.E.state.phase!=="cmd")return sGo(t);
     if(r==="flask"){await run(t,t.E.command(4));if(!alive(t))return;return sFlask(t)}
     soulNext(t,seq)};

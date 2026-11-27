@@ -569,6 +569,9 @@ def build_anim(arm=None, mesh=None, p2=None):
     A.ground_skip = {b.name for b in arm.data.bones if b.name.startswith(("Tail", "Wing"))}
     G0.define_actions(Wrap(A), L.sym)
     phase_shift(A, L.sym)
+    # v4（v1.3.0）新增攻擊片段 Sweep／Smash／Leap／ComboB／Special（只新增，既有片段不變）＋ meta 的 cancel
+    import v4_gargoyle_actions as V4
+    V4.define(A, L.sym)
     # 片段順序與合約一致
     VL.export_glb(arm, [mesh] + p2, OUT_GLB)
     L.write_meta(A, NAME, os.path.join(HERE, "export_raw"))
@@ -595,7 +598,7 @@ def build_anim(arm=None, mesh=None, p2=None):
     for r, (name, (act, last)) in enumerate(A.actions.items()):
         for i in range(8):
             f = round(last * i / 7)
-            VL.show_p2(p2, name == "IdleAggro" or (name == "PhaseShift" and f >= 30))
+            VL.show_p2(p2, name in ("IdleAggro", "Smash", "Leap", "ComboB", "Special") or (name == "PhaseShift" and f >= 30))
             A.show(name, f)
             L.render(os.path.join(TILES, f"act_{r:02d}_{name}_{i}_f{f:03d}.png"), (400, 400))
     A.show(None, 0)

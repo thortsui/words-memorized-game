@@ -1208,6 +1208,11 @@ if not ONLY:
         BK.write_meta(rig, MODEL, os.path.join(HERE, "export_raw"))
     os.makedirs(os.path.dirname(OUT_BLEND), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
+if os.environ.get("SEN_DEVBLEND"):          # v1.3.0：動作試作用（--only 時也存一份 blend 給預覽腳本）
+    bpy.ops.wm.save_as_mainfile(filepath=os.environ["SEN_DEVBLEND"], copy=True)
+    if not NOANIM:
+        import json
+        json.dump(rig.meta, open(os.environ["SEN_DEVBLEND"] + ".meta.json", "w"), indent=1)
 if not NORENDER:
     import v3_sentinel_render as RD
     RD.render_all(arm, mesh, p2objs, h, TILES, anim=not NOANIM, only=ONLY)

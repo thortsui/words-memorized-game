@@ -2,7 +2,7 @@
 參考圖：art/reference/v2/devourer_p1/p2/p3.jpg（左右鏡像：本模型左手符紋、右手握劍）。
 建模單位：公尺，H（角尖到靴底）＝3.9 m（＝遊戲縮放身高，載入後縮放約 1.0）。顱頂 0.86H。
 
-用法：blender --background --factory-startup --python v3_devourer_model.py -- [--quick] [--noanim] [--only A,B]
+用法：blender --background --factory-startup --python v3_devourer_model.py -- [--quick] [--nobake] [--noanim] [--only A,B]
   --quick：不烘焙（代表色），用來快速看造型。
 輸出：art/blender/export_raw/boss_devourer.glb、.clipmeta.json、art/blender/source/v3_devourer.blend
 """
@@ -20,6 +20,7 @@ import v3_devourer_hum as VH
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 QUICK = "--quick" in argv
 NOANIM = "--noanim" in argv
+NOBAKE = "--nobake" in argv          # v4：沿用 textures/baked/v3_devourer_* 既有烘焙（幾何不變時用）
 ONLY = argv[argv.index("--only") + 1].split(",") if "--only" in argv else None
 MODEL = "boss_devourer"
 BAKEKEY = "v3_devourer"
@@ -1411,7 +1412,7 @@ for o in B.parts:
     at = o.data.attributes.new("mcls", "INT", "POINT")
     c = _mcls(o.name)
     at.data.foreach_set("value", [c] * len(o.data.vertices))
-mesh = VH.assemble3(B, BAKEKEY, size=(TEXS, TEXS), bake=not QUICK, quick=QUICK, detail_of=DETAIL_OF, U=1.0)
+mesh = VH.assemble3(B, BAKEKEY, size=(TEXS, TEXS), bake=not (QUICK or NOBAKE), quick=QUICK, detail_of=DETAIL_OF, U=1.0)
 BONE_OF = {"P2_ChestMaw": "Spine2", "P2_ScriptChest": "Spine2", "P2_ScriptL": "UpperArmL", "P2_ScriptR": "UpperArmR", "P2_ScriptLegL": "ThighL",
            "P2_ScriptLegR": "ThighR", "P2_SwordCracks": "Weapon", "P2_PageWingL": "WingL", "P2_PageWingR": "WingR", "P3_Crown": "Head",
            "P3_HornBrokenR": "Head", "P3_HornBrokenL": "Head", "P3_HornBrokenR2": "Head", "P3_EyeFlames": "Head", "P3_InkBody": "InkTide",

@@ -33,3 +33,6 @@ art/blender/source/v3*.blend
 art/blender/source/*.blend1
 art/v3/tmp/
 _claude/
+art/v4/audio/raw/
+art/v4/audio/tmp/
+art/v4/tmp/

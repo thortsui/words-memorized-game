@@ -1,15 +1,17 @@
 #!/bin/bash
 # v3 噬語魔王：貼圖產生 → Blender 建模＋烘焙＋動作＋匯出 → 預覽 → 壓縮到 public/models → 後處理 → clipmeta 合併 → 檢查
-# 用法：bash art/blender/v3_devourer_run.sh [--quick] [--skip-build] [--noprev]
+# 用法：bash art/blender/v3_devourer_run.sh [--quick] [--nobake] [--skip-build] [--noprev]
+#   --nobake：沿用 textures/baked/v3_devourer_* 既有烘焙（只改動作時用，v4 起）
+#   暫存／log：art/v4/tmp/devourer（v4 起；C: 槽滿）
 cd "$(dirname "$0")"
 BL="/c/Program Files/Blender Foundation/Blender 4.2/blender.exe"
-TMPD="$(cd ../v3/tmp && pwd)/devourer"; mkdir -p "$TMPD"
+mkdir -p ../v4/tmp/devourer; TMPD="$(cd ../v4/tmp/devourer && pwd)"
 export TEMP="$TMPD" TMP="$TMPD"
 LOG="$TMPD/log_build.txt"
 M=boss_devourer
 python v3_devourer_tex.py
 if [[ " $* " != *" --skip-build "* ]]; then
-  "$BL" --background --factory-startup --python v3_devourer_model.py -- $( [[ " $* " == *" --quick "* ]] && echo --quick ) > "$LOG" 2>&1
+  "$BL" --background --factory-startup --python v3_devourer_model.py -- $( [[ " $* " == *" --quick "* ]] && echo --quick ) $( [[ " $* " == *" --nobake "* ]] && echo --nobake ) > "$LOG" 2>&1
   grep -aE "Traceback|Error|rror:|CAPE|WING|SWORD|TRIS|PART |X3PART|ACTION|reach|ground|META|DONE|line [0-9]+" "$LOG" | cut -c1-220
 fi
 BLEND=source/v3_devourer.blend; [[ " $* " == *" --quick "* ]] && BLEND=source/v3_devourer_quick.blend

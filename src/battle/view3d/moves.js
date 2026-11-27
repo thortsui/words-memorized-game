@@ -10,6 +10,7 @@
 //   pal                      配色 {slash, fire, thunder, ice, holy, meteor}
 import * as THREE from 'three';
 import { ease, rand } from './engine.js';
+import { sfx } from '../../core/audio.js';
 
 const v3=(x,y,z)=>new THREE.Vector3(x,y,z);
 
@@ -46,8 +47,62 @@ export function createMoves(ctx){
       const g=hero.root.position;fx.ring(v3(g.x,0,g.z),{color:0xffe0a0,r1:2.4,dur:.4});fx.emitN({p:v3(g.x,.1,g.z),n:16,color:[0x6b7078,0x8a8f98],speed:[1,3],flat:.3,up:.6,size:[.3,.6],life:[.4,.8],alpha:.4,drag:2,grow:.8});return}
     hero.play("Slash");await eng.wait(hero.impactTime("Slash"))}
 
+  /* ---- v1.3.0 連續連斬 ----
+     答題期間不出刀：主角架在 ChainReady 蓄勢，每答對一題只亮一下判定（完美／普通）；整套答完（或答錯、擊倒、被突襲）才一口氣播完整段連續動作。
+     第 i 刀依那一題的判定挑片段：完美＝ChainP1–P4（華麗）、普通＝ChainN1–N4（樸素）；最後一刀是終結技——全部完美＝FinishAll、最後一題完美＝FinishP、否則 FinishN。
+     答錯＝播完已答對的刀之後接 ChainBreak（被彈開、踉蹌）。每一段在 cancel 時間交叉淡入下一段，所以任何判定組合都串成一整段。 */
+  const ROW={perfect:["ChainP1","ChainP2","ChainP3","ChainP4"],normal:["ChainN1","ChainN2","ChainN3","ChainN4"]};
+  const hasFlow=()=>hero.has("ChainP1")&&hero.has("ChainN1")&&hero.has("FinishN")&&hero.has("FinishP");
+  const LUNGE={ChainP1:.15,ChainP3:.1,ChainN3:.12,FinishAll:.1,FinishP:.1,AssaultEnd:.3,Execution:.15,Riposte:.15}; // 這一段往前踏多少（公尺，片段原地播放）
+  const ANG={ChainP1:.7,ChainP2:-1.0,ChainP3:1.5,ChainP4:.2,ChainN1:-1.3,ChainN2:-.8,ChainN3:.1,ChainN4:0,FinishAll:-1.5,FinishP:3.1,FinishN:-1.4,AssaultA:.6,AssaultB:-.7,AssaultEnd:.1,Execution:-1.2,Riposte:.4};
+  function flowClip(p,fin,grades){const g=p.grade==="perfect"?"perfect":"normal";
+    if(fin)return grades.length>1&&grades.every(x=>x==="perfect")?"FinishAll":g==="perfect"?"FinishP":"FinishN";
+    return ROW[g][Math.min(p.index||0,3)]}
+  // 答題中的判定提示：主角頭上冒出「完美／普通」、劍上聚光（完美更亮）
+  function mark(p){const perf=p.grade==="perfect",c=hero.center(v3(),1.12);
+    fx.text(c,perf?"完美":"普通",perf?"soul gold big":"soul",{dur:.8,rise:18,dx:0,rot:0});sfx(perf?"gradePerfect":"gradeNormal",{v:.7});sfx("charge",{v:.5});
+    const hc=heroHand();fx.emit({p:hc,n:perf?16:7,color:perf?[0xffe2a0,0xffffff,0xffc04a]:[0xdfe8ff,0xffffff],speed:[.3,1.4],up:.6,size:[.04,perf?.12:.08],life:[.25,.55],radius:.25,kind:1});
+    if(perf)fx.flash(hc,{color:0xffe2a0,size:.6,dur:.16,opacity:.8})}
+  const until=t=>eng.wait(Math.max(0,t-eng.time));
+  // 一段：播片段、命中那幾格出刀光與傷害、到 cancel 時間就交給下一段。回傳 impact 的 promise
+  async function seg(clip,p,{fade=.1,power=.85,last=false}={}){const f=ctx.foe();if(!f)return;const P=hero.pose;
+    if(window.__soulTest)(window.__chainLog=window.__chainLog||[]).push({clip,grade:p.grade,index:p.index,t:+eng.time.toFixed(2)});
+    hero.play(clip,{fade,hold:true});const t0=eng.time,D=hero.duration(clip),hits=(hero.hitTimes(clip)||[hero.impactTime(clip)]).slice(),cut=last?D*.9:hero.cancelTime(clip),L=LUNGE[clip]||0;
+    sfx(/^Finish/.test(clip)?"swingH":"swingL",{v:.8});
+    if(L)eng.tween(Math.max(.08,hits[0]),k=>{P.position.z=L*ease.out(k)}).then(()=>eng.wait(Math.max(0,cut-hits[0]-.15))).then(()=>{if(st&&st.flowing)eng.to(P.position,{z:0},.25,ease.io)});
+    let im=null;const n=hits.length;
+    for(let j=0;j<n;j++){await until(t0+hits[j]);const c=foeC(),fin=j===n-1;
+      const a=(ANG[clip]??rand(-.9,.9))+(j%2?Math.PI*.6:0);
+      fx.slash(c,{color:pal.slash,size:Math.min(2.4,f.h*(power>1.2?1.35:1)+.2),ang:a,flip:j%2===1,sweep:/P2|FinishP|FinishAll/.test(clip)?2.4:1.5});
+      if(/FinishAll|FinishP/.test(clip)&&fin){fx.slash(c,{color:0xffffff,size:Math.min(2.4,f.h*1.2+.3),ang:-a,sweep:2.2,flip:true});fx.burstRing(c,{color:0xffe0a0,r1:2.2,dur:.35})}
+      metal(c,power>1.2&&fin);sfx(power>1.2&&fin?"clashBig":"clash",{v:.8});
+      // 傷害（扣血、數字）落在這一段最後一個命中；前面的命中只有刀光與火花
+      if(fin){im=ctx.impact(p,{power,color:pal.slash});if(last)sfx("finisher",{v:.9})}else{const b=ctx.foe();if(b){b.flash(0xffffff,.6);b.knock(.05,.02)}}}
+    if(/FinishAll/.test(clip)){const g=hero.root.position;fx.ring(v3(g.x,0,g.z),{color:0xffe0a0,r1:2.6,dur:.45});sfx("slam",{v:.6})}
+    await until(t0+cut);return im}
+  // 播放累積的連斬。mode：final（砍完／擊倒，最後一刀是終結技）、break（答錯）、cut（被突襲打斷）、partial（中途轉階段：播完已答的刀，回到蓄勢）
+  async function flush(mode="final"){const S=st;if(!S||!S.flow||S.flowing)return;const Q=S.queue.splice(0);
+    if(!Q.length&&mode!=="break"){if(mode==="final")await finish();return}
+    S.flowing=true;ctx.cam("melee");if(S.reapproach){S.reapproach=false;await ctx.approach(.22)}
+    const grades=Q.length?(Q[Q.length-1].grades||Q.map(x=>x.grade)):[];let im=null;
+    for(let k=0;k<Q.length;k++){const p=Q[k],fin=mode==="final"&&k===Q.length-1&&(p.last||p.kill),clip=flowClip(p,fin,grades);
+      const pw=clip==="FinishAll"?2.2:fin?1.6:p.grade==="perfect"?.95:.75;
+      im=await seg(clip,p,{fade:!k?.14:fin&&(p.index||0)<4?.15:.1,power:pw,last:fin});if(st!==S)return}
+    if(im)await im;
+    if(mode==="break"&&hero.has("ChainBreak")){hero.play("ChainBreak",{fade:.08,hold:true});sfx("clashBig",{v:.6});sfx("gradeWrong",{v:.6});metal(foeC(),false);
+      await eng.wait(hero.duration("ChainBreak")*.85)}
+    S.flowing=false;hero.pose.position.z=0;
+    if(mode==="partial"){S.reapproach=true;hero.play("ChainReady",{fade:.15});return}
+    if(mode==="cut")return;
+    if(hero.has("ChainRecover")&&mode==="final"){hero.play("ChainRecover",{fade:.12,hold:true});await eng.wait(hero.duration("ChainRecover")*.45)}
+    await finish()}
+
   async function start(p){const move=p.move||p.skillId||"slash";st={move,n:0};const h=hero.h;
-    if(melee(move)){st.melee=true;ctx.cam("melee");await ctx.approach(move==="counter"?.16:move==="quick"?.2:.3);return}
+    // 連斬三種演出：flow（攻擊題開始的連續連斬）、assault（突擊）、exec（弱點擊破處決）
+    if(move==="chain"&&hasFlow()){if(p.assault){st.assault=true;st.final=(p.index||0)>=(p.total||1)-1;st.ai=p.index||0}else if(p.type==="weakBreak"&&hero.has("Execution"))st.exec=true;
+      else{st.flow=true;st.queue=[]}}
+    if(melee(move)){st.melee=true;ctx.cam("melee");await ctx.approach(move==="counter"?.16:move==="quick"?.2:.3);
+      if(st&&st.flow&&hero.has("ChainReady")){hero.play("ChainReady",{fade:.18});sfx("charge",{v:.6})}return}
     if(move==="meteorEnd"){st.air=true;ctx.cam("sky");
       // 躍起：飛到敵人上方
       const f=ctx.foe(),r=hero.root.position,from=r.clone(),to=v3().lerpVectors(from,f.root.position,.62);to.y=Math.max(2.6,f.h*1.9);
@@ -75,6 +130,14 @@ export function createMoves(ctx){
     else await eng.wait(.3)}
 
   async function hit(p){if(!st)st={move:p.move||"slash",n:0,melee:true};const S=st,move=st.move,i=p.index||0,h=hero.h,f=ctx.foe();if(!f)return ctx.impact(p,{power:1});const c=foeC();
+    if(move==="chain"&&S.flow){S.queue.push(p);if(!(p.last||p.kill))p.deferred=true;mark(p);if(p.last||p.kill)await flush("final");return}
+    if(move==="chain"&&(S.assault||S.exec)){
+      if(i===0){S.clip=S.exec?"Execution":S.final?"AssaultEnd":S.ai%2?"AssaultB":"AssaultA";S.t0=eng.time;hero.play(S.clip,{fade:.1,hold:true});sfx(S.exec||S.final?"swingH":"swingL",{v:.8});const L=LUNGE[S.clip]||0;
+        if(L)eng.tween(Math.max(.08,hero.impactTime(S.clip)),k=>{hero.pose.position.z=L*ease.out(k)})}
+      const ht=hero.hitTimes(S.clip)||[hero.impactTime(S.clip)],at=i<ht.length?ht[i]:ht[ht.length-1]+.12*(i-ht.length+1);await until(S.t0+at);
+      fx.slash(c,{color:pal.slash,size:Math.min(2.3,f.h*(p.last?1.3:1)+.2),ang:(ANG[S.clip]||0)+(i%2?Math.PI*.6:0),flip:i%2===1,sweep:p.last?2.2:1.5});metal(c,!!p.last);sfx(p.last?"clashBig":"clash",{v:.8});
+      await ctx.impact(p,{power:p.last?(S.exec?2:1.5):.8,color:pal.slash});
+      if(p.last){await until(S.t0+hero.cancelTime(S.clip));eng.to(hero.pose.position,{z:0},.25,ease.io);if(st===S)await finish()}return}
     if(move==="chain"){const n=p.n||p.total||3,set=(CHAIN[n]||CHAIN[3])[(p.variant||0)%3],code=set[Math.min(i,set.length-1)];
       await chainStep(code,i,p);
       const ang={c0:.6,c1:-.7,c2:1.6,s:.4,sf:-.9,h:-1.3,spin:0,leap:-1.5,thrust:.1}[code]??rand(-.9,.9);
@@ -87,6 +150,7 @@ export function createMoves(ctx){
       // 連斬：整段 Combo 只播一次，各段傷害對在片段裡實際揮到的那幾格（秒數表在 actors.js 的 IMPACT）
       if(move==="gale"){if(i===0){st.times=hero.comboTimes("Combo",p.total);st.t0=eng.time;hero.play("Combo")}
         const at=st.times[Math.min(i,st.times.length-1)]+(i>=st.times.length?.22*(i-st.times.length+1):0);await eng.wait(Math.max(0,st.t0+at-eng.time))}
+      else if(move==="counter"&&hero.has("Riposte")){hero.play("Riposte",{fade:.08});sfx("swingL",{v:.8});eng.tween(hero.impactTime("Riposte"),k=>{hero.pose.position.z=LUNGE.Riposte*ease.out(k)}).then(()=>eng.to(hero.pose.position,{z:0},.3,ease.io));await eng.wait(hero.impactTime("Riposte"))}
       else{const sp=move==="quick"||move==="counter"?1.35:1;hero.play("Slash",{speed:sp});await eng.wait(hero.impactTime("Slash",sp))}
       const ang=move==="gale"?[.6,-.7,1.6][i%3]:rand(.3,.9);
       fx.slash(c,{color:pal.slash,size:Math.min(1.9,f.h*(p.last&&move==="gale"?1.25:.95)+.2),ang,flip:i%2===1});
@@ -134,9 +198,11 @@ export function createMoves(ctx){
     if(p.last&&st===S)await finish()}
 
   // 收招：清掉魔法陣等殘留、恢復天色、主角回位
-  async function finish(){const s=st;st=null;if(!s)return;cleanup(s);ctx.dim(0,.4);ctx.cam("base");
+  async function finish(){const s=st;st=null;if(!s)return;cleanup(s);hero.pose.position.z=0;ctx.dim(0,.4);ctx.cam("base");
     if(s.melee||s.air)await ctx.retreat();else{hero.setLoop("Idle");hero.play("Idle")}}
   function cleanup(s){if(s.circle)s.circle.remove();if(s.orb)s.orb.remove();if(s.cloud)s.cloud.remove();if(s.glow)s.glow.remove();
     if(s.sword){eng.scene.remove(s.sword);s.sword.children.forEach(m=>m.material.dispose())}}
-  return{start,hit,finish,abort(){if(st){cleanup(st);st=null}}};
+  return{start,hit,finish,flush,abort(){if(st){cleanup(st);st=null;hero.pose.position.z=0}},
+    // 還有累積、還沒播出來的連斬（controller 用來延後扣 Boss 血條；轉階段前先播完）
+    pending:()=>!!(st&&st.flow&&(st.queue.length||st.flowing))};
 }

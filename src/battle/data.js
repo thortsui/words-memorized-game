@@ -125,26 +125,37 @@ export const SOUL_BIG=[
 // phases：血量比例降到 at 以下就進入該階段（atkMul 攻擊倍率、extra 多出手次數、limitMul 閃避時限倍率、danger 該回合最後一招改成必殺的機率）
 // kit：各階段的招式比重 {single 單擊, combo 連擊, delayed 延遲, dash 突進}；combo：各階段連擊段數 [最少, 最多]；names：各招式名
 // attacks＝每個敵人回合出幾「招」（連擊一招算多題）
+// moves：各階段每種攻擊的候選片段（v1.3.0：一階 5 種、二階再加 4 種新招、魔王三階再 2 種）；clipNames：片段 → 招式名（必殺仍用階段的 move）
 export const SOUL_BOSSES=[
  {id:"sentinel",name:"腐朽守門騎士",lv:5,hp:40,atk:10,move:"鏽戟橫掃",attacks:1,limitMs:4000,model:"boss_sentinel",arena:"gate_ruins",
   names:{combo:"鏽戟三連刺",delayed:"沉重高舉斬",dash:"盾牌衝撞"},
   kit:[{single:.6,dash:.2,delayed:.2},{single:.3,combo:.4,dash:.15,delayed:.15}],combo:[[3,3],[3,4]],
+  moves:[{single:["Attack","Attack2","Sweep","Sweep"],combo:["Combo3"],delayed:["Delayed"],dash:["Dash"]},{single:["Smash","Smash","Sweep","Attack2"],combo:["ComboB","ComboB","Combo3"],delayed:["Delayed"],dash:["Leap","Leap","Dash"],danger:["Special"]}],
+  clipNames:{Attack:"鏽戟橫掃",Attack2:"鏽戟下劈",Combo3:"鏽戟三連刺",Delayed:"沉重高舉斬",Dash:"盾牌衝撞",Sweep:"門板迴掃",Smash:"門板震地",Leap:"躍起戟擊",ComboB:"根鬚三連",Special:"根鬚纏擊"},
   phases:[{at:.5,name:"根鬚暴走",atkMul:1.15,extra:0,limitMul:.95,move:"根鬚纏擊",danger:.35}]},
  {id:"gargoyle",name:"教堂石像鬼",lv:10,hp:95,atk:13,move:"俯衝利爪",attacks:1,limitMs:4000,model:"boss_gargoyle",arena:"cathedral_roof",
   names:{combo:"狂亂爪擊",delayed:"懸停俯衝",dash:"石翼突襲"},
   kit:[{single:.35,combo:.3,dash:.2,delayed:.15},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[3,4],[3,5]],
+  moves:[{single:["Attack","Attack2","Sweep","Sweep"],combo:["Combo3"],delayed:["Delayed"],dash:["Dash"]},{single:["Smash","Smash","Sweep","Attack2"],combo:["ComboB","ComboB","Combo3"],delayed:["Delayed"],dash:["Leap","Leap","Dash"],danger:["Special"]}],
+  clipNames:{Attack:"俯衝利爪",Attack2:"石爪重擊",Combo3:"狂亂爪擊",Delayed:"懸停俯衝",Dash:"石翼突襲",Sweep:"石翼橫掃",Smash:"俯衝砸地",Leap:"飛撲",ComboB:"撕咬連擊",Special:"碎石吐息"},
   phases:[{at:.5,name:"石翼狂嘯",atkMul:1.15,extra:1,limitMul:.95,move:"碎石吐息",danger:.5}]},
  {id:"priest",name:"霜冠祭司",lv:16,hp:110,atk:13,move:"霜槍突刺",attacks:1,limitMs:4000,model:"boss_priest",arena:"frozen_chapel",
   names:{combo:"霜槍連刺",delayed:"寒冰蓄勢",dash:"冰面滑襲"},
   kit:[{single:.3,combo:.35,dash:.15,delayed:.2},{single:.15,combo:.45,dash:.2,delayed:.2}],combo:[[3,4],[4,5]],
+  moves:[{single:["Attack","Attack2","Sweep","Sweep"],combo:["Combo3"],delayed:["Delayed"],dash:["Dash"]},{single:["Smash","Smash","Sweep","Attack2"],combo:["ComboB","ComboB","Combo3"],delayed:["Delayed"],dash:["Leap","Leap","Dash"],danger:["Special"]}],
+  clipNames:{Attack:"霜槍突刺",Attack2:"寒杖重擊",Combo3:"霜槍連刺",Delayed:"寒冰蓄勢",Dash:"冰面滑襲",Sweep:"寒杖橫掃",Smash:"冰柱砸落",Leap:"冰面滑步斬",ComboB:"霜咒三連",Special:"冰棺降臨"},
   phases:[{at:.5,name:"永凍禱詞",atkMul:1.2,extra:0,limitMul:.9,move:"冰棺降臨",danger:.5}]},
  {id:"executioner",name:"暗影行刑者",lv:22,hp:135,atk:14,move:"斷頭斧斬",attacks:1,limitMs:4000,model:"boss_executioner",arena:"execution_yard",
   names:{combo:"處刑連斬",delayed:"高舉斷罪",dash:"影步突進"},
   kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[3,5],[4,5]],
+  moves:[{single:["Attack","Attack2","Sweep","Sweep"],combo:["Combo3"],delayed:["Delayed"],dash:["Dash"]},{single:["Smash","Smash","Sweep","Attack2"],combo:["ComboB","ComboB","Combo3"],delayed:["Delayed"],dash:["Leap","Leap","Dash"],danger:["Special"]}],
+  clipNames:{Attack:"斷頭斧斬",Attack2:"裂骨重斧",Combo3:"處刑連斬",Delayed:"高舉斷罪",Dash:"影步突進",Sweep:"斷頭橫掃",Smash:"斷罪劈地",Leap:"躍斬",ComboB:"處刑亂舞",Special:"影分身處刑"},
   phases:[{at:.5,name:"處刑之舞",atkMul:1.2,extra:1,limitMul:.9,move:"影分身處刑",danger:.6}]},
  {id:"devourer",name:"噬語魔王",lv:30,hp:180,atk:15,move:"噬語巨劍",attacks:2,limitMs:3600,model:"boss_devourer",arena:"throne_of_words",boss:true,
   names:{combo:"吞字連斬",delayed:"沉默之劍",dash:"虛空突刺"},
   kit:[{single:.25,combo:.4,dash:.15,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2},{single:.1,combo:.5,dash:.2,delayed:.2}],combo:[[3,5],[4,5],[4,5]],
+  moves:[{single:["Attack","Attack2","Sweep","Sweep"],combo:["Combo3"],delayed:["Delayed"],dash:["Dash"]},{single:["Smash","Smash","Sweep","Attack2"],combo:["ComboB","ComboB","Combo3"],delayed:["Delayed"],dash:["Leap","Leap","Dash"],danger:["Special"]},{single:["Smash","Sweep","Attack"],combo:["ComboC","ComboC","ComboB"],delayed:["Delayed"],dash:["Leap"],danger:["Special3"]}],
+  clipNames:{Attack:"噬語巨劍",Attack2:"黑墨重斬",Combo3:"吞字連斬",Delayed:"沉默之劍",Dash:"虛空突刺",Sweep:"墨刃橫掃",Smash:"魔劍震地",Leap:"虛空躍擊",ComboB:"吞字三連",Special:"詞語風暴",ComboC:"終焉四連",Special3:"終焉之言"},
   phases:[{at:.66,name:"吞噬詞語",atkMul:1.15,extra:0,limitMul:.95,move:"詞語風暴",danger:.5},{at:.33,name:"終焉咒言",atkMul:1.3,extra:1,limitMul:.9,move:"終焉之言",danger:1}]}];
 // 練等：每打倒一隻 Boss（最後一隻除外）從 3 個裡選 1 個強化，只在這一局有效。max＝最多疊幾層
 export const SOUL_PERKS=[

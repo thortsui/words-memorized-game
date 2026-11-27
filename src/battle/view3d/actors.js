@@ -82,7 +82,7 @@ const META_RAW=Object.values(import.meta.glob('./clipmeta.json',{eager:true,impo
 const META=(()=>{let m=META_RAW;if(!m||typeof m!=="object")return{};if(m.models&&typeof m.models==="object")m=m.models;const out={};
   for(const [model,v] of Object.entries(m)){if(!v||typeof v!=="object")continue;const clips=v.clips&&typeof v.clips==="object"?v.clips:v;out[model]={};
     for(const [clip,c] of Object.entries(clips)){if(!c||typeof c!=="object")continue;const hits=Array.isArray(c.hits)?c.hits.filter(x=>typeof x==="number"&&x>=0):typeof c.hit==="number"?[c.hit]:[];
-      out[model][clip]={dur:typeof c.dur==="number"&&c.dur>0?c.dur:null,hits:hits.sort((a,b)=>a-b),steps:Array.isArray(c.steps)?c.steps.filter(x=>typeof x==="number"):null}}}
+      out[model][clip]={dur:typeof c.dur==="number"&&c.dur>0?c.dur:null,hits:hits.sort((a,b)=>a-b),steps:Array.isArray(c.steps)?c.steps.filter(x=>typeof x==="number"):null,cancel:typeof c.cancel==="number"&&c.cancel>0?c.cancel:null}}}
   return out})();
 export const hasClipMeta=()=>Object.keys(META).length>0;
 // 某模型某片段的命中秒數（已依實際片長縮放）；沒有資料回傳 null
@@ -167,11 +167,11 @@ const PROC={
 };
 PROC.Die=PROC.Faint;
 // 循環動作：值＝沒有片段時用的程式擺動（stalk＝巨獸踏步，比 walk 慢、沉）
-const LOOPS={Idle:"idle",IdleAggro:"idle",Walk:"walk",Run:"run",Stalk:"stalk",StrafeL:"strafeL",StrafeR:"strafeR"};
+const LOOPS={Idle:"idle",IdleAggro:"idle",ChainReady:"idle",Walk:"walk",Run:"run",Stalk:"stalk",StrafeL:"strafeL",StrafeR:"strafeR"};
 // 片段不存在時依序找替代（同事的新片段之後才會到；沒有就退回現有片段＋位移）
 const FALLBACK={IdleAggro:["Idle"],Stalk:["Walk"],StrafeL:["Walk"],StrafeR:["Walk"],Delayed:["Attack2","Attack"],Dash:["Attack"],Combo3:[],Roar:[]};
 // 這些片段播放時開武器拖尾
-const SWING=/^(Slash|HeavySlash|Combo|Combo3|Attack|Attack2|Delayed|Dash)$/;
+const SWING=/^(Slash|HeavySlash|Combo|Combo3|Attack|Attack2|Delayed|Dash|Chain[PN]\d|Finish(All|P|N)|Assault(A|B|End)|Execution|Riposte|Deflect|Sweep|Smash|Leap|Combo[BC]|Special3?)$/;
 /* 揮擊的時間扭曲：起手慢 → 揮到命中那一格最快 → 收招慢下來。
    命中秒數與片長都不變（每一段頭尾都對齊原本的時間），所以閃避判定、傷害數字的時間點不受影響；只改變段內的快慢分布。
    PEAK＝命中瞬間相對原速的倍率；段落：起手（緩進）、命中之間（快→慢→快）、收招（快→緩停） */
@@ -240,6 +240,9 @@ export class Actor{
   comboTimes(name="Combo",n=3){const h=this.hitTimes(name);if(h&&h.length)return h;const d=this.duration(name);return Array.from({length:n},(_,i)=>d*(.22+.56*i/Math.max(1,n-1)))}
   // 走路類片段原速播放時，身體應有的移動速度（m/s，從支撐腳往後滑的速度量出來）。位移速度＝這個值×播放速度，腳才不會滑步。沒有片段回傳 0
   locoSpeed(name){const n=this.clipName(name),v=this.loco&&this.loco[n];return v?v:0}
+  // 可以接下一招的時間（秒，已除速度）：clipmeta 的 cancel（依實際片長縮放）→ 最後命中後 40% 的回勢處 → 片長 80%
+  cancelTime(name,speed=1){name=this.clipName(name);const a=this.actions[name];if(!a)return this.duration(name,speed)*.8;const d=a.getClip().duration,c=META[this.name]&&META[this.name][name];
+    if(c&&c.cancel)return Math.min(d,c.cancel*(c.dur?d/c.dur:1))/speed;const h=this.hitTimes(name);return(h&&h.length?h[h.length-1]+.4*(d-h[h.length-1]):d*.8)/speed}
   duration(name,speed=1){name=this.clipName(name);const a=this.actions[name];if(a)return a.getClip().duration/speed;const p=PROC[name];return p?p.dur/speed:.3}
 
   // soft：補間動作留下的姿勢（前傾、縮放）用 0.15 秒滑回原位，不在換片段的那一格瞬間跳回

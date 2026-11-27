@@ -16,7 +16,32 @@
   "HitHeavy": {"dur": 1.733, "loop": false},
   "Cast": {"dur": 1.933, "loop": false, "hits": [1.067]},
   "Die": {"dur": 2.0, "loop": false},
-  "Victory": {"dur": 2.333, "loop": false}
+  "Victory": {"dur": 2.333, "loop": false},
+  "ChainReady": {"dur": 2.0, "loop": true},
+  "ChainP1": {"dur": 1.0, "loop": false, "hits": [0.467], "cancel": 0.7},
+  "ChainN1": {"dur": 0.9, "loop": false, "hits": [0.333], "cancel": 0.633},
+  "ChainP2": {"dur": 1.067, "loop": false, "hits": [0.533], "cancel": 0.8},
+  "ChainN2": {"dur": 0.9, "loop": false, "hits": [0.3], "cancel": 0.6},
+  "ChainP3": {"dur": 1.067, "loop": false, "hits": [0.367], "cancel": 0.8},
+  "ChainN3": {"dur": 0.9, "loop": false, "hits": [0.267], "cancel": 0.667},
+  "ChainP4": {"dur": 1.133, "loop": false, "hits": [0.433, 0.7], "cancel": 0.867},
+  "ChainN4": {"dur": 0.9, "loop": false, "hits": [0.3], "cancel": 0.6},
+  "FinishN": {"dur": 1.8, "loop": false, "hits": [0.933], "cancel": 1.333},
+  "FinishP": {"dur": 1.867, "loop": false, "hits": [0.667, 1.133], "cancel": 1.467},
+  "FinishAll": {"dur": 2.5, "loop": false, "hits": [0.6, 1.067], "cancel": 1.733},
+  "ChainBreak": {"dur": 1.4, "loop": false},
+  "ChainRecover": {"dur": 0.9, "loop": false, "cancel": 0.633},
+  "AssaultA": {"dur": 1.0, "loop": false, "hits": [0.2, 0.5], "cancel": 0.667},
+  "AssaultB": {"dur": 1.0, "loop": false, "hits": [0.3, 0.467], "cancel": 0.667},
+  "AssaultEnd": {"dur": 1.467, "loop": false, "hits": [0.4], "cancel": 1.0},
+  "Execution": {"dur": 2.733, "loop": false, "hits": [0.533, 1.7], "cancel": 2.133},
+  "Riposte": {"dur": 1.2, "loop": false, "hits": [0.467], "cancel": 0.8},
+  "Deflect": {"dur": 0.7, "loop": false, "hits": [0.133], "cancel": 0.367},
+  "SideL": {"dur": 0.7, "loop": false, "cancel": 0.467},
+  "SideR": {"dur": 0.7, "loop": false, "cancel": 0.467},
+  "Drink": {"dur": 1.6, "loop": false, "hits": [0.733]},
+  "GetUp": {"dur": 1.4, "loop": false},
+  "BattleCry": {"dur": 1.667, "loop": false}
  },
  "boss_sentinel": {
   "Idle": {"dur": 3.467, "loop": true},
@@ -35,7 +60,12 @@
   "Stagger": {"dur": 2.733, "loop": false},
   "PhaseShift": {"dur": 2.4, "loop": false, "hits": [1.167]},
   "Roar": {"dur": 2.4, "loop": false},
-  "Die": {"dur": 2.667, "loop": false}
+  "Die": {"dur": 2.667, "loop": false},
+  "Sweep": {"dur": 2.6, "loop": false, "hits": [1.0], "cancel": 1.733},
+  "Smash": {"dur": 2.867, "loop": false, "hits": [1.133], "cancel": 2.0},
+  "Leap": {"dur": 3.267, "loop": false, "hits": [1.5], "cancel": 2.267},
+  "ComboB": {"dur": 3.4, "loop": false, "hits": [1.033, 1.333, 1.667], "cancel": 2.4},
+  "Special": {"dur": 4.133, "loop": false, "hits": [1.5, 2.533], "cancel": 3.2}
  },
  "boss_gargoyle": {
   "Idle": {"dur": 2.967, "loop": true},
@@ -54,7 +84,12 @@
   "Delayed": {"dur": 3.533, "loop": false, "hits": [1.867]},
   "Dash": {"dur": 2.0, "loop": false, "hits": [0.4]},
   "Roar": {"dur": 2.467, "loop": false},
-  "PhaseShift": {"dur": 2.2, "loop": false, "hits": [1.033]}
+  "PhaseShift": {"dur": 2.2, "loop": false, "hits": [1.033]},
+  "Sweep": {"dur": 2.267, "loop": false, "hits": [1.0], "cancel": 1.667},
+  "Smash": {"dur": 3.4, "loop": false, "hits": [1.567], "cancel": 2.667},
+  "Leap": {"dur": 3.067, "loop": false, "hits": [1.167], "cancel": 2.467},
+  "ComboB": {"dur": 3.4, "loop": false, "hits": [0.867, 1.467, 1.667], "cancel": 2.667},
+  "Special": {"dur": 4.933, "loop": false, "hits": [2.033, 3.367], "cancel": 4.067}
  },
  "boss_priest": {
   "Idle": {"dur": 3.467, "loop": true},
@@ -73,7 +108,12 @@
   "Stagger": {"dur": 2.733, "loop": false},
   "PhaseShift": {"dur": 2.5, "loop": false, "hits": [1.2]},
   "Roar": {"dur": 2.4, "loop": false},
-  "Die": {"dur": 2.667, "loop": false}
+  "Die": {"dur": 2.667, "loop": false},
+  "Sweep": {"dur": 2.4, "loop": false, "hits": [1.033], "cancel": 1.867},
+  "Smash": {"dur": 3.267, "loop": false, "hits": [1.6], "cancel": 2.733},
+  "Leap": {"dur": 3.0, "loop": false, "hits": [1.367], "cancel": 2.467},
+  "ComboB": {"dur": 3.3, "loop": false, "hits": [0.967, 1.367, 1.733], "cancel": 2.767},
+  "Special": {"dur": 4.867, "loop": false, "hits": [2.467, 3.233], "cancel": 4.267}
  },
  "boss_executioner": {
   "Idle": {"dur": 3.633, "loop": true},
@@ -92,7 +132,12 @@
   "Stagger": {"dur": 2.867, "loop": false},
   "PhaseShift": {"dur": 2.3, "loop": false, "hits": [1.0]},
   "Roar": {"dur": 2.533, "loop": false},
-  "Die": {"dur": 2.8, "loop": false}
+  "Die": {"dur": 2.8, "loop": false},
+  "Sweep": {"dur": 2.6, "loop": false, "hits": [1.167], "cancel": 1.733},
+  "Smash": {"dur": 3.5, "loop": false, "hits": [1.233], "cancel": 2.667},
+  "Leap": {"dur": 3.067, "loop": false, "hits": [1.2], "cancel": 2.2},
+  "ComboB": {"dur": 3.433, "loop": false, "hits": [0.9, 1.3, 1.667], "cancel": 2.633},
+  "Special": {"dur": 4.467, "loop": false, "hits": [1.733, 2.567], "cancel": 3.633}
  },
  "boss_devourer": {
   "Idle": {"dur": 3.8, "loop": true},
@@ -112,6 +157,13 @@
   "PhaseShift": {"dur": 2.5, "loop": false, "hits": [1.2]},
   "PhaseShift2": {"dur": 2.6, "loop": false, "hits": [1.233]},
   "Roar": {"dur": 2.633, "loop": false},
-  "Die": {"dur": 2.933, "loop": false}
+  "Die": {"dur": 2.933, "loop": false},
+  "Sweep": {"dur": 2.533, "loop": false, "hits": [1.1], "cancel": 1.867},
+  "Smash": {"dur": 2.733, "loop": false, "hits": [1.2], "cancel": 2.133},
+  "Leap": {"dur": 3.0, "loop": false, "hits": [1.533], "cancel": 2.4},
+  "ComboB": {"dur": 3.467, "loop": false, "hits": [0.9, 1.433, 1.9], "cancel": 2.867},
+  "Special": {"dur": 3.733, "loop": false, "hits": [1.8, 2.333], "cancel": 3.067},
+  "ComboC": {"dur": 3.733, "loop": false, "hits": [0.833, 1.1, 1.467, 2.2], "cancel": 3.133},
+  "Special3": {"dur": 5.533, "loop": false, "hits": [2.533, 3.833], "cancel": 4.933}
  }
 }

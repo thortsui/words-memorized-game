@@ -11,7 +11,7 @@ import { createVfx2 } from './vfx2.js'; // v2 特效（墨與金）：只在下�
 import { createPhaseShow } from './phaseShow.js';
 import { createFeel } from './feel.js';
 import { createScreen2 } from './screen2.js';
-import { sfx } from '../../core/audio.js';
+import { sfx, setSfxBoss } from '../../core/audio.js';
 
 const v3=(x,y,z)=>new THREE.Vector3(x,y,z);
 const R0=3.6,TH_MAX=.85,RMAX=6,CAM_RMAX=11;
@@ -370,7 +370,7 @@ export function createSoulScene(eng,fx,api){
     const pos=hp.clone().addScaledVector(d,.9).addScaledVector(r,.75);pos.y=.55;const look=bp.clone();look.y=b.h*.82;
     // Roar 片段裡有很快的甩臂，不要播太快（最多 1.2 倍）；鏡頭演出結束後片段繼續播完，期間 Boss 不走位
     if(b.has("Roar")){const sp=clamp(b.duration("Roar")/(dur+.8),.8,1.2);b.play("Roar",{speed:sp});bossBusy(b.duration("Roar",sp)-.15)}
-    sfx("roar",{v:.85});bfx.roarBlast(b);eng.rumble(.05*(b.h/3.2),dur+.2);flamesDown(.3,dur*.5,.9);b.glow(b.eye,1.6);fx.pulseVig("dark",.45,dur+.3);
+    sfx("roar",{v:.85,boss:b.data&&b.data.id});bfx.roarBlast(b);eng.rumble(.05*(b.h/3.2),dur+.2);flamesDown(.3,dur*.5,.9);b.glow(b.eye,1.6);fx.pulseVig("dark",.45,dur+.3);
     fx.ring(bp,{color:b.eye,r1:b.h*2,dur:.7,opacity:.45});dust(bp,12);
     if(eng.rm){await eng.wait(dur*.6);return}
     const f0=52;cine={pos,look,k:5,fov:f0};await eng.tween(dur,k=>{cine.fov=lerp(f0,40,ease.out(k));if(Math.random()<.4)fx.emit({p:b.center(v3(),.85),n:1,color:[b.eye,0xffffff],speed:[1,3],size:[.04,.09],life:[.3,.6]})},ease.lin);
@@ -381,7 +381,12 @@ export function createSoulScene(eng,fx,api){
        full：從頭播（Attack／Attack2 輪流、Dash）；seg：Combo3 分段播（每段停在命中後，下一題答完接著播）；
        resume：Delayed 片段停在舉起的那一格，答完才揮下。 */
   let threat=null,bossBack=Promise.resolve(),atkN=0,atk={kind:"single",clip:"Attack",mode:"full",chain:false,seg:0};
+  // v1.3.0：規則引擎依階段招式表挑好片段（p.clip）。這些新招的預備姿勢在片段自己裡面：蓄力時播到命中前停住（own），答完才揮下
+  const OWN=/^(Smash|Special3?)$/;
   function planAtk(b,p){const kind=p.kind||"single",seg=p.seg||0,a={kind,seg,segs:p.segs||1,chain:!!p.chain,mode:"full",clip:"Attack",speed:1,danger:!!p.danger,noParry:!!p.noParry};
+    const C=p.clip&&b.has(p.clip)?p.clip:null;
+    if(kind==="combo"&&C&&C!=="Combo3"){const ht=b.hitTimes(C)||[];if(ht.length>=2&&seg<ht.length){a.clip=C;a.mode="seg";a.hits=ht;a.hit=ht[seg];return a}}
+    if(C&&kind!=="combo"&&kind!=="delayed"&&kind!=="ambush"){a.clip=C;if(OWN.test(C)){a.mode="resume";a.own=true}return a}
     // Combo3 有幾個命中點就分幾段；連擊段數比命中點多（第 4 段）時，最後改用單擊片段補上
     if(kind==="combo"&&b.has("Combo3")){const ht=b.hitTimes("Combo3")||[];if(ht.length>=2&&seg<ht.length){a.clip="Combo3";a.mode="seg";a.hits=ht;a.hit=ht[seg];return a}}
     if(kind==="combo"){a.clip=(atkN+seg)%2?"Attack2":"Attack";a.speed=1+.12*seg;return a}
@@ -392,7 +397,7 @@ export function createSoulScene(eng,fx,api){
     a.clip=atkN%2?"Attack2":"Attack";return a}
   // 從現在到命中的秒數
   function strikeDelay(speed=1){const b=boss;if(!b)return .3;const sp=atk.speed*speed;
-    if(atk.mode==="seg"){const a=b.actions.Combo3,cur=a&&b.curAct===a?a.time:0;return Math.max(.08,(atk.hit-(atk.seg?cur:0))/sp)}
+    if(atk.mode==="seg"){const a=b.actions[atk.clip],cur=a&&b.curAct===a?a.time:0;return Math.max(.08,(atk.hit-(atk.seg?cur:0))/sp)}
     if(atk.mode==="resume"){const a=b.actions[atk.clip],cur=a&&b.curAct===a?a.time:0;return Math.max(.1,(b.impactTime(atk.clip)-cur)/sp)}
     return b.impactTime(atk.clip,sp)}
   // 蓄力結束後到作答前的時機提示：Boss 頭上的環與主角腳下的環一起隨時限縮小（金色＝還在彈反時間內；不能彈反的招沒有金環），紅暈影越來越強
@@ -412,10 +417,15 @@ export function createSoulScene(eng,fx,api){
   async function bossStrike(speed=1,o={}){const b=boss;if(!b)return v3();stopCharge();if(!atk.chain||atk.seg===0)await bossBack;aiHalt();atkN+=atk.seg===atk.segs-1||atk.kind!=="combo"?1:0;
     const t=strikeDelay(speed),sp=atk.speed*speed,hp=hero.root.position.clone(),r=b.root.position,from=r.clone(),d=v3().subVectors(from,hp).setY(0),cur=d.length()||1;d.multiplyScalar(1/cur);
     const reach=b.h*.5+.5,to=hp.clone().addScaledVector(d,Math.min(cur,Math.max(reach,cur-(atk.kind==="dash"?99:2.2))));
-    if(atk.mode==="seg")b.playSeg("Combo3",atk.seg===0?0:null,atk.hit,sp);
+    if(atk.mode==="seg")b.playSeg(atk.clip,atk.seg===0?0:null,atk.hit,sp);
     else if(atk.mode==="resume")b.playSeg(atk.clip,null,b.impactTime(atk.clip),sp);
     else b.play(atk.clip,{speed:sp});
-    if(atk.mode!=="full")eng.wait(Math.max(0,t-.12)).then(()=>{if(boss===b)sfx("swoosh",{v:.8,low:1})});
+    // 命中之後把片段的跟隨／回勢播完（不要停在命中那一格）；連擊還沒打完的段落照舊停住等下一題
+    const follow=atk.mode==="resume"||(atk.mode==="seg"&&(atk.seg>=atk.segs-1||atk.seg>=(atk.hits||[]).length-1));
+    if(follow){const cl=atk.clip;eng.wait(t+.02).then(()=>{if(boss===b&&b.curAct===b.actions[cl])b.curAct.timeScale=Math.min(1,sp)})}
+    eng.wait(Math.max(0,t-.14)).then(()=>{if(boss===b)sfx("swoosh",{v:.8,low:1})});
+    if(/Special/.test(atk.clip)&&b.data&&/executioner|devourer/.test(b.data.id))eng.wait(Math.max(0,t-.3)).then(()=>{if(boss===b)sfx("dark",{v:.8})});
+    if(/Smash|Special|Leap/.test(atk.clip))eng.wait(t).then(()=>{if(boss!==b)return;sfx("slam",{v:.8});eng.rumble(.03,.35);dust(b.root.position,10)});
     if(b.data&&b.data.id==="priest")eng.wait(Math.max(0,t-.14)).then(()=>{if(boss===b)iceSpikes(hp,v3().copy(d).negate())});
     // Boss 出手：鏡頭往 Boss 那邊推一點
     csTo({back:CS0.back-.55,fovD:-4},Math.min(.5,t),ease.out);
@@ -428,7 +438,7 @@ export function createSoulScene(eng,fx,api){
     if(!o.noFx)bfx.impact(b,at,{k:atk.danger?1.8:atk.chain?.6:(atk.kind==="combo"||atk.kind==="delayed"||dash)?1.3:1,from});
     return at}
   // 冰刺：三根冰錐在 0.14 秒內從地面斜刺向主角（剛好在命中格到位），停一下再碎掉
-  function iceSpikes(at,d){for(let i=0;i<3;i++){const m=new THREE.Mesh(fx.G.cone,new THREE.MeshBasicMaterial({color:i===1?0xffffff:0x9fe6ff,transparent:true,opacity:.92,fog:false}));
+  function iceSpikes(at,d){sfx("ice",{v:.8});for(let i=0;i<3;i++){const m=new THREE.Mesh(fx.G.cone,new THREE.MeshBasicMaterial({color:i===1?0xffffff:0x9fe6ff,transparent:true,opacity:.92,fog:false}));
       const side=(i-1)*.42,base=v3(at.x+d.x*(.55+.1*Math.abs(i-1))-d.z*side,0,at.z+d.z*(.55+.1*Math.abs(i-1))+d.x*side),hgt=i===1?1.9:1.35;
       m.scale.set(.34,.01,.34);m.position.copy(base);m.rotation.set(-d.z*.45,0,d.x*.45); // 往主角那一側傾
       fx.temp(m,.62,(k,r)=>{const g=Math.min(1,r/.22);m.scale.y=Math.max(.01,hgt*ease.out(g));m.position.y=m.scale.y/2;m.material.opacity=r>.6?.92*(1-(r-.6)/.4):.92},ease.lin)}
@@ -440,8 +450,11 @@ export function createSoulScene(eng,fx,api){
     if(Math.hypot(hp.x-keep.x,hp.z-keep.z)>1.9+b.h*.08)H0.copy(keep);
     bossBack=eng.wait(delay).then(()=>{if(boss!==b)return;const from=r.clone();return eng.tween(.7,k=>{r.lerpVectors(from,H0,k)},ease.io)}).then(()=>{if(boss===b)heroPolar()})}
   // 主角橫向翻滾：約 0.9 秒，身體朝翻滾方向
-  async function roll(amount=.62,dur=.9){heroPolar();const sg=hs.th>0?-1:1;hs.dir=sg;const t0=hs.th,t1=clamp(hs.th+sg*amount,-TH_MAX-.3,TH_MAX+.3);
-    hs.tangent=sg;hero.play("Roll",{speed:hero.duration("Roll")/dur});
+  async function roll(amount=.62,dur=.9,side_=false){heroPolar();const sg=hs.th>0?-1:1;hs.dir=sg;const t0=hs.th,t1=clamp(hs.th+sg*amount,-TH_MAX-.3,TH_MAX+.3);
+    hs.tangent=sg;
+    // 短閃（擦傷、或一半機率的閃避）用左右側閃片段：依移動方向相對主角面向的左右挑
+    const ry=hero.root.rotation.y,th=hs.th,left=Math.cos(th)*Math.cos(ry)+Math.sin(th)*Math.sin(ry),side=sg*left>0?"SideL":"SideR";
+    if(side_&&hero.has(side)){hero.play(side,{speed:hero.duration(side)/Math.max(.5,dur*.8),fade:.06});sfx("roll",{v:.6})}else{hero.play("Roll",{speed:hero.duration("Roll")/dur});sfx("roll",{v:.8})}
     await eng.tween(dur*.82,k=>{hs.th=lerp(t0,t1,k)},ease.io);hs.tangent=0;dust(hero.root.position,5);await eng.wait(dur*.18)}
   const pushBack=(d,dur=.3)=>{heroPolar();const r0=hs.r,r1=Math.min(RMAX,r0+d);return eng.tween(dur,k=>{hs.r=lerp(r0,r1,k);if(Math.random()<.4)dust(hero.root.position,1)},ease.out)};
 
@@ -455,11 +468,12 @@ export function createSoulScene(eng,fx,api){
   const flaskClear=()=>{if(flask.orb){flask.orb.remove();flask.orb=null}if(flask.off){flask.off();flask.off=null}};
   /* ---------- 事件 ---------- */
   let side=null; // 'player' | 'enemy' | null：Boss 只在玩家回合走位
+  let cry=false; // 這隻 Boss 的第一個玩家回合：主角振臂（BattleCry）
   const H={
     // Boss 登場：在場中央播登場動作（原地起身），鏡頭由遠推近、濃霧慢慢散開，結尾咆哮（仰拍、低頻震動、火光壓暗）
     async bossEnter(p){stopThreat();stopCharge();stopAura();moves.abort();aiHalt();side=null;heroBusy=false;if(boss){boss.remove();boss=null}
       H0.set(0,0,0);
-      const b=boss=makeBoss(p.boss);curIndex=p.index||0;b.root.position.copy(H0);b.root.rotation.y=.2;b.lockYaw=true;b.root.visible=false;
+      const b=boss=makeBoss(p.boss);curIndex=p.index||0;cry=true;setSfxBoss(p.boss.id);b.root.position.copy(H0);b.root.rotation.y=.2;b.lockYaw=true;b.root.visible=false;
       hs.th=.25;hs.r=R0;hs.free=false;hs.tangent=0;stopRoam();hero.root.position.y=0;hero.play("Idle");
       setArena(ARENA[p.boss.arena]||ARENA.gate_ruins,p.index?1.6:.01);
       await Promise.race([b.ready,eng.wait(2.5,{real:true})]);if(boss!==b)return;
@@ -478,12 +492,14 @@ export function createSoulScene(eng,fx,api){
       await Promise.race([play,eng.wait(dur*.14+.2)]);if(boss!==b)return;b.setLoop("Idle");b.play("Idle");b.lockYaw=false;
       await roar(b,1.15);if(boss!==b)return;eng.to(b,{glowK:0},.8);cine=null;await eng.wait(.15);hs.roam=true},
     // 玩家回合開始：腳下一圈金線，主角開始繞行找空檔；Boss 開始壓近／繞行
-    async playerTurn(){preload(curIndex+1); /* 進入玩家回合才預載下一隻 */await bossBack;side="player";heroBusy=false;csReset(.5);hs.roam=true;hs.pause=.3;aiStart();fx.ring(hero.root.position,{color:0xd9c27a,r1:1.5,dur:.5,opacity:.6});await eng.wait(.2)},
+    async playerTurn(){preload(curIndex+1); /* 進入玩家回合才預載下一隻 */await bossBack;side="player";heroBusy=false;csReset(.5);hs.roam=true;hs.pause=.3;
+      if(cry&&hero.has("BattleCry")){cry=false;hero.play("BattleCry",{fade:.2});hs.pause=hero.duration("BattleCry")*.9}aiStart();fx.ring(hero.root.position,{color:0xd9c27a,r1:1.5,dur:.5,opacity:.6});await eng.wait(.2)},
     // 答對：劍上聚起藍白光
     async atb(){const c=hero.center(v3(),.65);fx.emit({p:c,n:10,color:[0x7fc8ff,0xffffff],speed:[.3,1.2],up:.8,size:[.04,.1],life:[.3,.6],radius:.4,kind:1});
       fx.text(hero.center(v3(),1.1),"ATB +1","soul blue",{dur:.7,rise:22});await eng.wait(.12)},
     // 答錯：踉蹌一下
-    async miss(){hero.play("Hit",{speed:1.6});hero.knock(.12,.1);dust(hero.root.position,4);await eng.wait(.15)},
+    async miss(p){fx.text(hero.center(v3(),1.12),"錯誤","soul dmg hurt",{dur:.8,rise:16,dx:0,rot:0});if(p&&p.slash&&moves.pending())return;
+      hero.play("Hit",{speed:1.6});hero.knock(.12,.1);dust(hero.root.position,4);await eng.wait(.15)},
     async quickSlash(p){await startMove(p)},
     async skill(p){feel.combo(p);if(p.big)fx.banner(p.name,"soul",1);await startMove(p)},
     async counter(p){await startMove(p)},
@@ -497,7 +513,8 @@ export function createSoulScene(eng,fx,api){
       if(b){bossRecover(.1);b.glow(0xffd75a,1.4);eng.to(b,{glowK:phaseTint?.7:0},1);if(b.has("Stagger"))b.play("Stagger",{speed:1.1,hold:true})}
       csReset(.4);hero.play("Idle");await eng.wait(.45)},
     // 連斬結束：中斷的話主角收刀退回（砍完的話最後一刀已經收招）
-    async slashEnd(p){if(p.broken&&!p.interrupted){await moves.finish();heroBusy=false}},
+    async slashEnd(p){if(moves.pending()){await moves.flush(p.interrupted?"cut":p.broken?"break":"final");if(!p.interrupted)heroBusy=false;return}
+      if(p.broken&&!p.interrupted){await moves.finish();heroBusy=false}},
     async assaultEnd(){const b=boss;if(b)b.play(idleName());await eng.wait(.15)},
     // 練等：主角腳下金環、頭上冒出強化名稱
     async perkOffer(){if(hero.has("Victory"))hero.play("Victory",{hold:true});await eng.wait(.2)},
@@ -507,16 +524,17 @@ export function createSoulScene(eng,fx,api){
        沒有 Drink 片段：用 Guard 片段停在舉手擋在身前的那一格，再用程式把上半身後仰、手上亮起藥壺光（舉到臉前喝）。
        喝藥時 Boss 會趁機壓近（強制進入逼近模式）。 */
     async flaskStart(){stopRoam();aiStart();AI.mode="stalk";AI.t=6;const P=hero.pose;
-      hero.play(hero.has("Guard")?"Guard":"Idle",{hold:true,speed:1.2});eng.wait(.22).then(()=>{if(hero.curAct&&/^Guard/.test(hero.curAct.getClip().name))hero.freeze(.02)});
-      eng.to(P.rotation,{x:-.12},.3,ease.out);flask.orb&&flask.orb.remove();flask.orb=fx.orb(hero.center(v3(),.8),{color:0xff9a5a,size:.3,opacity:.95});flask.orb.sprite.material.depthTest=false;flask.orb.sprite.renderOrder=14; // 藥壺在臉前，會被主角自己擋住：光暈畫在最上層
+      if(hero.has("Drink")){hero.playSeg("Drink",0,hero.impactTime("Drink")*.55,1)}
+      else{hero.play(hero.has("Guard")?"Guard":"Idle",{hold:true,speed:1.2});eng.wait(.22).then(()=>{if(hero.curAct&&/^Guard/.test(hero.curAct.getClip().name))hero.freeze(.02)});
+      eng.to(P.rotation,{x:-.12},.3,ease.out)}flask.orb&&flask.orb.remove();flask.orb=fx.orb(hero.center(v3(),.8),{color:0xff9a5a,size:.3,opacity:.95});flask.orb.sprite.material.depthTest=false;flask.orb.sprite.renderOrder=14; // 藥壺在臉前，會被主角自己擋住：光暈畫在最上層
       flask.off&&flask.off();flask.off=eng.onUpdate(()=>{if(!flask.orb)return;const c=hero.center(v3(),.82),f=v3(Math.sin(hero.root.rotation.y),0,Math.cos(hero.root.rotation.y));flask.orb.sprite.position.copy(c).addScaledVector(f,.32);flask.orb.sprite.scale.setScalar(.3+.05*Math.sin(eng.time*6))},60);
       fx.emit({p:hero.center(v3(),.8),n:8,color:[0xff9a5a,0xffe2a0],speed:[.2,.6],up:.4,size:[.04,.08],life:[.3,.6]});await eng.wait(.4)},
-    async drink(p){const P=hero.pose,c=hero.center(v3(),.82);eng.to(P.rotation,{x:-.32},.22,ease.out);
+    async drink(p){const P=hero.pose,c=hero.center(v3(),.82),dk=hero.has("Drink");if(dk)hero.playSeg("Drink",null,hero.duration("Drink"),1);else eng.to(P.rotation,{x:-.32},.22,ease.out);
       if(flask.orb){const o=flask.orb.sprite;await eng.tween(.3,k=>{o.scale.setScalar(.2*(1-k)+.02);o.material.opacity=.95*(1-k*.7)})}flaskClear();
       p.onImpact&&p.onImpact();
       const hp=hero.root.position;fx.emit({p:hp,n:26,color:[0xffe2a0,0xbfffd0,0xffffff],speed:[.1,.5],up:1.6,size:[.05,.12],life:[.7,1.3],radius:.5,radiusY:.05});
       fx.ring(hp,{color:0xbfffd0,r1:1.4,dur:.6,opacity:.6});fx.flash(c,{color:0xbfffd0,size:1.2,dur:.3,opacity:.5});fx.text(hero.center(v3(),1.12),"+"+p.amount,"soul heal",{dur:.9,rise:26});
-      eng.to(P.rotation,{x:0},.3,ease.io);hero.play("Idle");await eng.wait(.35);hs.roam=true},
+      eng.to(P.rotation,{x:0},.3,ease.io);if(dk){await eng.wait(Math.max(.2,hero.duration("Drink")-hero.impactTime("Drink")-.2))}hero.play("Idle");await eng.wait(.35);hs.roam=true},
     async spill(){const c=flask.orb?flask.orb.sprite.position.clone():hero.center(v3(),.8);flaskClear();eng.to(hero.pose.rotation,{x:0},.25,ease.io);hero.play("Hit",{speed:1.4});hero.knock(.08,.06);
       fx.emitN({p:c,n:18,color:[0xc8642a,0x8a3a1a,0xffb070],speed:[.6,2],up:.5,size:[.05,.12],life:[.4,.8],gravity:9,alpha:.9});fx.text(v3(c.x,c.y+.4,c.z),"灑了","soul",{dur:.8,rise:16,dx:0});
       await eng.wait(.45);hs.roam=true},
@@ -545,7 +563,7 @@ export function createSoulScene(eng,fx,api){
       fx.slash(at,{color:0xff3a2a,size:1.7,ang:-.5,dur:.26,sweep:1.6});sparks(at,18,[0xff3a2a,0xffd0a0,0xffffff],7)},
     // 連擊中段的彈刀：不衝上去，只有火花與小傷害（hit 事件直接處理）
     async deflect(){},
-    async hit(p){if(p.move==="deflect"){await impact(p,{power:.6,color:0xfff2c0});return}
+    async hit(p){if(p.move==="deflect"){if(hero.has("Deflect"))hero.play("Deflect",{fade:.06});sfx("clash",{v:.8});await impact(p,{power:.6,color:0xfff2c0});return}
       await moves.hit(p);if(p.last){heroBusy=false;if(side==="player"&&boss)AI.t=Math.min(AI.t,.4)}},
     // 攻擊時間結束：後撤一步，鏡頭拉遠；Boss 停下
     async windowEnd(){side="enemy";aiHalt();if(boss)boss.play(idleName());stopRoam();heroPolar();const r0=hs.r;csTo({back:CS0.back+.4},.4);await eng.tween(.3,k=>{hs.r=lerp(r0,Math.max(r0,R0*.9),k)},ease.out)},
@@ -554,7 +572,7 @@ export function createSoulScene(eng,fx,api){
     // 轉階段：蜷縮後爆發、衝擊波、霧色改變、火盆轉色、仰拍咆哮；之後待機換成 IdleAggro（有的話）、走位更快
     // 轉階段（變身）：演出在 phaseShow.js（仰拍緩推→爆發前慢放→閃光遮掩＋P2_/P3_ 部件彈出→水墨橫幅→回戰鬥機位，總長 ≤ 2.8 秒）
     // 這裡只提供場景掛鉤：鏡頭、主角擊退、霧色／火光漸變、常駐氣場、切 IdleAggro；結束一定交還 AI 與戰鬥鏡頭
-    async bossPhase(p){const b=boss;if(!b)return;stopThreat();aiHalt();await bossBack;if(boss!==b)return;stopRoam();bossBusy(3.2);
+    async bossPhase(p){const b=boss;if(!b)return;if(moves.pending())await moves.flush("partial");stopThreat();aiHalt();await bossBack;if(boss!==b)return;stopRoam();bossBusy(3.2);
       const alive=()=>boss===b&&!eng.dead;
       try{await pshow.run(b,p,{hero,alive,
         setCine:c=>{cine=c},
@@ -574,17 +592,18 @@ export function createSoulScene(eng,fx,api){
     //   突進：先往後跳開拉距離、壓低身體，接著橫越全場衝過來
     //   必殺：全畫面泛紅、招式名橫幅、低頻震動、火光壓暗
     async telegraph(p){const b=boss;if(!b)return;side="enemy";aiHalt();if(!(p.chain&&p.seg>0)&&!(p.kind==="combo"&&p.seg>0))await bossBack;stopRoam();hero.play("Idle");
-      atk=planAtk(b,p);bossBusy(9);
+      atk=planAtk(b,p);bossBusy(9);if(window.__soulTest)(window.__atkLog=window.__atkLog||[]).push({boss:b.data&&b.data.id,phase:phaseTint,kind:p.kind,want:p.clip,clip:atk.clip,mode:atk.mode,move:p.move});
       // 突襲：Boss 已經在 ambush 事件裡切到面前，這裡只閃一下眼光就開始倒數
       if(p.kind==="ambush"){b.glow(0xff2a1a,1.4);danger.position.copy(b.center(v3(),.75));danger.intensity=3.5;fx.setVig("danger",.3);await eng.wait(.18);startThreat(p.limitMs,p.perfectMs);return}
       if(p.kind==="combo"&&p.seg>0){b.glow(0xff2a1a,1);fx.text(b.center(v3(),1.1),"！","soul warn",{dur:.5,rise:8,dx:0,rot:0});danger.position.copy(b.center(v3(),.75));danger.intensity=3;
         if(atk.mode==="full")b.play("Telegraph",{speed:2.4,hold:true});await eng.wait(.3);startThreat(p.limitMs,p.perfectMs);return}
       if(p.kind==="dash"){const r=b.root.position,hp=hero.root.position,d=v3().subVectors(r,hp).setY(0),cur=d.length()||1;d.multiplyScalar(1/cur);const to=hp.clone().addScaledVector(d,Math.max(cur,4.4));to.y=0;const tr=Math.hypot(to.x,to.z);if(tr>6.5)to.multiplyScalar(6.5/tr);
         const from=r.clone();dust(r,6);eng.tween(.32,k=>{r.lerpVectors(from,to,k)},ease.out)}
-      if(p.danger){fx.banner(p.move,"soul danger",1.3);eng.rumble(.035,1.1);sfx("roar",{v:.6});flamesDown(.35,1.2,.8);fx.setVig("danger",0)}
+      if(p.danger){fx.banner(p.move,"soul danger",1.3);eng.rumble(.035,1.1);sfx("roar",{v:.7,boss:b.data&&b.data.id});flamesDown(.35,1.2,.8);fx.setVig("danger",0)}
       // 延遲：Delayed 片段「舉起後停頓約 0.8 秒、揮下約 0.1 秒就命中」。從命中時間往回推：停頓結束＝命中−0.1 秒、停頓開始＝再往前 0.8 秒。
       // 蓄力期間（T 秒）把片段播到停頓開始；選項鎖住的 lockMs 期間播完停頓（停頓長度依 lockMs 微調速度），解鎖那一刻正好停在揮下前，等答完才揮。
-      if(atk.mode==="resume"){const hit=b.impactTime(atk.clip),hEnd=Math.max(.2,hit-DELAY_SWING),hStart=Math.max(.1,hEnd-DELAY_HOLD),T=p.danger?.9:.7,lk=Math.max(.2,(p.lockMs||800)/1000);
+      if(atk.own){const hit=b.impactTime(atk.clip),lead=Math.min(.32,hit*.35),hEnd=Math.max(.1,hit-lead),T=p.danger?.9:.7;b.playSeg(atk.clip,0,hEnd,clamp(hEnd/T,.6,1.6));sfx("swingH",{v:.35})}
+      else if(atk.mode==="resume"){const hit=b.impactTime(atk.clip),hEnd=Math.max(.2,hit-DELAY_SWING),hStart=Math.max(.1,hEnd-DELAY_HOLD),T=p.danger?.9:.7,lk=Math.max(.2,(p.lockMs||800)/1000);
         b.playSeg(atk.clip,0,hStart,hStart/T);eng.wait(T).then(()=>{if(boss!==b||b.curAct!==b.actions[atk.clip])return;b.curAct.timeScale=(hEnd-hStart)/lk;return eng.wait(lk)}).then(()=>{if(boss===b&&b.curAct===b.actions[atk.clip])b.freeze(.02)})}
       else b.play("Telegraph",{hold:true});
       csTo({back:CS0.back-.4,fovD:-3},.6,ease.out);feel.pressure(p.danger?"dangerPressure":"pressure",{dur:p.danger?.9:.6});
@@ -602,7 +621,7 @@ export function createSoulScene(eng,fx,api){
       const t=strikeDelay(1.1),lead=hero.impactTime("Parry");
       eng.wait(Math.max(0,t-lead)).then(()=>hero.play("Parry"));
       const at=await bossStrike(1.1,{noFx:true});bfx.settle(b);
-      sparks(at,60,[0xfff2c0,0xffffff,0xffc04a],11);fx.burstRing(at,{color:0xfff2c0,r1:1.5,dur:.35});fx.flash(at,{color:0xfff2c0,size:1.3,dur:.2,opacity:.7});fx.pulseVig("white",.2,.25);
+      sfx("clashBig",{v:1});sparks(at,60,[0xfff2c0,0xffffff,0xffc04a],11);fx.burstRing(at,{color:0xfff2c0,r1:1.5,dur:.35});fx.flash(at,{color:0xfff2c0,size:1.3,dur:.2,opacity:.7});fx.pulseVig("white",.2,.25);
       fx.text(v3(at.x,at.y+.7,at.z),"彈反","soul gold big",{dur:1.2,rise:26,dx:0,rot:0});vfx.parry(at,b);
       feel.parry({chain:!!atk.chain,dir:v3().subVectors(at,b.root.position).setY(0).normalize()});b.knock(.35,.18);hero.knock(.08,.05); // S4：頓格＋側移＋慢動作（連擊中段 0.4／350）＋金色雙拍
       b.glow(b.eye,phaseTint?.7:0);
@@ -612,7 +631,7 @@ export function createSoulScene(eng,fx,api){
       await eng.wait(.3);csReset(.4)},
     // 翻滾閃避：主角朝側面翻滾，Boss 劈空砸在地上
     async dodge(p){stopThreat();const b=boss;if(!b)return;const spot=hero.root.position.clone();
-      const t=strikeDelay();const rolled=eng.wait(Math.max(0,t-.38)).then(()=>roll(.62,.9));vfx.dodge(spot,p,t);
+      const t=strikeDelay(),sideStep=Math.random()<.5;const rolled=eng.wait(Math.max(0,t-(sideStep?.3:.38))).then(()=>sideStep?roll(.5,.75,true):roll(.62,.9));vfx.dodge(spot,p,t);
       await bossStrike();dust(spot,12);fx.ring(spot,{color:0x8a94a8,r1:1.8,dur:.4,opacity:.6});sparks(v3(spot.x,.15,spot.z),10,[0xffc36a,0xffffff],4);feel.dodge();sfx("heavy",{v:.4});
       fx.text(v3(spot.x,1.5,spot.z),"閃避","soul",{dur:.8,rise:22,dx:0});
       bossRecover(.5);if(p&&p.chain){await eng.wait(.35);return}await rolled;csReset(.4)},
@@ -620,14 +639,14 @@ export function createSoulScene(eng,fx,api){
     async guard(){stopThreat();const b=boss;if(!b)return;const t=strikeDelay();
       eng.wait(Math.max(0,t-hero.impactTime("Guard"))).then(()=>hero.play("Guard"));
       const at=await bossStrike();vfx.guard(at);sparks(at,60,[0xff9a3a,0xffd9a0,0xffffff],10);sparks(at,20,[0xffffff,0xfff2c0],5,v3(0,1,0));fx.burstRing(at,{color:0xff9a3a,r1:1.5,dur:.3});fx.flash(at,{color:0xffd9a0,size:1.4,dur:.18,opacity:.9});
-      feel.guard(v3().subVectors(at,b.root.position).setY(0).normalize());fx.text(v3(at.x,at.y+.6,at.z),"鏘！格擋","soul",{dur:.8,rise:20,dx:0})},
+      feel.guard(v3().subVectors(at,b.root.position).setY(0).normalize());sfx("clash",{v:.9});fx.text(v3(at.x,at.y+.6,at.z),"鏘！格擋","soul",{dur:.8,rise:20,dx:0})},
     // 擦傷：翻滾慢了半拍，被刀鋒帶到
     async graze(){stopThreat();const b=boss;if(!b)return;const t=strikeDelay();
-      eng.wait(Math.max(0,t-.12)).then(()=>roll(.45,.9));
+      eng.wait(Math.max(0,t-.12)).then(()=>roll(.45,.8,true));
       const at=await bossStrike();fx.slash(at,{color:0xff4a3a,size:1,ang:.7,dur:.22});sparks(at,24,[0xff6a4a,0xffffff,0xffd9a0],7);fx.flash(at,{color:0xff8a6a,size:.9,dur:.14,opacity:.7})},
     // 中招：Boss 的攻擊結結實實打中；傷害由接下來的 playerHit 表現
     async foeHit(p){stopThreat();const b=boss;if(!b)return;if(p.timeout)hero.play("Guard",{speed:1.6});const at=await bossStrike(1.05);fx.slash(at,{color:0xff3a2a,size:p.kind==="danger"?2.2:1.5,ang:-.5,dur:.26,sweep:1.6});
-      if(p.kind==="danger"){fx.ring(hero.root.position,{color:0xff3a2a,r1:4,dur:.5});fx.pillar(hero.root.position,{color:0xff3a2a,r:.8,h:8,dur:.5})}},
+      sfx("flesh",{v:.9});if(p.kind==="danger"){sfx("slam",{v:.9});fx.ring(hero.root.position,{color:0xff3a2a,r1:4,dur:.5});fx.pillar(hero.root.position,{color:0xff3a2a,r:.8,h:8,dur:.5})}},
     // 玩家受擊：依 kind（hit／guard／graze）與必殺分級：頓格 70–150ms、震動、被打退＋後仰
     async playerHit(p){const c=hero.center(v3(),.6),k=p.danger?1.35:p.kind==="hit"?1:p.kind==="guard"?.45:.55;p.onImpact&&p.onImpact();vfx.hurt(c,k,p);
       hero.flash(0xff6a50,1);rimPulse(.5);fx.pulseVig("red",.1+.14*k,.3+.25*k);feel.hurt(p,boss?v3().subVectors(hero.root.position,boss.root.position).setY(0).normalize():null);
@@ -639,7 +658,7 @@ export function createSoulScene(eng,fx,api){
         sparks(c,20,[0xff3a2a,0x8a1a12,0xffffff],7);fx.burstRing(c,{color:0xff3a2a,r1:1.4});pushBack(1.6,.45);eng.wait(.55).then(()=>dust(hero.root.position,14,[0x7a6a60,0x8a8f98]));
         bossRecover(.35);await eng.wait(1);if(p.lethal)return;
         // 爬起來：從倒地姿勢慢慢混回待機，回到攻擊回合
-        hero.play("Idle",{fade:.5});await eng.wait(.45);heroBusy=false;side="player";csReset(.5);eng.wait(.3).then(()=>{if(side==="player"){hs.roam=true;aiStart()}});return}
+        if(hero.has("GetUp")){hero.play("GetUp",{fade:.25});await eng.wait(hero.duration("GetUp")*.85)}else{hero.play("Idle",{fade:.5});await eng.wait(.45)}heroBusy=false;side="player";csReset(.5);eng.wait(.3).then(()=>{if(side==="player"){hs.roam=true;aiStart()}});return}
       else if(p.kind==="guard"){pushBack(p.chain?.4:.9,.35)}
       else{sparks(c,6,[0xff6a4a],4)}
       bossRecover(.45);await eng.wait(p.chain?.22:.3+.2*k);if(!p.lethal&&!p.chain)csReset(.5)},

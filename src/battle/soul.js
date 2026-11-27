@@ -61,11 +61,12 @@ export function createSoulBattle({pool,mode,modes=null,rng=Math.random,ambushRng
     phaseCheck(ev);return B.mhp<=0}
   function phaseCheck(ev){if(B.mhp>0){const b=boss(),r=B.mhp/b.hp;while(B.bphase<b.phases.length&&r<=b.phases[B.bphase].at){B.bphase++;B.phaseBreak=true;ev("bossPhase",{boss:b,phase:B.bphase,info:b.phases[B.bphase-1]})}}}
   // 連斬的第 i 刀（一刀一個 hit 事件）；回傳是否擊倒
-  function slashHit(ev,C,i){const dmg=Math.round(C.hits[i]*dmgMul()),before=B.mhp;B.mhp=Math.max(0,B.mhp-dmg);C.landed++;B.slashes++;
-    ev("hit",{skillId:"chain",move:"chain",index:i,total:C.n,n:C.n,variant:C.variant,dmg,mhp:B.mhp,mhpMax:boss().hp,last:i===C.n-1,kill:before>0&&B.mhp<=0,target:boss().id});
+  // grade：這一刀那一題的判定（perfect 完美＝剩 perfectAt 以上的時間答對／normal 普通＝答對但花比較久）；grades＝到這一刀為止的判定序列（畫面依序列挑連段動作）
+  function slashHit(ev,C,i,grade="normal"){const dmg=Math.round(C.hits[i]*dmgMul()),before=B.mhp;B.mhp=Math.max(0,B.mhp-dmg);C.landed++;B.slashes++;C.grades.push(grade);
+    ev("hit",{skillId:"chain",move:"chain",index:i,total:C.n,n:C.n,variant:C.variant,grade,grades:C.grades.slice(),dmg,mhp:B.mhp,mhpMax:boss().hp,last:i===C.n-1,kill:before>0&&B.mhp<=0,target:boss().id});
     phaseCheck(ev);return B.mhp<=0}
   // 連斬結束（砍完或中斷）：弱點擊破判定、變身打斷攻勢，回到攻擊回合
-  function endChain(ev,C,broken){B.chain=null;ev("slashEnd",{landed:C.landed,total:C.n,broken:!!broken});
+  function endChain(ev,C,broken){B.chain=null;ev("slashEnd",{landed:C.landed,total:C.n,broken:!!broken,grades:broken?[...C.grades,"wrong"]:C.grades.slice()});
     if(!broken&&C.perfect&&SOUL.weakN&&!B.weakDone){if(++B.wstreak>=(pk("weak")?2:SOUL.weakN)){B.weakDone=true;B.wstreak=0;B.weaks++;
         if(damage(ev,"weakBreak",{move:"chain",name:"弱點擊破",n:5,variant:Math.floor(rng()*3)},SOUL.weakHits)){faint(ev);return true}}}
     else if(broken||!C.perfect)B.wstreak=0;
@@ -100,16 +101,19 @@ export function createSoulBattle({pool,mode,modes=null,rng=Math.random,ambushRng
       if(p&&k===n-1&&rng()<(p.danger||0))kind="danger";
       else{let r=rng()*Object.values(kit).reduce((a,x)=>a+x,0);for(const [kk,w] of Object.entries(kit)){if((r-=w)<0){kind=kk;break}}}
       const segs=kind==="combo"?cr[0]+Math.floor(rng()*(cr[1]-cr[0]+1)):1;
-      // 招式名：必殺用階段招式名；回合最後一記單擊沿用「階段招式」
-      const name=kind==="danger"?p.move:kind==="single"?(p&&k===n-1?p.move:b.move):(names[kind]||b.move);
-      plan.push({kind,segs,name})}
+      // 片段：該階段招式表裡這一種的候選隨機挑一個（畫面照片段演出）；招式名跟著片段走，必殺用階段招式名
+      const clip=pickClip(kind);
+      const name=kind==="danger"?p.move:(clip&&b.clipNames&&b.clipNames[clip])||(kind==="single"?b.move:(names[kind]||b.move));
+      plan.push({kind,segs,name,clip})}
     // 攻擊時間快用完才喝藥：Boss 趁空檔逼近，這個回合先來一記突進
-    if(B.punish){B.punish=false;plan.unshift({kind:"dash",segs:1,name:names.dash||b.move,punish:true})}
+    if(B.punish){B.punish=false;plan.unshift({kind:"dash",segs:1,name:names.dash||b.move,clip:"Dash",punish:true})}
     // 答得快（d ≥ extraAt）：多一段攻擊——有連擊就接在連擊後面多一段，沒有就多一記單擊
-    if(SOUL.extraSeg&&d.extra>0){const c=plan.find(m=>m.kind==="combo");if(c)c.segs=Math.min(5,c.segs+1);else plan.unshift({kind:"single",segs:1,name:b.move})}
+    if(SOUL.extraSeg&&d.extra>0){const c=plan.find(m=>m.kind==="combo");if(c)c.segs=Math.min(5,c.segs+1);else{const clip=pickClip("single");plan.unshift({kind:"single",segs:1,name:(clip&&b.clipNames&&b.clipNames[clip])||b.move,clip})}}
     return plan}
+  // 這一階段某種攻擊的候選片段（data.js 的 moves[階段][種類]），沒有就 null（畫面用預設片段）
+  function pickClip(kind){const b=boss(),M=b.moves&&b.moves[Math.min(B.bphase,b.moves.length-1)],L=M&&M[kind];return L&&L.length?L[Math.floor(rng()*L.length)]:null}
   function enemyTurn(ev){const b=boss(),d=diff(),plan=planTurn(),total=plan.reduce((a,m)=>a+m.segs,0);
-    B.enemy={i:0,total,plan,mi:0,si:0,cur:null};B.phase="enemy";ev("enemyTurn",{boss:b,total,moves:plan.length,plan:plan.map(m=>({kind:m.kind,segs:m.segs,name:m.name})),punish:plan.some(m=>m.punish),d:d.d})}
+    B.enemy={i:0,total,plan,mi:0,si:0,cur:null};B.phase="enemy";ev("enemyTurn",{boss:b,total,moves:plan.length,plan:plan.map(m=>({kind:m.kind,segs:m.segs,name:m.name,clip:m.clip})),punish:plan.some(m=>m.punish),d:d.d})}
   const cmds=()=>{return[{k:4,id:"flask",name:"藥壺",bars:0,hits:[],flask:true}]};
   /* ---- 突襲：攻擊回合中 Boss 搶先出手（每個玩家回合最多一次） ----
      機率＝ambushBase[第幾隻] ×（第二階段起 ambushPhaseMul）＋ 拖延加成（作答或猶豫超過 ambushSlackMs 的部分，每秒 ambushPerSec）＋ 喝藥加成，上限 ambushMax。
@@ -169,14 +173,14 @@ export function createSoulBattle({pool,mode,modes=null,rng=Math.random,ambushRng
       if(ok){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);B.fast=Math.min(B.fast,ms/1000);addStamina(SOUL.staminaHit);
         // 自動連斬：剩下的時間比例決定段數（剩 60% 以上＝完美＝5 連斬）；動作三組隨機一組
         const left=1-ms/B.win,lv=.1*pk("quick"),n=left>=SOUL.chainAt[0]-lv?5:left>=SOUL.chainAt[1]-lv?4:3,perfect=left>=SOUL.perfectAt-lv,hits=SOUL.chainHits[n],variant=Math.floor(rng()*3);
-        learn(w,ms);const C={n,hits,variant,perfect,landed:0,i:1,used:new Set([w.id]),name:(perfect?"完美・":"")+n+" 連斬"};
+        learn(w,ms);const C={n,hits,variant,perfect,landed:0,i:1,grades:[],used:new Set([w.id]),name:(perfect?"完美・":"")+n+" 連斬"};
         ev("skill",{move:"chain",skillId:"chain",name:C.name,n,variant,perfect,hitCount:n,totalDmg:0,mult:dmgMul(),target:boss().id});
-        if(slashHit(ev,C,0)){faint(ev);return out}
+        if(slashHit(ev,C,0,perfect?"perfect":"normal")){faint(ev);return out}
         // 突襲：第一刀之後被打斷，後面的斬擊都沒了
-        if(!opt.noAmbush&&arng()<ambushP(ms)){B.wstreak=0;ev("slashEnd",{landed:1,total:n,broken:true,interrupted:true});ambush(ev,"skill",{landed:1,total:n,ms});return out}
+        if(!opt.noAmbush&&arng()<ambushP(ms)){B.wstreak=0;ev("slashEnd",{landed:1,total:n,broken:true,interrupted:true,grades:C.grades.slice()});ambush(ev,"skill",{landed:1,total:n,ms});return out}
         // 第 2 刀起每一刀都要答一題複習題（nextSlash／answerSlash）
         if(n>1&&!opt.autoChain){B.chain=C;B.phase="slash";return out}
-        for(;C.i<n;C.i++)if(slashHit(ev,C,C.i)){faint(ev);return out} // opt.autoChain：測試用，整套直接砍完
+        for(;C.i<n;C.i++)if(slashHit(ev,C,C.i,"perfect")){faint(ev);return out} // opt.autoChain：測試用，整套直接砍完
         if(endChain(ev,C,false))return out;return out}
       else{B.combo=0;B.wstreak=0;requeue(w);ev("miss",{ms});if(!opt.noKnock&&knock(ev,"answer"))return out}
       B.phase="cmd";return out},
@@ -185,7 +189,7 @@ export function createSoulBattle({pool,mode,modes=null,rng=Math.random,ambushRng
       return{w,mode:mcOf(pickMode(B.mode,B.modes,w,rng)),limitMs:C.limitMs,index:C.i,total:C.n,review:why!=="new",why}},
     // 答對砍下這一刀；答錯或超時連斬中斷（不會被打倒，但這個字稍後再考）。複習題不扣攻擊時間
     answerSlash(ok,ms,opt={}){const out=[],ev=mk(out);if(B.phase!=="slashQ"||!B.chain)return out;const C=B.chain,w=B.w;B.n++;if(opt.timeout)ms=Math.max(ms,C.limitMs+1);record(ok,ms);
-      if(ok&&ms<=C.limitMs){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);learn(w,ms);if(slashHit(ev,C,C.i)){faint(ev);return out}C.i++;
+      if(ok&&ms<=C.limitMs){B.right++;B.combo++;B.best=Math.max(B.best,B.combo);learn(w,ms);if(slashHit(ev,C,C.i,ms<=C.limitMs*(1-SOUL.perfectAt)?"perfect":"normal")){faint(ev);return out}C.i++;
         if(C.i>=C.n){endChain(ev,C,false);return out}B.phase="slash";return out}
       B.combo=0;B.slashMiss++;requeue(w);ev("miss",{ms,slash:true,timeout:!!opt.timeout});endChain(ev,C,true);return out},
     // 題目顯示中時間用完
@@ -224,7 +228,7 @@ export function createSoulBattle({pool,mode,modes=null,rng=Math.random,ambushRng
       // 連擊越後面越快：彈反門檻跟著時限一起縮（高手也會被逼到翻滾）
       const noParry=kind==="dash"||kind==="danger",perfectMs=noParry?0:Math.round(limitMs*Math.min(.9,1-SOUL.perfectAt+.1*pk("parry"))); // 完美＝剩 60% 以上的時間就答對
       const lockMs=kind==="delayed"?Math.round(SOUL.delayLockMs[0]+rng()*(SOUL.delayLockMs[1]-SOUL.delayLockMs[0])):0;
-      const info={kind,seg,segs:m.segs,moveIndex:E.mi,moves:E.plan.length,chain:seg<m.segs-1,lockMs,noParry,danger:kind==="danger",ambush:!!E.ambush};
+      const info={kind,clip:m.clip||null,seg,segs:m.segs,moveIndex:E.mi,moves:E.plan.length,chain:seg<m.segs-1,lockMs,noParry,danger:kind==="danger",ambush:!!E.ambush};
       B.w=w;E.cur={limitMs,perfectMs,move:m.name,foeMul:d.foeMul,...info};B.phase="dodge";
       ev("telegraph",{boss:b,move:m.name,index:E.i,total:E.total,limitMs,perfectMs,...info});
       return{w,mode:mcOf(pickMode(B.mode,B.modes,w,rng)),limitMs,perfectMs,index:E.i,total:E.total,move:m.name,...info,events:out}},

@@ -1,6 +1,6 @@
 """v3 霜冠祭司：逐片段逐格檢查最低點（穿地）。開 source/v3_boss_priest.blend（與匯出的 GLB 同一套骨架與權重）。
 用法：blender --background --factory-startup --python v3_priest_ground.py -- [step=1（半格為單位）] [out.txt]
-每個片段列出：最低點 z（原始公尺；遊戲內 ×1.20）、哪一格、最低頂點的主要骨頭；P2 部件只在可見的片段段落計入（IdleAggro、PhaseShift 爆發後）。
+每個片段列出（v1.3.0 起二階新招 Smash／Leap／ComboB／Special 也計入 P2 部件）：最低點 z（原始公尺；遊戲內 ×1.20）、哪一格、最低頂點的主要骨頭；P2 部件只在可見的片段段落計入（IdleAggro、PhaseShift 爆發後）。
 """
 import bpy, sys, os
 import numpy as np
@@ -19,6 +19,7 @@ dom = np.array([gn[max(v.groups, key=lambda g: g.weight).group] if v.groups else
 rco = {}
 for o in rigid:
     c = np.empty(len(o.data.vertices) * 3); o.data.vertices.foreach_get("co", c); rco[o.name] = c.reshape(-1, 3)
+P2CLIPS = ("IdleAggro", "Smash", "Leap", "ComboB", "Special")   # v1.3.0：二階新招也顯示 P2 部件
 lines = []
 worst_all = 0.0
 for tr in arm.animation_data.nla_tracks:
@@ -38,8 +39,9 @@ for tr in arm.animation_data.nla_tracks:
         if z[i] < worst[0]:
             worst = (float(z[i]), f, dom[i])
         for o in rigid:
-            vis = o.name.startswith("X2_") or (o.name.startswith("P2_") and (tr.name == "IdleAggro" or (tr.name == "PhaseShift" and f >= 36)))
-            if o.name.startswith("X2_") and (tr.name == "IdleAggro" or (tr.name == "PhaseShift" and f >= 36)):
+            p2on = tr.name in P2CLIPS or (tr.name == "PhaseShift" and f >= 36)
+            vis = o.name.startswith("X2_") or (o.name.startswith("P2_") and p2on)
+            if o.name.startswith("X2_") and p2on:
                 vis = False
             if not vis:
                 continue

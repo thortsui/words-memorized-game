@@ -9,11 +9,16 @@ except Exception:
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERO = ["Idle", "Walk", "Slash", "HeavySlash", "Combo", "Roll", "Parry", "Guard", "Hit", "Die", "Victory",
-        "Run", "StrafeL", "StrafeR", "DodgeBack", "HitHeavy", "Cast"]
+        "Run", "StrafeL", "StrafeR", "DodgeBack", "HitHeavy", "Cast",
+        # v1.3.0：連續連斬（依判定接續）＋其他動作
+        "ChainReady", "ChainP1", "ChainP2", "ChainP3", "ChainP4", "ChainN1", "ChainN2", "ChainN3", "ChainN4",
+        "FinishAll", "FinishP", "FinishN", "ChainBreak", "ChainRecover", "AssaultA", "AssaultB", "AssaultEnd",
+        "Execution", "Riposte", "Deflect", "SideL", "SideR", "Drink", "GetUp", "BattleCry"]
 BOSS = ["Idle", "Enter", "Telegraph", "Attack", "Attack2", "Hit", "Stagger", "PhaseShift", "Die",
-        "Stalk", "StrafeL", "StrafeR", "IdleAggro", "Combo3", "Delayed", "Dash", "Roar"]
+        "Stalk", "StrafeL", "StrafeR", "IdleAggro", "Combo3", "Delayed", "Dash", "Roar",
+        "Sweep", "Smash", "Leap", "ComboB", "Special"]   # v1.3.0：每階段 2–3 種新招
 MODELS = {"hero_knight": HERO, "boss_sentinel": BOSS, "boss_executioner": BOSS,
-          "boss_gargoyle": BOSS, "boss_priest": BOSS, "boss_devourer": BOSS + ["PhaseShift2"]}
+          "boss_gargoyle": BOSS, "boss_priest": BOSS, "boss_devourer": BOSS + ["PhaseShift2", "ComboC", "Special3"]}
 CLIPMETA = json.load(open(os.path.join(ROOT, "src", "battle", "view3d", "clipmeta.json"), encoding="utf-8"))
 BONES = ["Root", "Hips", "Spine", "Spine2", "Neck", "Head", "Weapon"] + [b + s for b in
          ("Shoulder", "UpperArm", "Forearm", "Hand", "Thigh", "Shin", "Foot") for s in "LR"]

@@ -16,7 +16,7 @@ from mathutils import Vector
 from soul_humanoid_anim import W, HW, gait
 
 
-def build(rig, weapon, primary="sweep", slow=1.0, only=None, wide=1.0, dash="thrust", phase=None):
+def build(rig, weapon, primary="sweep", slow=1.0, only=None, wide=1.0, dash="thrust", phase=None, extra=None):
     """phase(K, T, I, IA, wide) -> (keys, hits)：自訂 PhaseShift（v2：蓄力→爆發→新姿態，結尾＝IdleAggro 起始）。"""
     P = rig.P
     FL, FLr, FR, FRr = (0.10 * wide, -0.22, 0), (10, 0, 0), (-0.12 * wide, 0.24, 0), (-45, 0, 0)
@@ -39,12 +39,15 @@ def build(rig, weapon, primary="sweep", slow=1.0, only=None, wide=1.0, dash="thr
         rig.reach_off = (0.0, 0.0, 0.0)
         return p
 
-    def A(name, keys, loop=False, hits=None, lag=None):
+    def A(name, keys, loop=False, hits=None, lag=None, cancel=None):
+        """cancel（v1.3.0）：可接下一招的格號（跟隨已完成），寫進 meta 的 "cancel"（秒）。hits 可寫 (格, 骨頭) 指定量測部位。"""
         if only and name not in only:
             return
         keys = [(round(k[0] * slow),) + tuple(k[1:]) for k in keys]
-        hits = [round(h * slow) for h in hits] if hits else None
+        hits = [((round(h[0] * slow), h[1]) if isinstance(h, tuple) else round(h * slow)) for h in hits] if hits else None
         rig.action(name, keys, loop, hits=hits, lag=lag)
+        if cancel is not None:
+            rig.meta[name]["cancel"] = round(round(cancel * slow) / rig.fps, 3)
 
     def idle(dz=0.0, lean=0.0, key="idle", sx=0.0, yaw=0.0, roll=0.0, off=None):
         return K(key, hips=(sx, 0, -0.05 + dz), hr=(4 + lean, roll, -18 + yaw), sp=(3 + lean * 0.5, -roll * 0.5, -5), ch=(3 + lean * 0.5, 0, -4), nod=1,
@@ -227,3 +230,7 @@ def build(rig, weapon, primary="sweep", slow=1.0, only=None, wide=1.0, dash="thr
     fall = K("fall", hips=(0.02, -0.34, -0.80 + rig.lie_dz), hr=(84, 0, 6), sp=(2, 0, 0), ch=(0, 0, 0), look=40, nod=-6, **lie)
     bnc = K("fall", hips=(0.02, -0.34, -0.76 + rig.lie_dz), hr=(80, 0, 6), sp=(3, 0, 0), ch=(1, 0, 0), look=30, nod=-10, **lie)
     A("Die", [(0, I), (5, d1, "out"), (14, d1, "io"), (21, kn, "in"), (39, kn2, "io"), (50, fall, "in3"), (54, bnc, "out"), (59, fall, "in"), (80, fall, "io")])
+
+    # ---------------------------------------------------------------- v1.3.0：每階段新招（Sweep／Smash／Leap／ComboB／Special），由各 Boss 的 extra 提供
+    if extra:
+        extra(K, T, I, IA, A, wide)

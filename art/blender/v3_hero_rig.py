@@ -96,15 +96,19 @@ class V3Rig(Rig):
 
     CHAIN_OVERRIDE = {"HitHeavy": dict(floor=0.36), "Roll": dict(stiff=0.06, damp=0.90, floor=0.36, colliders=[("Hips", "Spine2", 0.34), ("ThighL", "ShinL", 0.16), ("ThighR", "ShinR", 0.16), ("ShinL", "FootL", 0.12), ("ShinR", "FootR", 0.12)])}
 
-    def action(self, name, keys, *a, **kw):
-        """翻滾時披風跟身體貼得較緊（布料模擬改硬），避免倒立那幾格穿身／入地。"""
+    def action(self, name, keys, *a, cancel=None, **kw):
+        """翻滾時披風跟身體貼得較緊（布料模擬改硬），避免倒立那幾格穿身／入地。
+        cancel（v4 新增）：可接下一招的格號（原 keys 的格號），換算成秒寫進 meta[name]["cancel"]。"""
         ov = self.CHAIN_OVERRIDE.get(name)
         saved = [dict(c) for c in self.chains]
         if ov:
             for c in self.chains:
                 c.update(ov)
         try:
-            return super().action(name, keys, *a, **kw)
+            act = super().action(name, keys, *a, **kw)
         finally:
             for c, s in zip(self.chains, saved):
                 c.clear(); c.update(s)
+        if cancel is not None and name in self.meta:
+            self.meta[name]["cancel"] = round((cancel - keys[0][0]) / self.fps, 3)
+        return act
