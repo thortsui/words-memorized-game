@@ -61,17 +61,25 @@ for i,b in enumerate(T['boss']):
     add(taiko(1.4,.8),b); stab([m for m in chords[i]],b,.32); shing(b+.6,.15)
     for k in range(1,5): add(taiko(.45 if k%2 else .6),b+k)
     if i==4: [add(taiko(.5),b+4+j*.25) for j in range(4)]
-# 操作說明：輕一點
-drone([D-12,D-5],43,48.2,a=.4,r=.5,g=.09,cut=600)
-for j,k in enumerate([0,2,3,4,2,5,4,6]): add(pluck(D+12+pent[k],1.5),43.2+j*.55,(-1)**j*.25,.38)
+# 對決：出題時滴答聲，選擇時一聲，答對＝鼓＋金屬聲，答錯＝不和諧重擊
+drone([D-12,D-11],T['duel'],T['mont']+.2,a=.3,r=.4,g=.09,cut=500)
+def tick(t,g=.2):
+    n=int(.05*SR); s=np.sin(2*np.pi*2400*np.arange(n)/SR)*np.exp(-np.arange(n)/SR*90); add(s,t,.2,g)
+for b0,du,kind,hit,_ in T['beats']:
+    for j in range(6): tick(b0+.1+j*.25,.18)
+    tick(b0+1.6,.45); add(taiko(.5,1.3),b0+1.6)
+    ht=b0+2.4+hit
+    if kind=='ok': add(taiko(1.3),ht); shing(ht,.3); stab([D-12,D-5,D+2],ht,.28)
+    else: add(taiko(1.6,.6),ht); stab([D-12,D-11,D-6],ht,.45); add(gong(3.)*.5,ht)
+add(taiko(1.2),T['slogan']); stab([D-12,D-5,D],T['slogan'],.3)
 # 剪輯高潮：每個剪接點一記鼓＋弦樂快速頓音
-drone([D-12,D-5,D],48,56,a=.2,r=.1,g=.15,cut=900)
+drone([D-12,D-5,D],T['mont'],T['black'],a=.2,r=.1,g=.15,cut=900)
 for c in T['cuts']: add(taiko(1.1),c)
-t=48.0
-while t<55.9:
+t=T['mont']
+while t<T['black']-.1:
     s=saw(D-12,.12); s=lp(s,1200)*env(len(s),.003,.06); add(s,t,g=.35); t+=.125
 for w in T['words']: shing(w[0],.22)
-riser(53.5,56,.25)
+riser(T['black']-2.5,T['black'],.25)
 # 收尾：停頓→銅鑼＋巨鼓
 add(gong(),T['title']-.02,0,.9); add(taiko(1.8,.7),T['title']); stab([D-24,D-12,D-5],T['title'],.4)
 drone([D-12,D-5],T['title'],T['total'],a=.1,r=5,g=.12,cut=350)

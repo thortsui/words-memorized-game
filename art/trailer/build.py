@@ -33,8 +33,11 @@ add('c_hook',3,ovs=[('n4',.1,2.9,.25),('n5',1.5,2.9,.15)])
 # 18–43 五隻 Boss 登場
 for i,ss in enumerate([4.0,32.5,62.5,94.0,117.5]):
     add(f'd_boss{i+1}',5,'raw_soul.mp4',ss,ovs=[(f'boss{i+1}',.6,4.85,.35)],fin=.15,fout=.15)
-# 43–48 玩法說明（實際題目畫面）
-add('e_ui',5,'raw_ui.mp4',14.5,ovs=[('ui1',.3,4.8,.4)],fin=.3,fout=.3,place=(1161,679,150))
+# 對決：題目卡（1.6 秒）→選擇（0.8 秒）→結果（答對出劍／答錯受擊）
+for n,(b0,du,kind,hit,ans) in enumerate(T['beats']):
+    q=f'q{n+1}';res=['r_ok1','r_bad','r_ok2'][n]
+    add(f'e_d{n+1}',du,'raw_duel4.mp4',round(ans-2.4,2),ovs=[(q,0,1.66,.2),(q+'s',1.6,2.4,.06),(res,2.45,du-.05,.18)],fin=.15,fout=.1)
+add('e_slo',2.2,ovs=[('slogan',.1,2.15,.25)])
 # 48–56 剪輯高潮
 picks=[10.7,18.5,24.7,40.2,48.6,51.8,69.6,79.5,82.8,98.6,105.6,121.6,127.6,138.6]
 cuts=T['cuts']+[T['black']]
