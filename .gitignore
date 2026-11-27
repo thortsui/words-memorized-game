@@ -32,3 +32,4 @@ art/v2/shots/**/raw/
 art/blender/source/v3*.blend
 art/blender/source/*.blend1
 art/v3/tmp/
+_claude/
