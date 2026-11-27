@@ -71,7 +71,8 @@ export function createPhaseShow({eng,fx,bfx,getBoss}){
   // 顯示到第 form 型態（2＝二階、3＝三階）；回傳這次新出現的節點數
   function reveal(a,form,pop=true){const st=stateOf(a);st.form=Math.max(st.form,form);let c=0;
     // 三階要「消失」的原部件（例：devourer 原本的長角 HornLongR 換成斷角 P3_HornBroken）；命名 X3_* 亦同
-    if(st.form>=3&&st.content)st.content.traverse(o=>{if(/^(HornLongR|X3_)/.test(o.name))o.visible=false});
+    // X2_*：二階起消失；X3_*（及 devourer 舊長角 HornLongR）：三階起消失
+    if(st.form>=2&&st.content)st.content.traverse(o=>{if(/^X2_/.test(o.name)||(st.form>=3&&/^(HornLongR|X3_)/.test(o.name)))o.visible=false});
     for(const n of st.nodes)if(!n.shown&&n.form<=st.form){n.shown=true;n.set=false;n.pop=pop&&!eng.dead?0:-1;if(!pop){n.o.scale.copy(n.tgt)}c++}
     return c}
 
