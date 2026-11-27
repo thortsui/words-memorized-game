@@ -26,3 +26,6 @@ tests/smoke-*.png
 
 dist-claude/
 宣傳片/
+art/blender/source/v2*.blend
+art/v2/shots/**/_raw/
+art/v2/shots/**/raw/

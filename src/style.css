@@ -255,7 +255,20 @@ body.inbattle header{display:none}body.inbattle main{padding:8px max(2vw,8px) 8p
 .v3-banner span{font:900 clamp(20px,5.2vw,30px)/1.2 "Noto Sans TC",sans-serif;padding:6px 22px;letter-spacing:.08em}
 .v3-banner.cute span{background:#14163d;color:#ffd23f;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 3px #14163d;transform:rotate(-3deg)}
 .v3-banner.soul span{color:#e8e4dc;font-weight:500;letter-spacing:.4em;background:linear-gradient(90deg,transparent,rgb(0 0 0/.72) 20%,rgb(0 0 0/.72) 80%,transparent);padding:10px 56px;text-shadow:0 0 8px #000}
-.v3-banner.soul.phase span{color:#ff8a70}
+/* 階段名：水墨筆刷橫幅（phaseShow.js 加上 ph-<boss>／p3 類別；筆刷 0.3 s 由左展開，fx.banner 負責停留與淡出） */
+.v3-banner.soul.phase{--ph:#ff8a70;top:15%}
+.v3-banner.soul.phase span{position:relative;color:var(--ph);font:900 clamp(24px,6.4vw,40px)/1.15 "Noto Serif TC","Noto Sans TC",serif;letter-spacing:.32em;padding:18px 60px 18px calc(60px + .32em);background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 80' preserveAspectRatio='none'><path fill='%230b0a0f' fill-opacity='.92' d='M4 46C30 26 96 17 170 19C246 14 330 18 392 30L386 37C396 44 384 53 362 57C300 67 206 65 116 63C66 63 26 61 9 55L14 50Z'/><path fill='%230b0a0f' fill-opacity='.55' d='M20 24C90 12 200 10 300 13L298 16C200 15 100 18 22 28ZM40 66C140 70 260 71 350 64L348 68C250 75 140 74 42 70Z'/><circle cx='396' cy='26' r='3' fill='%230b0a0f'/><circle cx='8' cy='60' r='2.4' fill='%230b0a0f'/><circle cx='372' cy='66' r='1.8' fill='%230b0a0f'/></svg>") center/100% 100% no-repeat;text-shadow:0 0 14px color-mix(in srgb,var(--ph) 60%,transparent),0 2px 3px #000;animation:v3phIn .3s cubic-bezier(.2,.8,.3,1) both}
+.v3-banner.soul.phase span::after{content:"";position:absolute;left:14%;right:14%;bottom:13px;height:2px;background:linear-gradient(90deg,transparent,var(--ph),transparent);opacity:.7}
+.v3-banner.soul.phase.ph-sentinel{--ph:#7dffb0}
+.v3-banner.soul.phase.ph-gargoyle{--ph:#ff8a3a}
+.v3-banner.soul.phase.ph-priest{--ph:#8fe3ff}.v3-banner.soul.phase.ph-priest span{font-weight:500;letter-spacing:.42em}
+.v3-banner.soul.phase.ph-executioner{--ph:#b07aff}.v3-banner.soul.phase.ph-executioner span{letter-spacing:.36em}
+.v3-banner.soul.phase.ph-executioner span::before{content:"";position:absolute;left:57%;top:-8px;bottom:-8px;width:3px;background:linear-gradient(transparent,#efe4ff 30%,#efe4ff 70%,transparent);transform:rotate(26deg);box-shadow:0 0 10px var(--ph);animation:v3phCut .22s .18s ease-out both}
+.v3-banner.soul.phase.ph-devourer{--ph:#ff3a2a}.v3-banner.soul.phase.ph-devourer span{-webkit-text-stroke:.8px #ffd27a}
+.v3-banner.soul.phase.ph-devourer.p3 span{font-size:clamp(29px,7.7vw,48px);color:#ff3a2a;background-color:transparent;filter:drop-shadow(0 0 10px #000);-webkit-text-stroke:0;text-shadow:0 0 18px #ff3a2a,0 2px 3px #000;animation:v3phIn .3s cubic-bezier(.2,.8,.3,1) both,v3phShake .45s .3s linear both}
+@keyframes v3phIn{from{clip-path:inset(0 100% 0 0);transform:scale(1.06)}to{clip-path:inset(0 0 0 0);transform:none}}
+@keyframes v3phCut{from{opacity:0;transform:rotate(26deg) scaleY(0)}to{opacity:1;transform:rotate(26deg) scaleY(1)}}
+@keyframes v3phShake{0%,100%{transform:none}15%{transform:translate(-3px,1px)}30%{transform:translate(3px,-2px)}45%{transform:translate(-2px,2px)}60%{transform:translate(2px,-1px)}80%{transform:translate(-1px,1px)}}
 /* 全畫面暈影：不透明度由程式設定 */
 .v3-vig{position:absolute;inset:0;opacity:0;will-change:opacity}
 .v3-vig.red{background:radial-gradient(ellipse at center,transparent 45%,rgb(200 20 10/.75) 100%)}
@@ -604,3 +617,4 @@ header nav a.on{color:#f6d88f;background:rgba(201,162,74,.16)}
 .bwrap.soul .ansline.no{background:linear-gradient(90deg,rgb(120 30 24/.5),rgb(30 12 10/.6));border:1px solid rgb(224 69 58/.35);color:#f3d6d0}
 .bwrap.soul .ansline .w{color:#f0cf7a}
 @media(max-height:700px){.bwrap.soul .bprompt.en{font-size:26px}.bwrap.soul .bopts{gap:7px;margin-top:9px}.bwrap.soul .bopts button{min-height:46px;font-size:14.5px;padding:6px 24px 6px 10px}.bwrap.soul .bopts button.long{font-size:12.5px}.bwrap.soul .bqcard{padding:10px 12px 12px}}
+@media (prefers-reduced-motion:reduce){.v3-banner.soul.phase.ph-devourer.p3 span{animation:v3phIn .3s ease-out both}}

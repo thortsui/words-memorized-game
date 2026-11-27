@@ -1,0 +1,103 @@
+{
+ "tag": "before",
+ "W": 1280,
+ "H": 800,
+ "lock": "high",
+ "answered": 11,
+ "shots": [
+  {
+   "k": "0-0",
+   "fps": 45,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "0-1",
+   "fps": 47,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "1-0",
+   "fps": 45,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "1-1",
+   "fps": 42,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "2-0",
+   "fps": 51,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "2-1",
+   "fps": 45,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "3-0",
+   "fps": 51,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "3-1",
+   "fps": 44,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "4-0",
+   "fps": 47,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "4-1",
+   "fps": 50,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "4-2",
+   "fps": 42,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  }
+ ],
+ "fps": {
+  "n": 89,
+  "min": 8,
+  "p10": 28,
+  "median": 43,
+  "avg": 40.8,
+  "max": 59,
+  "maxGapMs": 2420,
+  "dprs": [
+   2
+  ],
+  "qualities": [
+   "high"
+  ]
+ },
+ "err": [],
+ "con": []
+}

@@ -13,7 +13,7 @@ HERO = ["Idle", "Walk", "Slash", "HeavySlash", "Combo", "Roll", "Parry", "Guard"
 BOSS = ["Idle", "Enter", "Telegraph", "Attack", "Attack2", "Hit", "Stagger", "PhaseShift", "Die",
         "Stalk", "StrafeL", "StrafeR", "IdleAggro", "Combo3", "Delayed", "Dash", "Roar"]
 MODELS = {"hero_knight": HERO, "boss_sentinel": BOSS, "boss_executioner": BOSS,
-          "boss_gargoyle": BOSS, "boss_priest": BOSS, "boss_devourer": BOSS}
+          "boss_gargoyle": BOSS, "boss_priest": BOSS, "boss_devourer": BOSS + ["PhaseShift2"]}
 CLIPMETA = json.load(open(os.path.join(ROOT, "src", "battle", "view3d", "clipmeta.json"), encoding="utf-8"))
 BONES = ["Root", "Hips", "Spine", "Spine2", "Neck", "Head", "Weapon"] + [b + s for b in
          ("Shoulder", "UpperArm", "Forearm", "Hand", "Thigh", "Shin", "Foot") for s in "LR"]

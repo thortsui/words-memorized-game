@@ -34,7 +34,7 @@ export function createEngine(container,{reducedMotion=false}={}){
   const camera=new THREE.PerspectiveCamera(45,1,.1,200);
   const E={THREE,renderer,scene,camera,canvas,overlay,wrap,container,rm:reducedMotion,
     dead:false,time:0,timeScale:1,dpr:baseDpr,quality:"high",fps:0,width:1,height:1,aspect:1,
-    onResize:[],onQuality:[],post:null};
+    onResize:[],onQuality:[],post:null,screen:null}; // screen：魂系畫面層 API（screen2.js 建立；其他場景為 null，呼叫端用 eng.screen&&eng.screen.flash(...)）
   // 後製（場景呼叫 E.usePost 開啟）；低畫質或 context 遺失時直接畫到螢幕
   E.usePost=o=>{try{E.post=createPost(E,o);if(E.width>1)E.post.setSize(E.width,E.height)}catch(e){console.warn("[view3d] post",e);E.post=null}};
   E.render=dt=>{if(E.post&&E.quality!=="low"){try{E.post.render(dt);return}catch(e){console.warn("[view3d] post render",e);E.post=null}}renderer.render(scene,camera)};

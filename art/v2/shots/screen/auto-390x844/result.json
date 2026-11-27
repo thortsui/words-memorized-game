@@ -1,0 +1,397 @@
+{
+ "tag": "auto",
+ "W": 390,
+ "H": 844,
+ "lock": "none",
+ "answered": 11,
+ "shots": [
+  {
+   "k": "0-0",
+   "fog": "18211f/0.046",
+   "bg": "18211f",
+   "scr": {
+    "mood": {
+     "vig": 0.38,
+     "sat": 0.9,
+     "bloom": 0.7,
+     "ink": 0,
+     "amb": 1,
+     "ambTint": 0,
+     "parts": 1,
+     "rim": 1,
+     "halo": 1
+    },
+    "phase": 0,
+    "boss": "sentinel",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "gate_ruins",
+     "n": 260,
+     "a": 0.6
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 79,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "0-1",
+   "fog": "142512/0.056",
+   "bg": "142512",
+   "scr": {
+    "mood": {
+     "vig": 0.46,
+     "sat": 0.86,
+     "bloom": 0.78,
+     "ink": 0.2,
+     "amb": 0.85,
+     "ambTint": 0.12,
+     "parts": 1.3,
+     "rim": 1.2,
+     "halo": 1.1
+    },
+    "phase": 1,
+    "boss": "sentinel",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "gate_ruins",
+     "n": 338,
+     "a": 0.6
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 71,
+   "q": "high",
+   "dpr": 2,
+   "calls": 1
+  },
+  {
+   "k": "1-0",
+   "fog": "151b28/0.044",
+   "bg": "151b28",
+   "scr": {
+    "mood": {
+     "vig": 0.38,
+     "sat": 0.9,
+     "bloom": 0.7,
+     "ink": 0,
+     "amb": 1,
+     "ambTint": 0,
+     "parts": 1,
+     "rim": 1,
+     "halo": 1
+    },
+    "phase": 0,
+    "boss": "gargoyle",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "cathedral_roof",
+     "n": 260,
+     "a": 0.42
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 144,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "1-1",
+   "fog": "2b1815/0.054",
+   "bg": "2b1815",
+   "scr": {
+    "mood": {
+     "vig": 0.46,
+     "sat": 0.86,
+     "bloom": 0.78,
+     "ink": 0.2,
+     "amb": 0.85,
+     "ambTint": 0.12,
+     "parts": 1.3,
+     "rim": 1.2,
+     "halo": 1.1
+    },
+    "phase": 1,
+    "boss": "gargoyle",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "cathedral_roof",
+     "n": 338,
+     "a": 0.42
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 120,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "2-0",
+   "fog": "1b2a37/0.050",
+   "bg": "1b2a37",
+   "scr": {
+    "mood": {
+     "vig": 0.38,
+     "sat": 0.9,
+     "bloom": 0.7,
+     "ink": 0,
+     "amb": 1,
+     "ambTint": 0,
+     "parts": 1,
+     "rim": 1,
+     "halo": 1
+    },
+    "phase": 0,
+    "boss": "priest",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "frozen_chapel",
+     "n": 260,
+     "a": 0.75
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 122,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "2-1",
+   "fog": "1a2d35/0.061",
+   "bg": "1a2d35",
+   "scr": {
+    "mood": {
+     "vig": 0.46,
+     "sat": 0.86,
+     "bloom": 0.78,
+     "ink": 0.2,
+     "amb": 0.85,
+     "ambTint": 0.12,
+     "parts": 1.3,
+     "rim": 1.2,
+     "halo": 1.1
+    },
+    "phase": 1,
+    "boss": "priest",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "frozen_chapel",
+     "n": 338,
+     "a": 0.75
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 116,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "3-0",
+   "fog": "1d1727/0.050",
+   "bg": "1d1727",
+   "scr": {
+    "mood": {
+     "vig": 0.38,
+     "sat": 0.9,
+     "bloom": 0.7,
+     "ink": 0,
+     "amb": 1,
+     "ambTint": 0,
+     "parts": 1,
+     "rim": 1,
+     "halo": 1
+    },
+    "phase": 0,
+    "boss": "executioner",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "execution_yard",
+     "n": 260,
+     "a": 0.6
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 141,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "3-1",
+   "fog": "241436/0.061",
+   "bg": "241436",
+   "scr": {
+    "mood": {
+     "vig": 0.46,
+     "sat": 0.86,
+     "bloom": 0.78,
+     "ink": 0.2,
+     "amb": 0.85,
+     "ambTint": 0.12,
+     "parts": 1.3,
+     "rim": 1.2,
+     "halo": 1.1
+    },
+    "phase": 1,
+    "boss": "executioner",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "execution_yard",
+     "n": 338,
+     "a": 0.6
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 143,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "4-0",
+   "fog": "24130f/0.050",
+   "bg": "24130f",
+   "scr": {
+    "mood": {
+     "vig": 0.38,
+     "sat": 0.9,
+     "bloom": 0.7,
+     "ink": 0,
+     "amb": 1,
+     "ambTint": 0,
+     "parts": 1,
+     "rim": 1,
+     "halo": 1
+    },
+    "phase": 0,
+    "boss": "devourer",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "throne_of_words",
+     "n": 260,
+     "a": 0.62
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 125,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "4-1",
+   "fog": "330b08/0.061",
+   "bg": "330b08",
+   "scr": {
+    "mood": {
+     "vig": 0.46,
+     "sat": 0.86,
+     "bloom": 0.78,
+     "ink": 0.2,
+     "amb": 0.85,
+     "ambTint": 0.12,
+     "parts": 1.3,
+     "rim": 1.2,
+     "halo": 1.1
+    },
+    "phase": 1,
+    "boss": "devourer",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "throne_of_words",
+     "n": 338,
+     "a": 0.62
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 120,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  },
+  {
+   "k": "4-2",
+   "fog": "360805/0.072",
+   "bg": "360805",
+   "scr": {
+    "mood": {
+     "vig": 0.55,
+     "sat": 0.8,
+     "bloom": 0.85,
+     "ink": 0.55,
+     "amb": 0.7,
+     "ambTint": 0.25,
+     "parts": 1.5,
+     "rim": 1.4,
+     "halo": 1.2
+    },
+    "phase": 2,
+    "boss": "devourer",
+    "lite": false,
+    "quality": "high",
+    "pulses": [],
+    "amb": {
+     "key": "throne_of_words",
+     "n": 390,
+     "a": 0.62
+    }
+   },
+   "vig": "red:,blue:0,white:,dark:0,danger:",
+   "fps": 90,
+   "q": "high",
+   "dpr": 1,
+   "calls": 1
+  }
+ ],
+ "fps": {
+  "n": 90,
+  "min": 11,
+  "p10": 64,
+  "median": 120,
+  "avg": 107.6,
+  "max": 144,
+  "maxGapMs": 2483,
+  "dprs": [
+   2,
+   1
+  ],
+  "qualities": [
+   "high"
+  ]
+ },
+ "err": [],
+ "con": [
+  {
+   "t": 80755,
+   "ty": "warning",
+   "text": "[view3d] tween TypeError: at is not a function\n    at sig (http://127.0.0.1:5183/src/battle/view3d/phaseShow.js?t=1795760102030:206:28)\n    at doBurst (http://127.0.0.1:5183/src/battle/view3d/phaseShow.js?t=1795760102030:182:7)\n    at tick (http://127.0.0.1:5183/src/battle/view3d/phaseShow.js?t=1795760102030:156:35)\n    at Object.fn (http://127.0.0.1:5183/src/battle/view3d/phaseShow.js?t=1795760102030:224:38)\n    at frame (http://127.0.0.1:5183/src/battle/view3d/engine.js?t=1795759864932:125:24)",
+   "loc": "http://127.0.0.1:5183/src/battle/view3d/engine.js?t=1795759864932"
+  }
+ ]
+}
